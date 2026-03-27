@@ -1,0 +1,990 @@
+﻿<%@ Master Language="C#" AutoEventWireup="true" CodeBehind="TPMMaster.Master.cs" Inherits="FSM.TPMMaster" %>
+
+<%@ Register Assembly="System.Web.Optimization" Namespace="System.Web.Optimization" TagPrefix="webopt" %>
+
+<!DOCTYPE html>
+<html lang="en">
+<head runat="server">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%: Page.Title %> - TPM </title>
+
+
+    <link rel="icon" type="image/svg+xml" href="~/xceleran.svg" />
+    <!-- jQuery first -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <!-- jQuery UI (optional if used) -->
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css" />
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- DataTables Responsive -->
+    <script src="https://cdn.datatables.net/responsive/3.0.2/js/dataTables.responsive.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/responsive/3.0.2/css/responsive.dataTables.min.css" />
+
+    <!-- Site-wide styles -->
+    <link rel="stylesheet" href="Content/Site.css" />
+
+    <style>
+        /* Modal styling for timeout, settings, logout confirmation, and sidebar logout confirmation */
+        #timeoutModal, #settingsModal, #logoutNotification, #sidebarLogoutConfirmation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-contents, .notification-content, .sidebar-logout-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            width: 450px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+            .modal-contents h3, .notification-content h3, .sidebar-logout-content h3 {
+                font-size: 1.5em;
+                color: #333;
+                margin-bottom: 10px;
+            }
+
+            .modal-contents p, .notification-content p, .sidebar-logout-content p {
+                color: #666;
+                font-size: 1em;
+                margin-bottom: 20px;
+                border-bottom: 1px solid #f39c12;
+                padding: 25px;
+            }
+
+            .modal-contents button, .notification-content button, .sidebar-logout-content button {
+                padding: 10px 20px;
+                margin: 10px;
+                border: none;
+                border-radius: 5px;
+                font-size: 1em;
+                cursor: pointer;
+            }
+
+                .modal-contents button:first-child, .notification-content button:first-child, .sidebar-logout-content button:first-child {
+                    background-color: #4CAF50;
+                    color: white;
+                }
+
+                .modal-contents button:last-child, .notification-content button:last-child, .sidebar-logout-content button:last-child {
+                    background-color: #f44336;
+                    color: white;
+                }
+
+        /* Close Icon Styling */
+        .close-icon {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 1.5em;
+            color: #333;
+            cursor: pointer;
+            user-select: none;
+        }
+
+            .close-icon:hover {
+                color: #f44336;
+            }
+
+        /* Logout Notification Specific Styling */
+        .notification-content p, .sidebar-logout-content p {
+            color: #333;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            border-bottom: none;
+            padding: 0;
+        }
+
+        /* Sidebar Logout Confirmation Branding */
+        .sidebar-logout-content .branding {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+            .sidebar-logout-content .branding h6 {
+                font-size: 0.9em;
+                color: #666;
+                margin-bottom: 10px;
+            }
+
+            .sidebar-logout-content .branding img {
+                max-width: 100px;
+                height: auto;
+            }
+
+        /* Timeout Duration Input Styling */
+        #timeoutDuration {
+            width: 60px;
+            padding: 8px;
+            border: 2px solid #4CAF50;
+            border-radius: 5px;
+            font-size: 16px;
+            color: #333;
+            background-color: #f9f9f9;
+            outline: none;
+            transition: border-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        }
+
+            #timeoutDuration:focus {
+                border-color: #2E7D32;
+                box-shadow: 0 0 5px rgba(46, 125, 50, 0.5);
+            }
+
+            #timeoutDuration::-webkit-inner-spin-button,
+            #timeoutDuration::-webkit-outer-spin-button {
+                -webkit-appearance: none;
+                margin: 0;
+            }
+
+            #timeoutDuration:hover {
+                background-color: #e8f5e9;
+            }
+               #sidebar.sidebar-collapsed .hover-trigger:hover .hover-card,
+        #sidebar.sidebar-collapsed .hover-trigger .hover-bridge:hover + .hover-card,
+        #sidebar.sidebar-collapsed .hover-trigger .hover-card:hover {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .submenu-circle {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.5rem;
+            background-color: currentColor;
+        }
+        /* Advanced Settings Buttons */
+    </style>
+</head>
+<body runat="server" id="bodyTag">
+    <form runat="server">
+        <asp:ScriptManager runat="server" EnablePageMethods="true">
+            <Scripts>
+                <asp:ScriptReference Name="MsAjaxBundle" />
+                <asp:ScriptReference Path="~/Scripts/WebForms/WebForms.js" />
+                <asp:ScriptReference Path="~/Scripts/WebForms/WebUIValidation.js" />
+                <asp:ScriptReference Path="~/Scripts/WebForms/MenuStandards.js" />
+                <asp:ScriptReference Path="~/Scripts/WebForms/GridView.js" />
+                <asp:ScriptReference Path="~/Scripts/WebForms/DetailsView.js" />
+                <asp:ScriptReference Path="~/Scripts/WebForms/TreeView.js" />
+                <asp:ScriptReference Path="~/Scripts/WebForms/WebParts.js" />
+                <asp:ScriptReference Path="~/Scripts/WebForms/Focus.js" />
+            </Scripts>
+        </asp:ScriptManager>
+        <div class="page-container">
+            <div class="right-logo">
+                <img style="display:none;" src="https://testsite.myserviceforce.com/fsm/images/FMSXceleran.png" alt="Xceleran Logo" class="right-logo-img">
+                <%-- <img src="https://central.xceleran.com/fsm/images/FMSXceleran.png" alt="Xceleran Logo" class="right-logo-img">--%>
+            </div>
+            <aside id="sidebar" class="sidebar">
+                <div class="sidebar-logo <%= LogoContainerClass %>">
+                    <img id="sidebar-logo-img" src="<%= SidebarLogoUrl %>" alt="Company Logo" class="sidebar-logo-img">
+                </div>
+                <nav class="sidebar-nav">
+                    <ul class="sidebar-nav-list">
+                        <li id="dashboard-link" class="sidebar-nav-item">
+                            <a href="Dashboard.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
+                                <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                                </svg>
+                                <span class="sidebar-text">Dashboard</span>
+                            </a>
+                        </li>
+
+                        <li id="AppoinementList-link" class="sidebar-nav-item">
+                            <a href="AppoinementList.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="New Work Orders">
+                                <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 2v4M16 2v4M3 10h18M5 6h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2zM9 14h6M11 18h2"></path>
+                                </svg>
+                                <span class="sidebar-text">New Work Orders</span>
+                            </a>
+                        </li>
+                        
+                              
+                         <li id="TpList-link" class="sidebar-nav-item">
+                                <a href="TpList.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Third Party Providers">
+                                    <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    <span class="sidebar-text">Third Party Providers</span>
+                                </a>
+                            </li>
+                        <li id="customers-link" class="sidebar-nav-item">
+                            <a href="Customer.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Service Locations">
+                                <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                </svg>
+                                <span class="sidebar-text">Service Locations</span>
+                            </a>
+                        </li>
+                           <li id="item-link" class="sidebar-nav-item">
+                            <a href="Dashboard.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Policy Holder Portal">
+                                <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01m-.01 4h.01"></path>
+                                </svg>
+                                <span class="sidebar-text">Policy Holder Portal</span>
+                            </a>
+                        </li>
+
+                        <li id="forms-link" class="sidebar-nav-item">
+                            <a href="Forms.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Forms">
+                                <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <span class="sidebar-text">Forms</span>
+                            </a>
+                        </li>
+
+                     
+
+
+                        <%--     <li id="settings-link" class="sidebar-nav-item">
+                            <a href="SMSSettings.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="SMS Settings">  
+                                <span class="sidebar-text"><i class="fas fa-cog default-icon me-2"></i> SMS Settings</span>
+                            </a>
+                        </li>--%>
+
+
+                        
+                         <li id="settings-link" class="sidebar-nav-item menu-item hover-trigger">
+                            <div class="d-flex flex-column w-100">
+                                <div class="submenu-toggle d-flex align-items-center w-100 cursor-pointer" onclick="toggleSubmenu(this)">
+                                    <div class="d-flex align-items-center">
+                                        <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        </svg>
+                                        <span class="sidebar-text">Settings</span>
+                                    </div>
+                                    <i class="fas fa-chevron-right ms-auto"></i>
+                                </div>
+                                <div class="submenu ps-3">
+                                    <a href="Settings.aspx" class="submenu-link">
+                                        <span class="submenu-circle"></span>
+                                        <span>General</span>
+                                    </a><br />
+                                    <a href="ThirdPartyProviders.aspx" class="submenu-link">
+                                        <span class="submenu-circle"></span>
+                                        <span>Third Party Providers</span>
+                                    </a>
+                                </div>
+                            </div>
+                          
+                        </li>
+
+                    
+
+
+
+                        <li class="sidebar-nav-item">
+                            <a href="javascript:void(0);" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Logout" onclick="showSidebarLogoutConfirmation()">
+                                <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                </svg>
+                                <span class="sidebar-text">Logout</span>
+                            </a>
+                        </li>
+
+                        <li class="theme-toggle" id="theme-toggle" data-bs-toggle="tooltip" data-bs-placement="right" title="Theme">
+                            <label class="switch">
+                                <input type="checkbox" id="theme-switch-input">
+                                <div class="slider">
+                                    <div class="light-ball"></div>
+                                    <div class="moon"></div>
+                                </div>
+                            </label>
+                            <span class="theme-toggle-text">Theme</span>
+                        </li>
+                    </ul>
+                </nav>
+
+                <div class="sidebar-footer">
+                    <h6 class="logo-title">Powered by</h6>
+                    <img id="sidebar-footer-img" src="https://testsite.myserviceforce.com/fsm/images/xceleranwhite.png" alt="FMSXceleran Logo" class="sidebar-footer-img">
+                    <%-- <img id="sidebar-footer-img" src="https://central.xceleran.com/fsm/images/xceleranwhite.png" alt="FMSXceleran Logo" class="sidebar-footer-img">--%>
+                </div>
+            </aside>
+
+            <div class="content-wrapper">
+                <div class="header-container">
+                    <button type="button" id="toggleSidebar" class="toggle-btn">☰</button>
+                    <span class="page-header"></span>
+                </div>
+                <asp:ContentPlaceHolder ID="MainContent" runat="server">
+                    <div class="main-content"></div>
+                </asp:ContentPlaceHolder>
+                <hr />
+                <footer class="footer">
+                    <p>© <%: DateTime.Now.Year %> - All rights reserved by <a href="https://xceleran.com" target="_blank">Xceleran</a></p>
+                </footer>
+            </div>
+        </div>
+
+        <!-- Timeout Modal -->
+        <div id="timeoutModal" style="display: none;">
+            <div class="modal-contents">
+                <span class="close-icon" onclick="resetTimeout()">&times;</span>
+                <i class="fa fa-warning" style="color: #f39c12; font-size: 3rem; padding: 20px;"></i>
+                <h3>Your Session Will Expire in <span id="timer"></span></h3>
+                <p>
+                    Let us know if you need more time! You can change your inactivity timer in 
+                    <a href="javascript:void(0);" onclick="showSettingsModal()">Advanced Settings</a>.
+                </p>
+                <button class="btn btn-primary" type="button" onclick="resetTimeout()">I need more time</button>
+                <button type="button" onclick="showLogoutConfirmation()">No</button>
+            </div>
+        </div>
+
+        <!-- Advanced Settings Modal -->
+        <div id="settingsModal" style="display: none;">
+            <div class="modal-contents">
+                <span class="close-icon" onclick="hideSettingsModal()">&times;</span>
+                <h3>Advanced Settings</h3>
+                <label for="timeoutDuration">Set timeout duration (in minutes):</label>
+                <input type="number" id="timeoutDuration" value="1" min="1" />
+                <div class="advance-settings">
+                    <button type="button" onclick="saveSettings()">Save Settings</button>
+                    <button type="button" onclick="hideSettingsModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeout Logout Confirmation Modal -->
+        <div id="logoutNotification" style="display: none;">
+            <div class="notification-content">
+                <span class="close-icon" onclick="closeLogoutConfirmation()">&times;</span>
+                <p>Are you sure?</p>
+                <button type="button" onclick="yesLogout()">Yes</button>
+                <button type="button" onclick="closeLogoutConfirmation()">No</button>
+            </div>
+        </div>
+
+        <!-- Sidebar Logout Confirmation Modal -->
+        <div id="sidebarLogoutConfirmation" style="display: none;">
+            <div class="sidebar-logout-content">
+                <span class="close-icon" onclick="hideSidebarLogoutConfirmation()">&times;</span>
+                <p>Are you sure you want to log out?</p>
+                <button class="btn btn-secondary" type="button" onclick="confirmSidebarLogout()">Yes</button>
+                <button class="btn btn-danger" type="button" onclick="hideSidebarLogoutConfirmation()">No</button>
+                <div class="branding">
+                    <h6>Powered by</h6>
+                    <img id="sidebar-logout-logo" src="https://testsite.myserviceforce.com/fsm/images/xceleranwhite.png" alt="FMSXceleran Logo" class="sidebar-footer-img">
+                    <%--<img id="sidebar-logout-logo" src="https://central.xceleran.com/fsm/images/xceleranwhite.png" alt="FMSXceleran Logo" class="sidebar-footer-img">--%>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audio for Warning Sound -->
+        <audio id="warningSound" src="~/Assets/notification/warning.mp3" preload="auto"></audio>
+    </form>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global flag to track calendar expansion state
+        window.isCalendarExpanded = false;
+
+        // Initial session timeout settings
+        let SESSION_TIMEOUT_DURATION = 60 * 60 * 1000; // Default 10 minutes in milliseconds
+        const MODAL_DISPLAY_BEFORE_TIMEOUT = 30 * 1000; // Show modal 30 seconds before timeout
+        let timeoutTimer, countdownTimer;
+        let countdownTimeRemaining = MODAL_DISPLAY_BEFORE_TIMEOUT;
+        let isTimeoutModalVisible = false;
+        let wasTimeoutModalVisible = false; // Track if timeout modal was visible before settings
+
+        // Function to reset the document title to the original title
+        function resetTitle() {
+            document.title = "<%: Page.Title %> - TPM";
+        }
+
+        // Function to show the timeout modal
+        function showTimeoutModal() {
+            try {
+                document.getElementById('timeoutModal').style.display = 'flex';
+                isTimeoutModalVisible = true;
+                countdownTimeRemaining = MODAL_DISPLAY_BEFORE_TIMEOUT;
+                startCountdown();
+                document.title = "⚠️ You will be logged out soon!";
+
+                // Play the warning sound
+                const warningSound = document.getElementById('warningSound');
+                if (warningSound) {
+                    warningSound.play().catch(error => {
+                        console.warn('Warning sound could not be played:', error);
+                    });
+                }
+            } catch (error) {
+                console.error('Error in showTimeoutModal:', error);
+            }
+        }
+
+        // Function to hide the timeout modal
+        function hideTimeoutModal() {
+            try {
+                document.getElementById('timeoutModal').style.display = 'none';
+                isTimeoutModalVisible = false;
+                clearInterval(countdownTimer); // Stop the countdown
+                resetTitle();
+            } catch (error) {
+                console.error('Error in hideTimeoutModal:', error);
+            }
+        }
+
+        // Function to start the countdown
+        function startCountdown() {
+            try {
+                clearInterval(countdownTimer); // Ensure previous timers are cleared
+                countdownTimer = setInterval(() => {
+                    countdownTimeRemaining -= 1000;
+                    const minutes = Math.floor((countdownTimeRemaining / 1000) / 60);
+                    const seconds = Math.floor((countdownTimeRemaining / 1000) % 60);
+                    document.getElementById('timer').textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                    if (countdownTimeRemaining <= 0) {
+                        clearInterval(countdownTimer);
+                        confirmLogout(); // Automatically log out when countdown reaches 0
+                    }
+                }, 1000);
+            } catch (error) {
+                console.error('Error in startCountdown:', error);
+            }
+        }
+
+        // Function to reset the timeout timer
+        function resetTimeout() {
+            try {
+                hideTimeoutModal(); // Close the timeout modal
+                clearTimeout(timeoutTimer); // Clear existing timeout
+                resetTitle(); // Reset the document title
+                startSessionTimeout(); // Restart session timeout
+            } catch (error) {
+                console.error('Error in resetTimeout:', error);
+            }
+        }
+
+        // Function to start the session timeout timer
+        function startSessionTimeout() {
+            try {
+                clearTimeout(timeoutTimer); // Clear any existing timeout
+                timeoutTimer = setTimeout(showTimeoutModal, SESSION_TIMEOUT_DURATION - MODAL_DISPLAY_BEFORE_TIMEOUT);
+            } catch (error) {
+                console.error('Error in startSessionTimeout:', error);
+            }
+        }
+
+        // Function to show the timeout logout confirmation modal
+        function showLogoutConfirmation() {
+            try {
+                hideTimeoutModal(); // Hide timeout modal
+                const logoutModal = document.getElementById('logoutNotification');
+                if (logoutModal) {
+                    logoutModal.style.display = 'flex';
+                    console.log('Timeout logout confirmation modal displayed');
+                } else {
+                    console.error('Timeout logout notification modal not found');
+                }
+            } catch (error) {
+                console.error('Error in showLogoutConfirmation:', error);
+            }
+        }
+
+        // Function to close the timeout logout confirmation modal and return to timeout modal
+        function closeLogoutConfirmation() {
+            try {
+                document.getElementById('logoutNotification').style.display = 'none';
+                showTimeoutModal(); // Return to timeout modal
+            } catch (error) {
+                console.error('Error in closeLogoutConfirmation:', error);
+            }
+        }
+
+        // Function to handle "Yes" button in the timeout logout confirmation modal
+        function yesLogout() {
+            try {
+                confirmLogout(); // Perform logout
+            } catch (error) {
+                console.error('Error in yesLogout:', error);
+            }
+        }
+
+        // Function to handle confirmed logout (timeout-related)
+        function confirmLogout() {
+            try {
+                clearTimeout(timeoutTimer);
+                clearInterval(countdownTimer);
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.href = '/Dashboard.aspx?logout=true';
+
+            } catch (error) {
+                console.error('Error in confirmLogout:', error);
+            }
+        }
+
+        // Function to show the sidebar logout confirmation modal
+        function showSidebarLogoutConfirmation() {
+            try {
+                const logoutModal = document.getElementById('sidebarLogoutConfirmation');
+                if (logoutModal) {
+                    // Update logo based on theme
+                    const theme = localStorage.getItem('theme') || 'dark';
+                    const logo = document.getElementById('sidebar-logout-logo');
+                    logo.src = theme === 'dark'
+                        ? 'https://testsite.myserviceforce.com/fsm/images/xceleran.png'
+                        /*? 'https://central.xceleran.com/fsm/images/xceleran.png'*/
+                        : 'https://testsite.myserviceforce.com/fsm/images/xceleran.png';
+                    //: 'https://central.xceleran.com/fsm/images/xceleran.png';
+                    logoutModal.style.display = 'flex';
+                    console.log('Sidebar logout confirmation modal displayed');
+                } else {
+                    console.error('Sidebar logout confirmation modal not found');
+                }
+            } catch (error) {
+                console.error('Error in showSidebarLogoutConfirmation:', error);
+            }
+        }
+        
+        // Submenu toggle for Settings (reuses Jobs Scheduler pattern)
+        window.toggleSubmenu = function (element) {
+            var $element = $(element);
+            var $submenu = $element.siblings('.submenu');
+            var $chevron = $element.find('.ms-auto');
+
+            $submenu.toggleClass('open');
+            $chevron.toggleClass('rotate-90');
+
+            if (!$('#sidebar').hasClass('collapsed')) {
+                $submenu.css('display', $submenu.hasClass('open') ? 'block' : 'none');
+            }
+        };
+   
+
+        // Function to hide the sidebar logout confirmation modal
+        function hideSidebarLogoutConfirmation() {
+            try {
+                document.getElementById('sidebarLogoutConfirmation').style.display = 'none';
+                console.log('Sidebar logout confirmation modal hidden');
+            } catch (error) {
+                console.error('Error in hideSidebarLogoutConfirmation:', error);
+            }
+        }
+
+        // Function to handle confirmed logout (sidebar-related)
+        function confirmSidebarLogout() {
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.href = '/Login/Logout';
+            } catch (error) {
+                console.error('Error in confirmSidebarLogout:', error);
+            }
+        }
+
+        // Function to show the advanced settings modal
+        function showSettingsModal() {
+            try {
+                wasTimeoutModalVisible = isTimeoutModalVisible; // Track timeout modal state
+                hideTimeoutModal(); // Hide the timeout modal if it's visible
+                document.getElementById('settingsModal').style.display = 'flex';
+
+                // Retrieve the saved timeout duration from localStorage (if any)
+                const savedTimeout = localStorage.getItem('sessionTimeoutDuration');
+                if (savedTimeout) {
+                    document.getElementById('timeoutDuration').value = savedTimeout;
+                }
+            } catch (error) {
+                console.error('Error in showSettingsModal:', error);
+            }
+        }
+
+        // Function to hide the advanced settings modal
+        function hideSettingsModal() {
+            try {
+                document.getElementById('settingsModal').style.display = 'none';
+                if (wasTimeoutModalVisible) {
+                    showTimeoutModal(); // Restore timeout modal if it was visible
+                }
+            } catch (error) {
+                console.error('Error in hideSettingsModal:', error);
+            }
+        }
+
+        // Function to save custom timeout settings
+        function saveSettings() {
+            try {
+                const newTimeoutDuration = parseInt(document.getElementById('timeoutDuration').value);
+
+                if (newTimeoutDuration >= 1) {
+                    SESSION_TIMEOUT_DURATION = newTimeoutDuration * 60 * 1000;
+                    localStorage.setItem('sessionTimeoutDuration', newTimeoutDuration);
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Settings Saved',
+                        text: `Timeout duration updated to ${newTimeoutDuration} minute(s).`,
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    resetTimeout();
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Invalid Input',
+                        text: 'Please enter a valid number greater than or equal to 1.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }
+
+                hideSettingsModal();
+            } catch (error) {
+                console.error('Error in saveSettings:', error);
+            }
+        }
+
+        // Activity handler to reset timeout
+        function handleActivity() {
+            try {
+                if (!isTimeoutModalVisible) {
+                    resetTimeout();
+                }
+            } catch (error) {
+                console.error('Error in handleActivity:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                // Sidebar toggle functionality
+                const sidebar = document.getElementById('sidebar');
+                const toggleButton = document.getElementById('toggleSidebar');
+                const sidebarTexts = document.querySelectorAll('.sidebar-text');
+                const sidebarIcons = document.querySelectorAll('.sidebar-icon');
+
+                // Theme toggle functionality
+                const themeSwitchInput = document.getElementById('theme-switch-input');
+                const themeToggleText = document.querySelector('.theme-toggle-text');
+                const sidebarLogoImg = document.getElementById('sidebar-logo-img');
+                const sidebarFooterImg = document.getElementById('sidebar-footer-img');
+                const rightLogoImg = document.querySelector('.right-logo img');
+
+                if (!themeSwitchInput || !themeToggleText || !sidebarLogoImg || !sidebarFooterImg || !rightLogoImg) {
+                    console.error('Theme toggle or logo elements not found:', {
+                        themeSwitchInput,
+                        themeToggleText,
+                        sidebarLogoImg,
+                        sidebarFooterImg,
+                        rightLogoImg
+                    });
+                    return;
+                }
+
+                // Load saved theme from localStorage or default to light //New
+                const savedTheme = localStorage.getItem('theme') || 'light';
+                document.documentElement.setAttribute('data-theme', savedTheme);
+                // Added to sync with Bootstrap theme
+                document.body.setAttribute('data-bs-theme', savedTheme === 'dark' ? 'dark' : 'light');
+                themeSwitchInput.checked = savedTheme === 'dark';
+                // console.log('Initial theme set:', savedTheme); // Removed for brevity, can be re-added
+                updateThemeUI(savedTheme);
+
+                function updateThemeUI(theme) {
+                    try {
+                        // Update theme toggle text
+                        themeToggleText.textContent = theme === 'dark' ? 'Dark Mode' : 'Light Mode';
+                        // Update sidebar logo
+                        sidebarLogoImg.src = theme === 'dark'
+                            ? '<%= SidebarLogoUrl %>'     
+                            : '<%= SidebarLogoUrlLight %>'; 
+                        // Update sidebar footer logo
+                        sidebarFooterImg.src = theme === 'dark'
+                            ? 'https://testsite.myserviceforce.com/fsm/images/xceleranwhite.png'
+                            /*? 'https://central.xceleran.com/fsm/images/xceleranwhite.png'*/
+                            : 'https://testsite.myserviceforce.com/fsm/images/xceleran.png';
+                        /*: 'https://central.xceleran.com/fsm/images/xceleran.png';*/
+                        // Update right logo
+                        if (rightLogoImg) {
+                            rightLogoImg.src = theme === 'dark'
+                                ? 'https://testsite.myserviceforce.com/fsm/images/FSMWhite.png'
+                                /*? 'https://central.xceleran.com/fsm/images/FSMWhite.png'*/
+                                : 'https://testsite.myserviceforce.com/fsm/images/FMSXceleran.png';
+                            /*: 'https://central.xceleran.com/fsm/images/FMSXceleran.png';*/
+                        } else {
+                            console.warn('Right logo image not found');
+                        }
+                        // console.log('Theme updated to:', theme);
+                        // console.log('Logo sources:', {
+                        //     sidebarLogo: sidebarLogoImg.src,
+                        //     footerLogo: sidebarFooterImg.src,
+                        //     rightLogo: rightLogoImg ? rightLogoImg.src : 'not found'
+                        // });
+                    } catch (error) {
+                        console.error('Error updating theme UI:', error);
+                    }
+                }
+
+                themeSwitchInput.addEventListener('change', () => {
+                    // try { // Removed try-catch for simplicity, can be re-added
+                    const newTheme = themeSwitchInput.checked ? 'dark' : 'light';
+                    document.documentElement.setAttribute('data-theme', newTheme);
+                    // Added to sync with Bootstrap theme
+                    document.body.setAttribute('data-bs-theme', newTheme);
+                    localStorage.setItem('theme', newTheme);
+                    updateThemeUI(newTheme);
+                    // console.log('Theme toggled to:', newTheme);
+                    // } catch (error) {
+                    //     console.error('Error toggling theme:', error);
+                    // }
+                });
+
+                // Active menu detection and page header update
+                const currentPath = window.location.pathname.toLowerCase();
+                const pageName = currentPath.split('/').pop().replace('.aspx', '') || 'dashboard';
+               
+                const navItems = {
+                    'dashboard': { id: 'dashboard-link', title: 'Dashboard' },
+                    'AppoinementList': { id: 'AppoinementList-link', title: 'New Work Orders' },
+                    'customer': { id: 'customers-link', title: 'Customer Service Locations' },
+                    'customerdetails': { id: 'customers-link', title: 'Customer Service Locations' },
+                    'invoicecreate': { id: 'customers-link', title: 'Customer Service Locations' },
+                    'forms': { id: 'forms-link', title: 'Forms' },
+                    /* 'invoice': { id: 'invoices-link', title: 'Invoices/Estimates' }, */
+                    'dispatch': { id: 'dispatch-link', title: 'Dispatch' },
+                    'billableitems': { id: 'item-link', title: 'Billable Items' },
+                    'settings': { id: 'settings-link', title: 'Settings' }
+                };
+
+                // Remove existing active classes
+                document.querySelectorAll('.sidebar-nav-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+
+               
+                // Set active class and update page header
+                const activeNav = navItems[pageName] || { id: 'dashboard-link', title: 'Dashboard' };
+                const activeItem = document.getElementById(activeNav.id);
+                if (activeItem) {
+                    activeItem.classList.add('active');
+                    console.log(`Active menu item set: ${activeNav.id}`);
+                } else {
+                    console.warn(`No active menu item found for page: ${pageName}`);
+                }
+                const pageHeader = document.querySelector('.page-header');
+                if (pageHeader) {
+                     
+                    pageHeader.textContent = activeNav.title;
+                    if (pageName == 'appoinementlist') {
+                         pageHeader.textContent = 'New Work Orders';
+                    }
+                     if (pageName == 'thirdpartyproviders') {
+                         pageHeader.textContent = 'Third Party Providers';
+                    }
+                   
+                    if (pageName == 'tplist') {
+                         pageHeader.textContent = 'Third Party Providers';
+                    }
+                    
+                }
+
+                // Sidebar toggle functionality
+                if (toggleButton && sidebar) {
+                    const isMobile = () => window.matchMedia('(max-width: 849px)').matches;
+
+                    const updateSidebarState = () => {
+                        const sidebar = document.getElementById('sidebar');
+                        const toggleButton = document.getElementById('toggleSidebar');
+                        const headerContainer = document.querySelector('.header-container');
+                        const sidebarTexts = document.querySelectorAll('.sidebar-text');
+                        const sidebarIcons = document.querySelectorAll('.sidebar-icon');
+
+                        if (!sidebar || !toggleButton || !headerContainer) return;
+
+                        const isExpanded = sidebar.classList.contains('sidebar-expanded');
+                        const isCollapsed = sidebar.classList.contains('sidebar-collapsed');
+                        const isHidden = sidebar.classList.contains('sidebar-hidden');
+
+                        if (isMobile()) {
+                            sidebarTexts.forEach(text => text.style.display = 'inline');
+                            sidebarIcons.forEach(icon => icon.style.display = 'inline');
+                            toggleButton.textContent = isHidden ? '☰' : '✕';
+                            toggleButton.classList.remove('collapsed');
+                            headerContainer.classList.toggle('visible', !isHidden);
+                            headerContainer.classList.toggle('hidden', isHidden);
+                        } else {
+                            sidebarTexts.forEach(text => {
+                                text.style.display = isCollapsed ? 'none' : 'inline';
+                            });
+                            sidebarIcons.forEach(icon => icon.style.display = 'inline');
+                            toggleButton.textContent = isExpanded ? '➤' : '☰';
+                            toggleButton.classList.toggle('collapsed', isCollapsed);
+                            headerContainer.classList.toggle('collapsed', isCollapsed);
+                            headerContainer.classList.toggle('hidden', false);
+                        }
+                    };
+
+                    const toggleSidebar = () => {
+                        const sidebar = document.getElementById('sidebar');
+                        const toggleButton = document.getElementById('toggleSidebar');
+                        const sidebarTexts = document.querySelectorAll('.sidebar-text');
+                        const sidebarIcons = document.querySelectorAll('.sidebar-icon');
+
+                        if (!sidebar || !toggleButton) return;
+
+                        const isMobile = () => window.matchMedia('(max-width: 849px)').matches;
+
+                        if (isMobile()) {
+                            const isHidden = sidebar.classList.contains('sidebar-hidden');
+                            sidebar.classList.toggle('sidebar-hidden', !isHidden);
+                            sidebar.style.transform = isHidden ? 'translateX(0)' : 'translateX(-100%)';
+                        } else {
+                            const isExpanded = sidebar.classList.contains('sidebar-expanded');
+                            sidebar.classList.toggle('sidebar-expanded', !isExpanded);
+                            sidebar.classList.toggle('sidebar-collapsed', isExpanded);
+                        }
+
+                        updateSidebarState();
+                    };
+
+                    toggleButton.addEventListener('click', toggleSidebar);
+
+                    // Initial state setup
+                    if (isMobile()) {
+                        sidebar.classList.add('sidebar-hidden', 'sidebar-mobile');
+                        sidebar.style.transform = 'translateX(-100%)';
+                    } else {
+                        sidebar.classList.add('sidebar-collapsed');
+                        sidebar.classList.remove('sidebar-expanded');
+                    }
+                    updateSidebarState();
+
+                    // Window resize handler
+                    window.addEventListener('resize', () => {
+                        const isMobile = () => window.matchMedia('(max-width: 849px)').matches;
+                        const headerContainer = document.querySelector('.header-container');
+                        if (isMobile()) {
+                            if (!sidebar.classList.contains('sidebar-hidden')) {
+                                sidebar.classList.add('sidebar-hidden');
+                                sidebar.style.transform = 'translateX(-100%)';
+                            }
+                            sidebar.classList.add('sidebar-mobile');
+                            sidebar.classList.remove('sidebar-expanded', 'sidebar-collapsed');
+                            toggleButton.classList.remove('collapsed');
+                            if (headerContainer) {
+                                headerContainer.classList.add('hidden');
+                                headerContainer.classList.remove('collapsed', 'visible');
+                            }
+                        } else {
+                            // On desktop resize, always ensure sidebar is collapsed initially
+                            sidebar.classList.remove('sidebar-hidden', 'sidebar-mobile', 'sidebar-expanded');
+                            sidebar.classList.add('sidebar-collapsed');
+                            sidebar.style.transform = '';
+                            toggleButton.classList.add('collapsed'); // Ensure toggle button reflects collapsed state
+                            if (headerContainer) {
+                                headerContainer.classList.remove('hidden', 'visible');
+                                headerContainer.classList.add('collapsed');
+                            }
+                        }
+                        updateSidebarState();
+                        console.log('Resize handler executed:', {
+                            isMobile: isMobile(),
+                            isCalendarExpanded: window.isCalendarExpanded,
+                            sidebarClasses: sidebar.classList.toString(),
+                            toggleBtnText: toggleButton.textContent,
+                            headerContainerClasses: headerContainer ? headerContainer.classList.toString() : 'not found'
+                        });
+                    });
+
+                    // Debug icon visibility and styles
+                    sidebarIcons.forEach((icon, index) => {
+                        const computedStyle = window.getComputedStyle(icon);
+                        console.log(`Icon ${index} (Billable Items is #4):`, {
+                            display: computedStyle.display,
+                            visibility: computedStyle.visibility,
+                            width: computedStyle.width,
+                            stroke: computedStyle.stroke
+                        });
+                    });
+                } else {
+                    console.error('Sidebar or toggle button not found:', { sidebar, toggleButton });
+                }
+                // Add click animation and active state to menu items
+                document.querySelectorAll('.sidebar-nav-item').forEach(item => {
+                    item.addEventListener('click', function (e) {
+                        if (!e.target.closest('a')) return;
+
+                        // Remove active class from all items
+                        document.querySelectorAll('.sidebar-nav-item').forEach(i => {
+                            i.classList.remove('active');
+                        });
+
+                        // Add active class to clicked item
+                        this.classList.add('active');
+                        console.log(`Clicked item set to active: ${this.id}`);
+
+                        // Update page header
+                        const itemId = this.id;
+                        const navItem = Object.values(navItems).find(nav => nav.id === itemId);
+                        const pageHeader = document.querySelector('.page-header');
+                        if (navItem && pageHeader) {
+                            pageHeader.textContent = navItem.title;
+                        }
+                    });
+                });
+
+                // Debug hover state
+                document.querySelectorAll('.sidebar-nav-item').forEach(item => {
+                    item.addEventListener('mouseenter', () => {
+                        console.log(`Hovering over: ${item.id}`);
+                    });
+                    item.addEventListener('mouseleave', () => {
+                        console.log(`Stopped hovering: ${item.id}`);
+                    });
+                });
+
+                // Initialize session timeout
+                const savedTimeout = localStorage.getItem('sessionTimeoutDuration');
+                if (savedTimeout) {
+                    SESSION_TIMEOUT_DURATION = parseInt(savedTimeout) * 60 * 1000;
+                }
+                startSessionTimeout();
+
+                // Reset timeout on user activity (before modal appears)
+                ['click', 'keypress', 'mousemove'].forEach(event => {
+                    document.addEventListener(event, handleActivity);
+                });
+            } catch (error) {
+                console.error('Error in DOMContentLoaded handler:', error);
+            }
+        });
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+            tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+                new bootstrap.Tooltip(tooltipTriggerEl)
+            })
+        });
+    </script>
+
+</body>
+</html>
