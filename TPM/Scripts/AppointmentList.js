@@ -509,10 +509,10 @@ function generateCustomerDetails(data) {
     $('#CustomerID').val(safe(data.CustomerID));
     $('#CustomerGuid').val(safe(data.CustomerGuid));
 
-    loadCustomerSiteData(data.CustomerID, data.Notes, data.ApptID, data.SchedulingCal, data.IsApproved, data.SiteID);
+    loadCustomerSiteData(data.CustomerID, data.Notes, data.ApptID, data.SchedulingCal, data.IsApproved, data.SiteID, data.ApptDateTime);
 }
 
-function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApproved, SiteId) {
+function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApproved, SiteId, ApptDateTime) {
   
     if (!customerId) return;
 
