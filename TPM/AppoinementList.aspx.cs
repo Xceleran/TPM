@@ -17,6 +17,7 @@ using System.Configuration;
 using System.Data.SqlClient;
 using FSM;
 using FSM.SMSService;
+using System.IO;
 
 namespace TPM
 {
@@ -560,7 +561,7 @@ namespace TPM
             try
             {
                 db.Open();
-                string strSQL = @"SELECT top 100 * FROM [msSchedulerV3].dbo.tbl_CustomerSite WHERE CompanyID='" + companyid + "' AND id='" + SiteId 
+                string strSQL = @"SELECT  * FROM [msSchedulerV3].dbo.tbl_CustomerSite WHERE CompanyID='" + companyid + "' AND id='" + SiteId 
                     + "' AND CustomerID='" + customerId + "' order by SiteName";
                 db.Execute(strSQL, out dt);
                 db.Close();
@@ -585,6 +586,7 @@ namespace TPM
                             Contact = dr["Contact"].ToString() ?? "",
                             Email = dr["Email"].ToString() ?? "",
                             PhoneNumber = dr["PhoneNumber"].ToString() ?? "",
+                            MobileNumber = dr["MobileNumber"].ToString() ?? "",
                             Note = dr["Note"].ToString() ?? "",
                             IsActive = Convert.ToBoolean(dr["IsActive"]),
                             CreatedDateTime = Convert.ToDateTime(dr["CreatedDateTime"])
@@ -632,6 +634,158 @@ namespace TPM
                 if (db.Connection.State == ConnectionState.Open) db.Close();
             }
             return sites;
+        }
+        protected void btnSendSMS_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Validate session
+                if (Session["CompanyID"] == null)
+                {
+                    ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", " Swal.fire('Session expired. Please login again.', '', 'error');", true);
+                    return;
+                }
+
+                string CompanyID = Session["CompanyID"].ToString();
+                string CustomerID = txtCustomerId.Value;
+                string SmsBody = txtSMS.Text;
+                string Mobile = txtMobile.Text;
+
+                // Server-side validation
+                if (string.IsNullOrWhiteSpace(CustomerID))
+                {
+                    ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", " Swal.fire('Customer ID is required.', '', 'warning');", true);
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(SmsBody))
+                {
+                    ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", " Swal.fire('SMS message cannot be empty.', '', 'warning');", true);
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(Mobile))
+                {
+                    ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", " Swal.fire('Phone/Mobile number is required.', '', 'warning');", true);
+                    return;
+                }
+
+                CustomerID = Common.CleanInput(CustomerID);
+                SmsBody = Common.CleanInput(SmsBody);
+                Mobile = Common.CleanInput(Mobile);
+
+                TwilioSMSService smsService = new TwilioSMSService();
+                bool result = smsService.SendCustomerAdHocSMS(CompanyID, CustomerID, SmsBody, Mobile);
+
+                string exception;
+                if (result == true)
+                {
+                    // Clear the SMS text field after successful send
+                    txtSMS.Text = "";
+                    exception = " Swal.fire('SMS Sent Successfully', '', 'success');";
+                }
+                else
+                {
+                    exception = " Swal.fire('Something went wrong, Please try again.', '', 'warning');";
+                }
+
+                ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", exception, true);
+            }
+            catch (Exception ex)
+            {
+                ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", $" Swal.fire('Error: {ex.Message}', '', 'error');", true);
+            }
+        }
+
+        protected void btnSendMMS_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Validate session
+                if (Session["CompanyID"] == null)
+                {
+                    ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", " Swal.fire('Session expired. Please login again.', '', 'error');", true);
+                    return;
+                }
+
+                string CompanyID = Session["CompanyID"].ToString();
+                string _CustomerID = txtCustId.Value;
+                string mobile = txtCustMob.Text;
+                string mmsBody = txtMMSBody.Text;
+
+                // Server-side validation
+                if (string.IsNullOrWhiteSpace(_CustomerID))
+                {
+                    ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", " Swal.fire('Customer ID is required.', '', 'warning');", true);
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(mmsBody))
+                {
+                    ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", " Swal.fire('MMS message cannot be empty.', '', 'warning');", true);
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(mobile))
+                {
+                    ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", " Swal.fire('Phone/Mobile number is required.', '', 'warning');", true);
+                    return;
+                }
+
+                if (!fuAttachment.HasFile)
+                {
+                    ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", " Swal.fire('Please select a file to attach.', '', 'warning');", true);
+                    return;
+                }
+
+                mmsBody = Common.CleanInput(mmsBody);
+
+                string _Path = "~/EmailHistoryContent/" + _CustomerID + "/";
+                string strFolder = System.Web.HttpContext.Current.Server.MapPath(_Path);
+
+                if (!Directory.Exists(strFolder))
+                {
+                    Directory.CreateDirectory(strFolder);
+                }
+
+                FileInfo fi = new FileInfo(fuAttachment.FileName);
+                string ext = fi.Extension;
+
+                string uniqueFileName = Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper() + "_" + _CustomerID + ext;
+                string savedFilePath = System.IO.Path.Combine(strFolder, uniqueFileName);
+
+                fuAttachment.SaveAs(savedFilePath);
+
+                string baseUrl = ConfigurationManager.AppSettings["baseurl"];
+                if (string.IsNullOrEmpty(baseUrl))
+                {
+                    baseUrl = Request.Url.GetLeftPart(UriPartial.Authority) + Request.ApplicationPath.TrimEnd('/');
+                }
+                baseUrl = baseUrl.TrimEnd('/');
+                string mmsUrl = baseUrl + "/EmailHistoryContent/" + _CustomerID + "/" + uniqueFileName;
+                string filePath = "EmailHistoryContent/" + _CustomerID + "/" + uniqueFileName;
+
+                // Send MMS
+                TwilioSMSService twilio = new TwilioSMSService();
+                bool result = twilio.SendCustomerMMS(CompanyID, _CustomerID, mmsBody, mobile, filePath, mmsUrl);
+
+                string response = "";
+                if (result)
+                {
+                    // Clear the MMS fields after successful send
+                    txtMMSBody.Text = "";
+                    response = " Swal.fire('MMS Sent Successfully', '', 'success');";
+                }
+                else
+                {
+                    response = " Swal.fire('Something went wrong, Please try again.', '', 'warning');";
+                }
+                ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", response, true);
+            }
+            catch (Exception ex)
+            {
+                ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", $" Swal.fire('Error: {ex.Message}', '', 'error');", true);
+            }
         }
         public static class LocationHelper
         {
