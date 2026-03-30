@@ -272,6 +272,20 @@ $(document).ready(function () {
         closeModal('addSiteModal');
     });
 
+    // SMS button click handler in site cards
+    $('#sites').on('click', '.cust-site-SMS-btn', function () {
+        var mobile = $(this).attr('data-mobilenumber-id');
+        var customerId = $(this).attr('data-customer-id');
+        OpenSMSPopUp(mobile, customerId);
+    });
+
+    // MMS button click handler in site cards
+    $('#sites').on('click', '.cust-site-MMS-btn', function () {
+        var mobile = $(this).attr('data-mobilenumber-id');
+        var customerId = $(this).attr('data-customer-id');
+        OpenMMSPopUp(mobile, customerId);
+    });
+
     $('#statusFilter').on('change', function () {
         LoadAppointments();
     });
@@ -545,11 +559,11 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                         </button>`;
 
                     const smsButton = `
-                        <button class="cust-site-icon-btn cust-site-SMS-btn" title="SMS" data-site-id="${site.Id}" data-customer-id="${site.customerID}" data-MobileNumber-id="${site.MobileNumber}" data-is-default="${isDefaultSite}">
-                            <i class="fa-solid fa-message me-1"></i></button>`;
-                    const mmsButton = `
-                        <button class="cust-site-icon-btn cust-site-MMS-btn" title="MMS" data-site-id="${site.Id}" data-is-default="${isDefaultSite}">
+                        <button class="cust-site-icon-btn cust-site-SMS-btn" title="Send SMS" data-site-id="${site.Id}" data-customer-id="${site.CustomerID}" data-MobileNumber-id="${site.MobileNumber}" data-is-default="${isDefaultSite}">
                             <i class="fa-solid fa-message"></i></button>`;
+                    const mmsButton = `
+                        <button class="cust-site-icon-btn cust-site-MMS-btn" title="Send MMS" data-site-id="${site.Id}" data-customer-id="${site.CustomerID}" data-MobileNumber-id="${site.MobileNumber}" data-is-default="${isDefaultSite}">
+                            <i class="fa-solid fa-photo-film"></i></button>`;
 
 
                     const deleteButton = `

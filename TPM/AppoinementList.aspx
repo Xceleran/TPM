@@ -463,6 +463,52 @@
                 '&customerId=' + encodeURIComponent(customerId), '_blank');
         }
 
+        function OpenSMSPopUp(mobile, customerID) {
+            $('#<%= txtMobile.ClientID %>').val(mobile);
+            $('#<%= txtCustomerId.ClientID %>').val(customerID);
+            $('#modalSendSMS').modal('show');
+        }
+
+        function CloseSMSPopup() {
+            $('#<%= txtMobile.ClientID %>').val('');
+            $('#<%= txtCustomerId.ClientID %>').val('');
+            $('#<%= txtSMS.ClientID %>').val('');
+            $('#modalSendSMS').modal('hide');
+        }
+
+        function OpenMMSPopUp(mobile, customerID) {
+            $('#<%= txtCustMob.ClientID %>').val(mobile);
+            $('#<%= txtCustId.ClientID %>').val(customerID);
+            $('#modalSendMMS').modal('show');
+        }
+
+        function CloseMMSPopup() {
+            $('#<%= txtCustMob.ClientID %>').val('');
+            $('#<%= txtCustId.ClientID %>').val('');
+            $('#<%= txtMMSBody.ClientID %>').val('');
+            $('#<%= fuAttachment.ClientID %>').val('');
+            $("#fileError").text('');
+            $("#fileError").removeClass('text-success').addClass('text-danger');
+            $('#modalSendMMS').modal('hide');
+        }
+
+        function OpenSMSHistoryFromModal() {
+            var mobile = $('#<%= txtMobile.ClientID %>').val().trim() || $('#<%= txtCustMob.ClientID %>').val().trim();
+            var customerId = $('#<%= txtCustomerId.ClientID %>').val().trim() || $('#<%= txtCustId.ClientID %>').val().trim();
+            var customerName = $('#customerName').text().trim();
+
+            if (!mobile) {
+                Swal.fire('Validation Error', 'Mobile number is required to view history.', 'warning');
+                return;
+            }
+
+            $('#modalSendSMS').modal('hide');
+            $('#modalSendMMS').modal('hide');
+
+            window.open('CustomerChatHistory.aspx?mobile=' + encodeURIComponent(mobile) +
+                '&name=' + encodeURIComponent(customerName) +
+                '&customerId=' + encodeURIComponent(customerId), '_blank');
+        }
 
     </script>
     <script>
