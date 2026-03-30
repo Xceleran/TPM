@@ -240,7 +240,7 @@ $(document).ready(function () {
         $('#div_Msg').html('');
         openModal('MsgViewModal');
         $('.ajax-loader').css("visibility", "visible");
-        const ApptID = $(this).data('site-id');
+        const ApptID = $(this).attr('data-site-id');
         $.ajax({
             type: "POST",
             url: "AppoinementList.aspx/Get_Message",
@@ -249,23 +249,22 @@ $(document).ready(function () {
             dataType: "json",
             success: function (response) {
                 console.log(response.d);
-                if (response.d) {
-                   
-                    var sites = response.d || [];
+                var sites = response.d || [];
+                if (sites.length > 0 && sites[0].Note) {
                     $('#div_Msg').html(sites[0].Note);
                 } else {
-                   
+                    $('#div_Msg').html('<p class="text-muted">No message found.</p>');
                 }
                 $('.ajax-loader').css("visibility", "hidden");
             },
             error: function (xhr) {
-                console.error("Error deleting site: ", xhr.responseText);
+                console.error("Error loading message: ", xhr.responseText);
                 $('.ajax-loader').css("visibility", "hidden");
-               
+
             }
         });
-       
-      
+
+
     });
     $('#closeMsgView').on('click', function () {
         closeModal('MsgViewModal');

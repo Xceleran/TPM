@@ -443,7 +443,7 @@ namespace TPM
             try
             {
                 db.Open();
-                string strSQL = @"SELECT isnull(Message,'') as Message FROM [msSchedulerV3].dbo.tbl_Appointment WHERE CompanyID='" + companyid + "' AND ApptID='" + ApptID + "'";
+                string strSQL = @"SELECT isnull(Note,'') as Note FROM [msSchedulerV3].dbo.tbl_Appointment WHERE CompanyID='" + companyid + "' AND ApptID='" + ApptID + "'";
                 db.Execute(strSQL, out dt);
                 db.Close();
 
@@ -454,7 +454,7 @@ namespace TPM
                         sites.Add(new CustomerSite
                         {
                             
-                            Note = dr["Message"].ToString() ?? "",
+                            Note = dr["Note"].ToString() ?? "",
                            
                         });
                     }
