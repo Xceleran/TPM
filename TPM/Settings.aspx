@@ -8,8 +8,8 @@
 
         <!-- Main Tab Navigation -->
         <ul class="nav nav-tabs" id="settingsTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="custom-fields-tab" data-bs-toggle="tab" data-bs-target="#custom-fields" type="button" role="tab" aria-controls="custom-fields" aria-selected="true">
+            <li class="nav-item" role="presentation" style="display:none;">
+                <button class="nav-link" id="custom-fields-tab" data-bs-toggle="tab" data-bs-target="#custom-fields" type="button" role="tab" aria-controls="custom-fields" aria-selected="false">
                     <i class="bi bi-ui-checks me-2"></i>Custom Fields
                 </button>
             </li>
@@ -19,7 +19,7 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="automated-messages-main-tab" data-bs-toggle="tab" data-bs-target="#automated-messages-container" type="button" role="tab" aria-controls="automated-messages-container" aria-selected="false">
+                <button class="nav-link active" id="automated-messages-main-tab" data-bs-toggle="tab" data-bs-target="#automated-messages-container" type="button" role="tab" aria-controls="automated-messages-container" aria-selected="true">
                     <i class="bi bi-robot me-2"></i>Communication
                 </button>
             </li>
@@ -33,8 +33,8 @@
         <!-- Main Tab Content -->
         <div class="tab-content" id="settingsTabContent">
 
-            <!--  Custom Fields Tab -->
-            <div class="tab-pane fade show active" id="custom-fields" role="tabpanel" aria-labelledby="custom-fields-tab">
+            <!--  Custom Fields Tab (hidden) -->
+            <div class="tab-pane fade" id="custom-fields" role="tabpanel" aria-labelledby="custom-fields-tab">
                 <div class="d-flex justify-content-end align-items-center mb-4">
                     <div>
                         <button type="button" id="btnCreateNew" class="btn btn-success">
@@ -192,7 +192,7 @@
             </div>
 
             <!--  Messages Tab Container -->
-            <div class="tab-pane fade" id="automated-messages-container" role="tabpanel" aria-labelledby="automated-messages-main-tab">
+            <div class="tab-pane fade show active" id="automated-messages-container" role="tabpanel" aria-labelledby="automated-messages-main-tab">
                 <div class="row">
                     <!-- Vertical Navigation -->
                     <div class="col-md-2">
