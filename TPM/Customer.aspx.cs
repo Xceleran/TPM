@@ -1137,7 +1137,7 @@ namespace FSM
         }
         [WebMethod]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
-        public static string GetCustomerSiteData(string customerId,int draw, int start, int length, string searchValue, string sortColumn, string sortDirection)
+        public static string GetCustomerSiteData(string customerId,int draw, int start, int length, string searchValue, string sortColumn, string sortDirection, string appointmentStartDate = "", string appointmentStatus = "")
         {
             var sites = new List<CustomerSite>();
 
@@ -1147,12 +1147,36 @@ namespace FSM
             int totalRecords = 0;
             DataTable dt = new DataTable();
             searchValue = searchValue.Replace("'", "");
+            appointmentStartDate = (appointmentStartDate ?? "").Replace("'", "");
+            appointmentStatus = (appointmentStatus ?? "").Replace("'", "");
+            // UI shows "Confirmed" but DB stores "Scheduled"
+            if (appointmentStatus == "Confirmed") appointmentStatus = "Scheduled";
+
+            bool hasApptFilters = !string.IsNullOrEmpty(appointmentStartDate) || !string.IsNullOrEmpty(appointmentStatus);
+            string joinType = hasApptFilters ? "INNER JOIN" : "LEFT JOIN";
+
             try
             {
                 //db.Open();
-                string strSQL = @"SELECT st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.LastName,st.Address,st.Country,st.State,st.Zip,st.Contact,st.Email,st.PhoneNumber,st.Note,COUNT(appt.CompanyID) AS appointment_count 
-                            FROM [msSchedulerV3].dbo.tbl_CustomerSite st LEFT JOIN [msSchedulerV3].[dbo].[tbl_Appointment] appt 
-                    ON  appt.CompanyID = st.CompanyID and appt.siteid = st.id and  appt.CustomerID = st.CustomerID      WHERE st.CompanyID='" + companyid + "' AND st.CustomerID='" + customerId + "' ";
+                string apptJoinConditions = "";
+                if (!string.IsNullOrEmpty(appointmentStartDate))
+                {
+                    apptJoinConditions += $" AND CONVERT(DATE, COALESCE(appt.StartDateTime, appt.ApptDateTime)) = '{appointmentStartDate}' ";
+                }
+                if (!string.IsNullOrEmpty(appointmentStatus))
+                {
+                    // Handle status as either StatusName or StatusID via tbl_Status
+                    apptJoinConditions += $@" AND EXISTS (
+                        SELECT 1 FROM [msSchedulerV3].[dbo].[tbl_Status] sts
+                        WHERE sts.CompanyID = appt.CompanyID
+                        AND (CASE WHEN appt.Status = '0' OR appt.Status IS NULL OR appt.Status = '' THEN 1 ELSE TRY_CAST(appt.Status AS INT) END = sts.StatusID OR appt.Status = sts.StatusName)
+                        AND sts.StatusName = '{appointmentStatus}'
+                    ) ";
+                }
+
+                string strSQL = $@"SELECT st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.LastName,st.Address,st.Country,st.State,st.Zip,st.Contact,st.Email,st.PhoneNumber,st.Note,COUNT(appt.CompanyID) AS appointment_count
+                            FROM [msSchedulerV3].dbo.tbl_CustomerSite st {joinType} [msSchedulerV3].[dbo].[tbl_Appointment] appt
+                    ON  appt.CompanyID = st.CompanyID and appt.siteid = st.id and  appt.CustomerID = st.CustomerID {apptJoinConditions}     WHERE st.CompanyID='" + companyid + "' AND st.CustomerID='" + customerId + "' ";
 
                 if (!string.IsNullOrEmpty(searchValue))
                 {
@@ -1162,10 +1186,24 @@ namespace FSM
                 strSQL += $" GROUP BY st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.LastName,st.Address,st.Country,st.State,st.Zip,st.Contact,st.Email,st.PhoneNumber,st.Note ";
                 strSQL += $" ORDER BY st.SiteName {sortDirection} OFFSET {start} ROWS FETCH NEXT {length} ROWS ONLY;";
 
-                strSQL += @"SELECT count(Id) as totalRecords  FROM [msSchedulerV3].dbo.tbl_CustomerSite WHERE CompanyID='" + companyid + "' AND CustomerID='" + customerId + "'";
+                // Count query - must also apply appointment filters when active
+                if (hasApptFilters)
+                {
+                    strSQL += $@"SELECT count(DISTINCT st.Id) as totalRecords FROM [msSchedulerV3].dbo.tbl_CustomerSite st
+                        INNER JOIN [msSchedulerV3].[dbo].[tbl_Appointment] appt
+                        ON appt.CompanyID = st.CompanyID and appt.siteid = st.id and appt.CustomerID = st.CustomerID {apptJoinConditions}
+                        WHERE st.CompanyID='" + companyid + "' AND st.CustomerID='" + customerId + "'";
+                }
+                else
+                {
+                    strSQL += @"SELECT count(Id) as totalRecords  FROM [msSchedulerV3].dbo.tbl_CustomerSite WHERE CompanyID='" + companyid + "' AND CustomerID='" + customerId + "'";
+                }
                 if (!string.IsNullOrEmpty(searchValue))
                 {
-                    strSQL += $" AND (SiteName LIKE '%{searchValue}%' OR FirstName LIKE '%{searchValue}%' OR Email LIKE '%{searchValue}%') ;";
+                    if (hasApptFilters)
+                        strSQL += $" AND (st.SiteName LIKE '%{searchValue}%' OR st.FirstName LIKE '%{searchValue}%' OR st.Email LIKE '%{searchValue}%') ;";
+                    else
+                        strSQL += $" AND (SiteName LIKE '%{searchValue}%' OR FirstName LIKE '%{searchValue}%' OR Email LIKE '%{searchValue}%') ;";
                 }
                 else
                 {
@@ -1205,8 +1243,9 @@ namespace FSM
                         });
                     }
                 }
-                else
+                else if (!hasApptFilters)
                 {
+                    // Only show default customer location when no filters are active
                     DataTable customerDt = new DataTable();
                     db.Open();
                     string customerSql = @"SELECT * FROM [msSchedulerV3].[dbo].[tbl_Customer] WHERE CustomerID = @CustomerID AND CompanyID = @CompanyID;";
@@ -1220,8 +1259,8 @@ namespace FSM
                         DataRow cust = customerDt.Rows[0];
                         sites.Add(new CustomerSite
                         {
-                            Id = 0, 
-                            CompanyID = companyid, 
+                            Id = 0,
+                            CompanyID = companyid,
                             CustomerID = cust["CustomerID"].ToString(),
                             CustomerGuid = cust["CustomerGuid"].ToString(),
                             SiteName = "Customer Location (Default)",
