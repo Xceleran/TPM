@@ -853,6 +853,106 @@ tr.selected .cust-table-edit-btn {
         opacity: 1;
     }
 
+/* Sites Filter Bar */
+.sites-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    background: #f0f4f8;
+    border: 1px solid #d6e0ea;
+    border-radius: 8px;
+    flex-wrap: wrap;
+}
+
+.sites-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sites-filter-group label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #4a5568;
+    white-space: nowrap;
+}
+
+.sites-filter-input {
+    padding: 7px 12px;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    font-size: 13px;
+    min-width: 155px;
+    height: 36px;
+    background: #fff;
+    color: #2d3748;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.sites-filter-input:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+}
+
+.sites-filter-btn {
+    padding: 7px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    height: 36px;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    background-color: #007bff;
+    color: #fff;
+    letter-spacing: 0.3px;
+}
+
+.sites-filter-btn:hover {
+    background-color: #0056b3;
+    box-shadow: 0 2px 6px rgba(0, 91, 187, 0.25);
+}
+
+.sites-filter-clear-btn {
+    background-color: transparent;
+    color: #6c757d;
+    border: 1px solid #cbd5e0;
+}
+
+.sites-filter-clear-btn:hover {
+    background-color: #e2e8f0;
+    color: #4a5568;
+    box-shadow: none;
+}
+
+[data-theme="dark"] .sites-filter-bar {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .sites-filter-group label {
+    color: #cbd5e0;
+}
+
+[data-theme="dark"] .sites-filter-input {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .sites-filter-clear-btn {
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #a0aec0;
+}
+
+[data-theme="dark"] .sites-filter-clear-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e2e8f0;
+}
+
 /* Site Card Styling */
 .sites-header {
     display: flex;

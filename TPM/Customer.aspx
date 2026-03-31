@@ -164,6 +164,20 @@
                         <div class="cust-section-content" id="sites">
                             <div class="sites-header">
                             </div>
+                            <div class="sites-filter-bar" id="sitesFilterBar">
+                                <div class="sites-filter-group">
+                                    <label for="siteApptDateFilter">Appointment Date:</label>
+                                    <input type="date" id="siteApptDateFilter" class="sites-filter-input" />
+                                </div>
+                                <div class="sites-filter-group">
+                                    <label for="siteApptStatusFilter">Status:</label>
+                                    <select id="siteApptStatusFilter" class="sites-filter-input">
+                                        <option value="">All Statuses</option>
+                                    </select>
+                                </div>
+                                <button type="button" id="siteFilterSearchBtn" class="sites-filter-btn"><i class="fas fa-search" style="margin-right:5px;"></i>Search</button>
+                                <button type="button" id="siteFilterClearBtn" class="sites-filter-btn sites-filter-clear-btn"><i class="fas fa-times" style="margin-right:5px;"></i>Clear</button>
+                            </div>
                              <div class="loading-overlay" id="loading-spinner">
                                 <div class="spinner-border text-primary" role="status">
                                     <span class="visually-hidden">Loading...</span>

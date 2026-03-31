@@ -24,9 +24,43 @@ function closeModal(modalId) {
     }
 }
 
+function loadSiteApptStatuses() {
+    $.ajax({
+        url: "Customer.aspx/GetAppointmentStatuses",
+        type: "POST",
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        data: "{}",
+        success: function (response) {
+            var select = $('#siteApptStatusFilter');
+            select.find('option:gt(0)').remove();
+            var statuses = response.d || [];
+            statuses.forEach(function (s) {
+                select.append('<option value="' + escapeHTML(s.StatusName) + '">' + escapeHTML(s.StatusName) + '</option>');
+            });
+            // Restore saved filter values after dropdown is populated
+            var savedDate = sessionStorage.getItem('siteApptDateFilter');
+            var savedStatus = sessionStorage.getItem('siteApptStatusFilter');
+            if (savedDate) $('#siteApptDateFilter').val(savedDate);
+            if (savedStatus) $('#siteApptStatusFilter').val(savedStatus);
+        }
+    });
+}
+
+function saveSiteFiltersToSession() {
+    sessionStorage.setItem('siteApptDateFilter', $('#siteApptDateFilter').val() || '');
+    sessionStorage.setItem('siteApptStatusFilter', $('#siteApptStatusFilter').val() || '');
+}
+
+function clearSiteFiltersFromSession() {
+    sessionStorage.removeItem('siteApptDateFilter');
+    sessionStorage.removeItem('siteApptStatusFilter');
+}
+
 $(document).ready(function () {
 
     loadCustomers();
+    loadSiteApptStatuses();
 
     $('.cust-section-toggle').on('click', function () {
         const sectionId = $(this).data('section');
@@ -253,6 +287,24 @@ $(document).ready(function () {
 
     $('#closeAddSite, #closeAddSiteIcon').on('click', function () {
         closeModal('addSiteModal');
+    });
+
+    // Site appointment filter - Search button
+    $('#siteFilterSearchBtn').on('click', function () {
+        saveSiteFiltersToSession();
+        if ($.fn.DataTable.isDataTable('#customerSiteTable')) {
+            $('#customerSiteTable').DataTable().draw();
+        }
+    });
+
+    // Site appointment filter - Clear button
+    $('#siteFilterClearBtn').on('click', function () {
+        $('#siteApptDateFilter').val('');
+        $('#siteApptStatusFilter').val('');
+        clearSiteFiltersFromSession();
+        if ($.fn.DataTable.isDataTable('#customerSiteTable')) {
+            $('#customerSiteTable').DataTable().draw();
+        }
     });
 
     $('#statusFilter').on('change', function () {
@@ -516,6 +568,8 @@ function loadCustomerSiteData(customerId) {
             dataType: "json",
 
             data: function (d) {
+                // Save current filter values on every request
+                saveSiteFiltersToSession();
                 return JSON.stringify({
                     customerId: customerId,
                     draw: d.draw,
@@ -523,7 +577,9 @@ function loadCustomerSiteData(customerId) {
                     length: d.length,
                     searchValue: d.search.value,
                     sortColumn: d.columns[d.order[0].column].data,
-                    sortDirection: d.order[0].dir
+                    sortDirection: d.order[0].dir,
+                    appointmentStartDate: $('#siteApptDateFilter').val() || '',
+                    appointmentStatus: $('#siteApptStatusFilter').val() || ''
                 });
             },
          
