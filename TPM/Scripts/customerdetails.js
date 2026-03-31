@@ -2815,8 +2815,7 @@ function populateTimeSlots() {
     $timeSlot.empty();
     $timeSlot.append('<option value="">Select Time Slot</option>');
 
-    const genericSlots = ["Morning", "Afternoon", "Evening"];
-    genericSlots.forEach(s => $timeSlot.append(new Option(s, s.toLowerCase())));
+   
 
     // Add 30-min increments from 8 AM to 8 PM
     for (let h = 8; h < 20; h++) {

@@ -564,6 +564,9 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                     const mmsButton = `
                         <button class="cust-site-icon-btn cust-site-MMS-btn" title="Send MMS" data-site-id="${site.Id}" data-customer-id="${site.CustomerID}" data-MobileNumber-id="${site.MobileNumber}" data-is-default="${isDefaultSite}">
                             <i class="fa-solid fa-photo-film"></i></button>`;
+                    const emaailButton = `
+                        <button class="cust-site-icon-btn cust-site-MMS-btn" title="Send MMS" data-site-id="${site.Id}" data-customer-id="${site.CustomerID}" data-MobileNumber-id="${site.MobileNumber}" data-is-default="${isDefaultSite}">
+                            <i class="fa-solid fa-photo-film"></i></button>`;
 
 
                     const deleteButton = `

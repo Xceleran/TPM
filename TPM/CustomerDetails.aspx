@@ -943,48 +943,10 @@
                                             class="ms-2 badge bg-light text-dark font-monospace"
                                             style="font-size: 0.8rem; border: 1px solid #dee2e6;"></span></button>
                                 </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link-modal px-4 py-2" id="forms-tab" data-bs-toggle="tab"
-                                        data-bs-target="#forms-section" type="button" role="tab"
-                                        aria-controls="forms-section" aria-selected="false"
-                                        style="font-weight: 600; color: #4b5563; background-color: white; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); transition: all 0.2s;"
-                                        onmouseover="this.style.backgroundColor='#dbeafe'; this.style.color='#1e40af';"
-                                        onmouseout="if(!this.classList.contains('active')){this.style.backgroundColor='white'; this.style.color='#4b5563';}">Forms</button>
-                                </li>
+                              
                             </ul>
                             <div class="d-flex flex-wrap gap-2">
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-basic-tab" data-bs-toggle="tab"
-                                    data-bs-target="#csl-basic-section" type="button" role="tab"
-                                    aria-controls="csl-basic-section" aria-selected="false">
-                                    Basic Info</button>
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-appointments-tab"
-                                    data-bs-toggle="tab" data-bs-target="#csl-appointments-section" type="button"
-                                    role="tab" aria-controls="csl-appointments-section" aria-selected="false">
-                                    Appointments</button>
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-invoices-tab"
-                                    data-bs-toggle="tab" data-bs-target="#csl-invoices-section" type="button" role="tab"
-                                    aria-controls="csl-invoices-section" aria-selected="false">
-                                    Invoices/Estimates</button>
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-notes-tab" data-bs-toggle="tab"
-                                    data-bs-target="#csl-notes-section" type="button" role="tab"
-                                    aria-controls="csl-notes-section" aria-selected="false">
-                                    Notes</button>
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-equipment-tab"
-                                    data-bs-toggle="tab" data-bs-target="#csl-equipment-section" type="button"
-                                    role="tab" aria-controls="csl-equipment-section" aria-selected="false">
-                                    Equipment</button>
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-pictures-tab"
-                                    data-bs-toggle="tab" data-bs-target="#csl-pictures-section" type="button" role="tab"
-                                    aria-controls="csl-pictures-section" aria-selected="false">
-                                    Pictures</button>
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-files-tab" data-bs-toggle="tab"
-                                    data-bs-target="#csl-files-section" type="button" role="tab"
-                                    aria-controls="csl-files-section" aria-selected="false">
-                                    Files</button>
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-agreements-tab"
-                                    data-bs-toggle="tab" data-bs-target="#csl-agreements-section" type="button"
-                                    role="tab" aria-controls="csl-agreements-section" aria-selected="false">
-                                    Maintenance Agreements</button>
+                                
                             </div>
                             <div class="ms-auto">
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"

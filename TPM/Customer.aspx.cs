@@ -260,6 +260,187 @@ namespace FSM
 
             return JsonConvert.SerializeObject(response);
         }
+        public class CustomFieldData
+        {
+            public int FieldId { get; set; }
+            public string Value { get; set; }
+        }
+        [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static bool UpdateAppointmentWithCustomFields(Appointment appointment, List<CustomFieldData> customFieldValues)
+        {
+            // Use the existing logic from Appointments.aspx or similar if available
+            // For simplicity, we can call the SaveCustomFieldData method if it exists here
+            if (customFieldValues != null)
+            {
+                SaveCustomFieldData(Convert.ToInt32(appointment.AppoinmentId), customFieldValues);
+            }
+
+            return UpdateAppointment(appointment);
+        }
+
+        [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static bool SaveCustomFieldData(int appointmentId, List<CustomFieldData> customFieldValues)
+        {
+            string connStrJobs = ConfigurationManager.AppSettings["ConnStrJobs"];
+            using (var con = new System.Data.SqlClient.SqlConnection(connStrJobs))
+            {
+                con.Open();
+                var transaction = con.BeginTransaction();
+                try
+                {
+                    string deleteSql = "DELETE FROM [msSchedulerV3].[dbo].[AppointmentCustomFields] WHERE AppointmentID = @AppointmentID";
+                    using (var deleteCmd = new System.Data.SqlClient.SqlCommand(deleteSql, con, transaction))
+                    {
+                        deleteCmd.Parameters.AddWithValue("@AppointmentID", appointmentId);
+                        deleteCmd.ExecuteNonQuery();
+                    }
+
+                    if (customFieldValues != null)
+                    {
+                        foreach (var fieldData in customFieldValues)
+                        {
+                            if (string.IsNullOrEmpty(fieldData.Value) || fieldData.Value == "[]") continue;
+                            string insertSql = @"INSERT INTO [msSchedulerV3].[dbo].[AppointmentCustomFields] (AppointmentID, FieldID, FieldValue, LastUpdated)
+                                            VALUES (@AppointmentID, @FieldID, @FieldValue, GETDATE())";
+                            using (var cmd = new System.Data.SqlClient.SqlCommand(insertSql, con, transaction))
+                            {
+                                cmd.Parameters.AddWithValue("@AppointmentID", appointmentId);
+                                cmd.Parameters.AddWithValue("@FieldID", fieldData.FieldId);
+                                cmd.Parameters.AddWithValue("@FieldValue", fieldData.Value);
+                                cmd.ExecuteNonQuery();
+                            }
+                        }
+                    }
+                    transaction.Commit();
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    transaction.Rollback();
+                    System.Diagnostics.Debug.WriteLine("Error in SaveCustomFieldData: " + ex.Message);
+                    return false;
+                }
+            }
+        }
+
+        [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static bool UpdateAppointment(Appointment appointment)
+        {
+            try
+            {
+                string companyId = HttpContext.Current.Session["CompanyID"].ToString();
+                Database db = new Database();
+
+                // Get old status to check for changes
+                string oldStatus = "";
+                db.Open();
+                DataTable dtOld = new DataTable();
+                string checkSql = "SELECT Status FROM [msSchedulerV3].[dbo].[tbl_Appointment] WHERE ApptID = @ApptID AND CompanyID = @CompanyID";
+                db.AddParameter("@ApptID", appointment.AppoinmentId, SqlDbType.Int);
+                db.AddParameter("@CompanyID", companyId, SqlDbType.NVarChar);
+                db.ExecuteParam(checkSql, out dtOld);
+                if (dtOld.Rows.Count > 0) oldStatus = dtOld.Rows[0]["Status"].ToString();
+                if (oldStatus == "0" || string.IsNullOrEmpty(oldStatus)) oldStatus = "Pending";
+                db.Close();
+
+                // Clear parameters from the status check query before adding update parameters
+                db.Command.Parameters.Clear();
+
+                string sql = @"UPDATE [msSchedulerV3].[dbo].[tbl_Appointment] SET
+                            ServiceType = @ServiceType,
+                            ResourceID = @ResourceID,
+                            Status = @Status,
+                            TicketStatus = @TicketStatus,
+                            ApptDateTime = @ApptDateTime,
+                            StartDateTime = @StartDateTime,
+                            EndDateTime = @EndDateTime,
+                            TimeSlot = @TimeSlot,
+                            Hour = @Hour,
+                            Minute = @Minute,
+                            Note = @Note
+                           WHERE ApptID = @ApptID AND CompanyID = @CompanyID";
+
+                db.AddParameter("@ServiceType", appointment.ServiceType, SqlDbType.NVarChar);
+                db.AddParameter("@ResourceID", appointment.ResourceID, SqlDbType.Int);
+                string statusToSave = appointment.Status;
+                if (statusToSave == "0" || string.IsNullOrEmpty(statusToSave)) statusToSave = "Pending";
+                db.AddParameter("@Status", statusToSave, SqlDbType.NVarChar);
+                db.AddParameter("@TicketStatus", appointment.TicketStatus ?? "", SqlDbType.NVarChar);
+                db.AddParameter("@ApptDateTime", appointment.RequestDate, SqlDbType.DateTime);
+                string dateFormatString = "MM/dd/yyyy hh:mm tt";
+                object startDtValue = DBNull.Value;
+                object endDtValue = DBNull.Value;
+                if (!string.IsNullOrEmpty(appointment.StartDateTime))
+                {
+                    DateTime parsed;
+                    if (DateTime.TryParseExact(appointment.StartDateTime, dateFormatString, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out parsed))
+                        startDtValue = parsed;
+                    else if (DateTime.TryParse(appointment.StartDateTime, out parsed))
+                        startDtValue = parsed;
+                }
+                if (!string.IsNullOrEmpty(appointment.EndDateTime))
+                {
+                    DateTime parsed;
+                    if (DateTime.TryParseExact(appointment.EndDateTime, dateFormatString, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out parsed))
+                        endDtValue = parsed;
+                    else if (DateTime.TryParse(appointment.EndDateTime, out parsed))
+                        endDtValue = parsed;
+                }
+                db.AddParameter("@StartDateTime", startDtValue, SqlDbType.DateTime);
+                db.AddParameter("@EndDateTime", endDtValue, SqlDbType.DateTime);
+                db.AddParameter("@TimeSlot", appointment.TimeSlot, SqlDbType.NVarChar);
+                db.AddParameter("@Hour", appointment.Hour, SqlDbType.Int);
+                db.AddParameter("@Minute", appointment.Minute, SqlDbType.Int);
+                db.AddParameter("@Note", appointment.Note, SqlDbType.NVarChar);
+                db.AddParameter("@SiteId", appointment.SiteId, SqlDbType.Int);
+                db.AddParameter("@ApptID", appointment.AppoinmentId, SqlDbType.Int);
+                db.AddParameter("@CompanyID", companyId, SqlDbType.NVarChar);
+
+                db.Open();
+                bool success = db.UpdateSql(sql);
+
+                if (success)
+                {
+                    // Log status history if changed
+                    if (!string.IsNullOrEmpty(appointment.Status) && !string.IsNullOrEmpty(oldStatus) && oldStatus != appointment.Status)
+                    {
+                        try
+                        {
+                            string historySql = @"INSERT INTO [msSchedulerV3].[dbo].[tbl_AppointmentStatusHistory]
+                                               ([AppointmentId], [CompanyID], [PreviousStatus], [NewStatus], [StatusChangeDateTime], [ChangedBy], [Notes], [CreatedDateTime])
+                                               VALUES
+                                               (@ApptID, @CompanyID, @PreviousStatus, @NewStatus, GETDATE(), @ChangedBy, @Note, GETDATE())";
+
+                            db.Command.Parameters.Clear();
+                            db.AddParameter("@ApptID", appointment.AppoinmentId, SqlDbType.NVarChar);
+                            db.AddParameter("@CompanyID", companyId, SqlDbType.NVarChar);
+                            db.AddParameter("@PreviousStatus", oldStatus, SqlDbType.NVarChar);
+                            db.AddParameter("@NewStatus", appointment.Status, SqlDbType.NVarChar);
+                            string currentUser = HttpContext.Current.Session["LoginUser"] as string ?? "System";
+                            db.AddParameter("@ChangedBy", currentUser, SqlDbType.NVarChar);
+                            db.AddParameter("@Note", (object)appointment.Note ?? DBNull.Value, SqlDbType.NVarChar);
+
+                            db.UpdateSql(historySql);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Error logging history in UpdateAppointment (Customer): {ex.Message}");
+                        }
+                    }
+                }
+
+                db.Close();
+                return success;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error in UpdateAppointment: " + ex.Message);
+                return false;
+            }
+        }
         [WebMethod]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public static object GetServiceTypes()
@@ -274,7 +455,7 @@ namespace FSM
                 DataTable dt = new DataTable();
                 string sql = @"SELECT ServiceTypeID, ServiceName 
                                FROM tbl_ServiceType 
-                                WHERE CompanyID = @CompanyID AND (Source IS NULL OR Source != 'CEC')
+                                WHERE CompanyID = @CompanyID AND (Source != 'FSM')
                                ORDER BY ServiceName";
              //   db.AddParameter("@CompanyID", companyId, SqlDbType.NVarChar);
                 //db.ExecuteParam(sql, out dt);
@@ -1386,6 +1567,23 @@ namespace FSM
             public string subject { get; set; }
             public string body { get; set; }
             public string customerID { get; set; }
+        }
+        public class Appointment
+        {
+            public string AppoinmentId { get; set; }
+            public string CustomerID { get; set; }
+            public string ServiceType { get; set; }
+            public int ResourceID { get; set; }
+            public string Status { get; set; }
+            public string TicketStatus { get; set; }
+            public string RequestDate { get; set; }
+            public string StartDateTime { get; set; }
+            public string EndDateTime { get; set; }
+            public string TimeSlot { get; set; }
+            public int Hour { get; set; }
+            public int Minute { get; set; }
+            public string Note { get; set; }
+            public int SiteId { get; set; }
         }
 
     }

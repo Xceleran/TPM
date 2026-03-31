@@ -623,7 +623,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/2.2.2/js/dataTables.min.js"></script>
     <script type="text/javascript" src="https://cdn.datatables.net/select/3.0.0/js/dataTables.select.min.js"></script>
-    <script src="Scripts/customer.js?v=11"></script>
+  
     <script>
 
         $(document).ready(function () {
@@ -680,4 +680,5 @@
             }
         });
     </script>
+      <script src="Scripts/customer.js?v=12"></script>
 </asp:Content>
