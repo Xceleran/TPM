@@ -36,7 +36,7 @@ function loadSiteApptStatuses() {
             select.find('option:gt(0)').remove();
             var statuses = response.d || [];
             statuses.forEach(function (s) {
-                select.append('<option value="' + escapeHTML(s.StatusName) + '">' + escapeHTML(s.StatusName) + '</option>');
+                select.append('<option value="' + escapeHTML(s.StatusID) + '">' + escapeHTML(s.StatusName) + '</option>');
             });
             // Restore saved filter values after dropdown is populated
             var savedDate = sessionStorage.getItem('siteApptDateFilter');

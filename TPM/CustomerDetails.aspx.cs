@@ -442,6 +442,7 @@ namespace TPM
             return customerData;
         }
 
+
         [WebMethod(EnableSession = true)]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public static List<AppointmentModel> GetCustomerAppoinmets(string customerId, int siteId)
@@ -870,7 +871,8 @@ namespace TPM
                                 FROM [msSchedulerV3].dbo.tbl_Equipment eqp 
                                 LEFT JOIN [msSchedulerV3].dbo.tbl_Customer cus ON eqp.CustomerGuid = cus.CustomerGuid
                                 LEFT JOIN [msSchedulerV3].dbo.tbl_EquipmentType et ON eqp.EquipmentTypeID = et.equipmentTypeID
-                                WHERE eqp.CustomerGuid=@CustomerGuid AND eqp.CompanyID = @CompanyID AND eqp.SiteId = @SiteId;";
+                                WHERE eqp.CustomerGuid=@CustomerGuid AND eqp.CompanyID = @CompanyID AND eqp.SiteId = @SiteId order by eqp.CreatedDateTime desc;";
+
                 db.AddParameter("@CustomerGuid", customerGuid, SqlDbType.NVarChar);
                 db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
                 db.AddParameter("@SiteId", siteId, SqlDbType.Int);
@@ -1762,7 +1764,7 @@ namespace TPM
                         NULL as UploadedFrom,
                         NULL as UploadedTo
                     FROM [msSchedulerV3].[dbo].[tbl_MaintenanceAgreements]
-                    WHERE CAST(CustomerID AS NVARCHAR(50)) = @CustomerID 
+                    WHERE CAST(CustomerID AS NVARCHAR(50)) = @CustomerID and SiteId = @SiteId
                       AND CompanyID = @CompanyID
                     ORDER BY UploadDate DESC";
 
@@ -1777,6 +1779,7 @@ namespace TPM
 
                 db.AddParameter("@CustomerID", customerId, SqlDbType.NVarChar);
                 db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+                db.AddParameter("@SiteId", siteId, SqlDbType.NVarChar);
                 // SiteId parameter removed - showing all customer agreements
 
                 // ExecuteParam creates its own connection, so we don't need db.Open() or db.Close()
@@ -1968,9 +1971,10 @@ namespace TPM
                 // Handle CustomerID as both string and integer for compatibility
                 // Note: tbl_Pictures table doesn't have AppointmentId, TaggedFrom, TaggedTo, UploadedFrom, UploadedTo columns
                 string sql = @"
-                    SELECT 
+                    SELECT
                         Id,
                         FileName,
+                        PictureURL,
                         UploadDate,
                         COALESCE(NULLIF(UploadedBy, ''), 'System') as UploadedBy,
                         SiteId,
@@ -1981,8 +1985,8 @@ namespace TPM
                         NULL as UploadedFrom,
                         NULL as UploadedTo
                     FROM [msSchedulerV3].[dbo].[tbl_Pictures]
-                    WHERE CAST(CustomerID AS NVARCHAR(50)) = @CustomerID 
-                      AND CompanyID = @CompanyID
+                    WHERE CAST(CustomerID AS NVARCHAR(50)) = @CustomerID
+                      AND CompanyID = @CompanyID and SiteId = @SiteId
                     ORDER BY UploadDate DESC";
 
                 // Initialize Command if needed (ExecuteParam uses db.Command.Parameters)
@@ -1996,6 +2000,7 @@ namespace TPM
 
                 db.AddParameter("@CustomerID", customerId, SqlDbType.NVarChar);
                 db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+                db.AddParameter("@SiteId", siteId, SqlDbType.NVarChar);
                 // SiteId parameter removed - showing all customer pictures
 
                 // ExecuteParam creates its own connection, so we don't need db.Open() or db.Close()
@@ -2003,15 +2008,36 @@ namespace TPM
 
                 System.Diagnostics.Debug.WriteLine($"GetSitePictures: Found {dt.Rows.Count} pictures for customer {customerId}");
 
+                string appPath = HttpContext.Current.Request.ApplicationPath.TrimEnd('/');
+
                 if (dt.Rows.Count > 0)
                 {
                     foreach (DataRow row in dt.Rows)
                     {
+                        string pictureUrl = row.Table.Columns.Contains("PictureURL") && row["PictureURL"] != DBNull.Value
+                            ? row.Field<string>("PictureURL") : null;
+
+                        string fileUrl;
+                        if (!string.IsNullOrEmpty(pictureUrl) && pictureUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Full absolute URL (new format)
+                            fileUrl = pictureUrl;
+                        }
+                        else if (!string.IsNullOrEmpty(pictureUrl))
+                        {
+                            // Relative path (legacy format)
+                            fileUrl = appPath + "/" + pictureUrl;
+                        }
+                        else
+                        {
+                            fileUrl = appPath + $"/CustomerDetails.aspx?type=picture&id={row.Field<int>("Id")}";
+                        }
+
                         pictures.Add(new PictureViewModel
                         {
                             Id = row.Field<int>("Id"),
                             FileName = row.Field<string>("FileName") ?? "",
-                            FileUrl = $"/fsm/CustomerDetails.aspx?type=picture&id={row.Field<int>("Id")}",
+                            FileUrl = fileUrl,
                             UploadDate = row.Field<DateTime?>("UploadDate")?.ToString("MM/dd/yyyy HH:mm") ?? "",
                             UploadedBy = row.Field<string>("UploadedBy") ?? "System",
                             AppointmentId = row.Table.Columns.Contains("AppointmentId") && row["AppointmentId"] != DBNull.Value ? (int?)Convert.ToInt32(row["AppointmentId"]) : null,
@@ -2039,28 +2065,22 @@ namespace TPM
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public static bool SaveSitePicture(string customerId, int siteId, string fileName, string fileContent, string reference)
         {
+            string fullPath = null;
             try
             {
                 string companyid = HttpContext.Current.Session["CompanyID"]?.ToString();
                 string userId = HttpContext.Current.Session["LoginUser"]?.ToString() ?? HttpContext.Current.Session["UserID"]?.ToString() ?? HttpContext.Current.User?.Identity?.Name ?? "System";
 
-                System.Diagnostics.Debug.WriteLine($"SaveSitePicture called with: customerId={customerId}, siteId={siteId}, fileName={fileName}, fileContent length={fileContent?.Length ?? 0}, reference={reference}, companyid={companyid}, userId={userId}");
-
                 if (string.IsNullOrEmpty(companyid) || string.IsNullOrEmpty(customerId) || string.IsNullOrEmpty(fileName) || string.IsNullOrEmpty(fileContent))
                 {
-                    System.Diagnostics.Debug.WriteLine($"SaveSitePicture: Validation failed - CompanyID: {companyid}, CustomerID: {customerId}, FileName: {fileName}, FileContent length: {fileContent?.Length ?? 0}");
                     return false;
                 }
 
-                Database db = new Database();
-                string connString = db.ConnectionString;
-
                 // Convert base64 to bytes
-                // byte[] fileBytes;
+                byte[] fileBytes;
                 try
                 {
-                    //   fileBytes = Convert.FromBase64String(fileContent);
-                    //  System.Diagnostics.Debug.WriteLine($"SaveSitePicture: Converted base64 to bytes, length: {fileBytes.Length}");
+                    fileBytes = Convert.FromBase64String(fileContent);
                 }
                 catch (Exception ex)
                 {
@@ -2068,44 +2088,73 @@ namespace TPM
                     return false;
                 }
 
+                // Save file to disk
+                string relativePath = "FSMPictures/" + companyid + "/" + customerId + "/";
+                string folderPath = HttpContext.Current.Server.MapPath("~/" + relativePath);
+
+                if (!Directory.Exists(folderPath))
+                {
+                    Directory.CreateDirectory(folderPath);
+                }
+
+                string safeFileName = Path.GetFileName(fileName);
+                fullPath = Path.Combine(folderPath, safeFileName);
+                if (File.Exists(fullPath))
+                {
+                    safeFileName = Guid.NewGuid().ToString().Substring(0, 8) + "_" + safeFileName;
+                    fullPath = Path.Combine(folderPath, safeFileName);
+                }
+
+                File.WriteAllBytes(fullPath, fileBytes);
+
+                // Build full absolute URL from current request
+                var request = HttpContext.Current.Request;
+                string baseUrl = request.Url.Scheme + "://" + request.Url.Authority + request.ApplicationPath.TrimEnd('/') + "/";
+                string pictureUrl = baseUrl + relativePath + safeFileName;
+
+                Database db = new Database();
+                string connString = db.ConnectionString;
+
                 string sql = @"
                     INSERT INTO [msSchedulerV3].[dbo].[tbl_Pictures]
-                    (CompanyID, CustomerID, SiteId, FileName, FileContent, UploadDate, UploadedBy, Reference)
-                    VALUES (@CompanyID, @CustomerID, @SiteId, @FileName, @FileContent, GETDATE(), @UploadedBy, @Reference)";
+                    (CompanyID, CustomerID, SiteId, FileName, PictureURL, UploadDate, UploadedBy, Reference, Tag)
+                    VALUES (@CompanyID, @CustomerID, @SiteId, @FileName, @PictureURL, GETDATE(), @UploadedBy, @Reference, @Tag)";
 
-                using (System.Data.SqlClient.SqlConnection conn = new System.Data.SqlClient.SqlConnection(connString))
-                using (System.Data.SqlClient.SqlCommand cmd = new System.Data.SqlClient.SqlCommand(sql, conn))
+                using (SqlConnection conn = new SqlConnection(connString))
+                using (SqlCommand cmd = new SqlCommand(sql, conn))
                 {
-                    cmd.CommandType = System.Data.CommandType.Text;
+                    cmd.CommandType = CommandType.Text;
                     cmd.CommandTimeout = 900;
 
-                    cmd.Parameters.Add(new System.Data.SqlClient.SqlParameter("@CompanyID", System.Data.SqlDbType.NVarChar) { Value = companyid });
-                    cmd.Parameters.Add(new System.Data.SqlClient.SqlParameter("@CustomerID", System.Data.SqlDbType.NVarChar) { Value = customerId });
-                    cmd.Parameters.Add(new System.Data.SqlClient.SqlParameter("@SiteId", System.Data.SqlDbType.Int) { Value = siteId });
-                    cmd.Parameters.Add(new System.Data.SqlClient.SqlParameter("@FileName", System.Data.SqlDbType.NVarChar) { Value = fileName });
-                    cmd.Parameters.Add("@FileContent", fileContent);
-                    cmd.Parameters.Add(new System.Data.SqlClient.SqlParameter("@UploadedBy", System.Data.SqlDbType.NVarChar) { Value = userId });
-                    cmd.Parameters.Add(new System.Data.SqlClient.SqlParameter("@Reference", System.Data.SqlDbType.NVarChar) { Value = (object)reference ?? DBNull.Value });
-
-                    System.Diagnostics.Debug.WriteLine($"SaveSitePicture: Executing SQL with {cmd.Parameters.Count} parameters");
+                    cmd.Parameters.Add(new SqlParameter("@CompanyID", SqlDbType.NVarChar) { Value = companyid });
+                    cmd.Parameters.Add(new SqlParameter("@CustomerID", SqlDbType.NVarChar) { Value = customerId });
+                    cmd.Parameters.Add(new SqlParameter("@SiteId", SqlDbType.Int) { Value = siteId });
+                    cmd.Parameters.Add(new SqlParameter("@FileName", SqlDbType.NVarChar) { Value = safeFileName });
+                    cmd.Parameters.Add(new SqlParameter("@PictureURL", SqlDbType.NVarChar) { Value = pictureUrl });
+                    cmd.Parameters.Add(new SqlParameter("@UploadedBy", SqlDbType.NVarChar) { Value = userId });
+                    cmd.Parameters.Add(new SqlParameter("@Reference", SqlDbType.NVarChar) { Value = (object)reference ?? DBNull.Value });
+                    cmd.Parameters.Add(new SqlParameter("@Tag", SqlDbType.NVarChar) { Value = "FSM" });
 
                     conn.Open();
                     int rowsAffected = cmd.ExecuteNonQuery();
 
-                    System.Diagnostics.Debug.WriteLine($"SaveSitePicture: Rows affected = {rowsAffected}");
+                    if (rowsAffected <= 0 && fullPath != null && File.Exists(fullPath))
+                    {
+                        File.Delete(fullPath); // Cleanup file if DB insert failed
+                    }
 
                     return rowsAffected > 0;
                 }
             }
             catch (Exception ex)
             {
+                // Cleanup file on error
+                if (fullPath != null && File.Exists(fullPath))
+                {
+                    try { File.Delete(fullPath); } catch { }
+                }
                 System.Diagnostics.Debug.WriteLine($"Error in SaveSitePicture: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
-                if (ex.InnerException != null)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-                    System.Diagnostics.Debug.WriteLine($"Inner Stack Trace: {ex.InnerException.StackTrace}");
-                }
                 return false;
             }
         }
@@ -2118,49 +2167,69 @@ namespace TPM
             {
                 string companyid = HttpContext.Current.Session["CompanyID"]?.ToString();
 
-                System.Diagnostics.Debug.WriteLine($"DeleteSitePicture called with: pictureId={pictureId}, companyid={companyid}");
-
                 if (string.IsNullOrEmpty(companyid) || pictureId <= 0)
                 {
-                    System.Diagnostics.Debug.WriteLine($"DeleteSitePicture: Validation failed - CompanyID: {companyid}, PictureId: {pictureId}");
                     return false;
                 }
 
                 Database db = new Database();
                 string connString = db.ConnectionString;
 
-                string sql = @"
-                    DELETE FROM [msSchedulerV3].[dbo].[tbl_Pictures]
+                // First get the PictureURL so we can delete the physical file
+                string pictureUrl = null;
+                string selectSql = @"SELECT PictureURL FROM [msSchedulerV3].[dbo].[tbl_Pictures]
                     WHERE Id = @PictureId AND CompanyID = @CompanyID";
 
-                using (System.Data.SqlClient.SqlConnection conn = new System.Data.SqlClient.SqlConnection(connString))
-                using (System.Data.SqlClient.SqlCommand cmd = new System.Data.SqlClient.SqlCommand(sql, conn))
+                using (SqlConnection conn = new SqlConnection(connString))
                 {
-                    cmd.CommandType = System.Data.CommandType.Text;
-                    cmd.CommandTimeout = 900;
-
-                    cmd.Parameters.Add(new System.Data.SqlClient.SqlParameter("@PictureId", System.Data.SqlDbType.Int) { Value = pictureId });
-                    cmd.Parameters.Add(new System.Data.SqlClient.SqlParameter("@CompanyID", System.Data.SqlDbType.NVarChar) { Value = companyid });
-
-                    System.Diagnostics.Debug.WriteLine($"DeleteSitePicture: Executing SQL with {cmd.Parameters.Count} parameters");
-
                     conn.Open();
-                    int rowsAffected = cmd.ExecuteNonQuery();
 
-                    System.Diagnostics.Debug.WriteLine($"DeleteSitePicture: Rows affected = {rowsAffected}");
+                    using (SqlCommand selectCmd = new SqlCommand(selectSql, conn))
+                    {
+                        selectCmd.Parameters.Add(new SqlParameter("@PictureId", SqlDbType.Int) { Value = pictureId });
+                        selectCmd.Parameters.Add(new SqlParameter("@CompanyID", SqlDbType.NVarChar) { Value = companyid });
+                        object result = selectCmd.ExecuteScalar();
+                        if (result != null && result != DBNull.Value)
+                        {
+                            pictureUrl = result.ToString();
+                        }
+                    }
 
-                    return rowsAffected > 0;
+                    // Now delete the DB record
+                    string deleteSql = @"DELETE FROM [msSchedulerV3].[dbo].[tbl_Pictures]
+                        WHERE Id = @PictureId AND CompanyID = @CompanyID";
+
+                    using (SqlCommand deleteCmd = new SqlCommand(deleteSql, conn))
+                    {
+                        deleteCmd.Parameters.Add(new SqlParameter("@PictureId", SqlDbType.Int) { Value = pictureId });
+                        deleteCmd.Parameters.Add(new SqlParameter("@CompanyID", SqlDbType.NVarChar) { Value = companyid });
+
+                        int rowsAffected = deleteCmd.ExecuteNonQuery();
+
+                        // Delete physical file after successful DB delete
+                        if (rowsAffected > 0 && !string.IsNullOrEmpty(pictureUrl))
+                        {
+                            try
+                            {
+                                string physicalPath = HttpContext.Current.Server.MapPath("~/" + pictureUrl);
+                                if (File.Exists(physicalPath))
+                                {
+                                    File.Delete(physicalPath);
+                                }
+                            }
+                            catch (Exception fileEx)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"DeleteSitePicture: Failed to delete file: {fileEx.Message}");
+                            }
+                        }
+
+                        return rowsAffected > 0;
+                    }
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error in DeleteSitePicture: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
-                if (ex.InnerException != null)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-                    System.Diagnostics.Debug.WriteLine($"Inner Stack Trace: {ex.InnerException.StackTrace}");
-                }
                 return false;
             }
         }
@@ -2221,7 +2290,7 @@ namespace TPM
                         NULL as UploadedTo
                     FROM [msSchedulerV3].[dbo].[tbl_Files]
                     WHERE CAST(CustomerID AS NVARCHAR(50)) = @CustomerID 
-                      AND CompanyID = @CompanyID
+                      AND CompanyID = @CompanyID and SiteId= @SiteId
                     ORDER BY UploadDate DESC";
 
                 // Initialize Command if needed (ExecuteParam uses db.Command.Parameters)
@@ -2235,6 +2304,7 @@ namespace TPM
 
                 db.AddParameter("@CustomerID", customerId, SqlDbType.NVarChar);
                 db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+                db.AddParameter("@SiteId", siteId, SqlDbType.NVarChar);
                 // SiteId parameter removed - showing all customer files
 
                 // ExecuteParam creates its own connection, so we don't need db.Open() or db.Close()
@@ -2496,7 +2566,7 @@ namespace TPM
                         contentType = "application/pdf";
                         break;
                     case "picture":
-                        sql = @"SELECT FileName, FileContent FROM [msSchedulerV3].[dbo].[tbl_Pictures] 
+                        sql = @"SELECT FileName, FileContent, PictureURL FROM [msSchedulerV3].[dbo].[tbl_Pictures]
                                 WHERE Id = @Id AND CompanyID = @CompanyID";
                         contentType = "image/jpeg"; // Default, will be determined from file
                         break;
@@ -2524,6 +2594,23 @@ namespace TPM
                         if (reader.Read())
                         {
                             fileName = reader["FileName"]?.ToString() ?? "file";
+
+                            // For pictures with PictureURL, redirect to the static file
+                            if (fileType.ToLower() == "picture")
+                            {
+                                try
+                                {
+                                    string pictureUrl = reader["PictureURL"]?.ToString();
+                                    if (!string.IsNullOrEmpty(pictureUrl))
+                                    {
+                                        string appPath = Request.ApplicationPath.TrimEnd('/');
+                                        Response.Redirect(appPath + "/" + pictureUrl, true);
+                                        return;
+                                    }
+                                }
+                                catch (System.Threading.ThreadAbortException) { throw; }
+                                catch { }
+                            }
 
                             if (fileType.ToLower() == "file" && reader["FileType"] != DBNull.Value)
                             {
@@ -2563,11 +2650,25 @@ namespace TPM
                                 if (reader[fileContentColumn] != DBNull.Value)
                                 {
                                     fileContent = (byte[])reader[fileContentColumn];
+
+                                    // Fix for old records where base64 string was stored as UTF-8 bytes
+                                    // instead of decoded image bytes. Detect and re-decode.
+                                    if (fileType.ToLower() == "picture" && fileContent != null && fileContent.Length > 0)
+                                    {
+                                        try
+                                        {
+                                            string possibleBase64 = System.Text.Encoding.UTF8.GetString(fileContent);
+                                            if (possibleBase64.StartsWith("iVBOR") || possibleBase64.StartsWith("/9j/") ||
+                                                possibleBase64.StartsWith("R0lGO") || possibleBase64.StartsWith("Qk"))
+                                            {
+                                                fileContent = Convert.FromBase64String(possibleBase64);
+                                            }
+                                        }
+                                        catch { }
+                                    }
                                 }
                             }
                             catch { }
-
-                          
                         }
                     }
                 }
@@ -2697,7 +2798,7 @@ namespace TPM
                     return "Error: CompanyID is missing from session.";
                 }
 
-                EmailProcessor emailProcessor;
+               EmailProcessor emailProcessor;
                 try
                 {
                     emailProcessor = new EmailProcessor();
@@ -2963,6 +3064,41 @@ namespace TPM
             {
                 ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", $" Swal.fire('Error: {ex.Message}', '', 'error');", true);
             }
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static string GetDuration(int serviceTypeID)
+        {
+            var duration = "0";
+            if (serviceTypeID > 0)
+            {
+                string CompanyID = HttpContext.Current.Session["CompanyID"].ToString();
+                Database db = new Database();
+                try
+                {
+                    db.Open();
+                    DataTable dt = new DataTable();
+                    string sql = @"select Hour, Minute from [msSchedulerV3].[dbo].[tbl_ServiceType] where CompanyID = '" + CompanyID + "' and ServiceTypeID ='" + serviceTypeID + "';";
+                    db.Execute(sql, out dt);
+                    if (dt.Rows.Count > 0)
+                    {
+                        DataRow row = dt.Rows[0];
+                        int hr = row.Field<int?>("Hour") ?? 0;
+                        int min = row.Field<int?>("Minute") ?? 0;
+                        duration = $"{hr} Hr : {min} Min";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return duration;
+                }
+                finally
+                {
+                    db.Close();
+                }
+            }
+            return duration;
         }
     }
 }

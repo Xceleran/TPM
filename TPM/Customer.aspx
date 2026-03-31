@@ -6,7 +6,7 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/select/3.0.0/css/select.dataTables.min.css">
 
     <!-- Local Styles and Scripts -->
-    <link rel="stylesheet" href="Content/customer.css">
+    <link rel="stylesheet" href="Content/customer.css?v=1">
 
     <style>
         .loading-overlay {
@@ -694,5 +694,5 @@
             }
         });
     </script>
-      <script src="Scripts/customer.js?v=12"></script>
+      <script src="Scripts/customer.js?v=13"></script>
 </asp:Content>

@@ -1508,7 +1508,7 @@
             </div>
         </div>
 
-        <script src="Scripts/customerdetails.js?v=3"></script>
+ 
         <script>
             // SMS Modal Functions
             function OpenSMSPopUp(mobile, customerID) {
@@ -1724,5 +1724,5 @@
                 });
             });
         </script>
-
+               <script src="Scripts/customerdetails.js?v=7"></script>
     </asp:Content>
