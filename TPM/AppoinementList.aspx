@@ -542,5 +542,5 @@
         });
     </script>
 
-     <script src="Scripts/AppointmentList.js?v=9"></script>
+     <script src="Scripts/AppointmentList.js?v=10"></script>
 </asp:Content>

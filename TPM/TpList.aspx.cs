@@ -213,25 +213,25 @@ namespace TPM
                         //          <ul class='dropdown-menu' aria-labelledby='Action" + i.ToString() + @"'>" +
                         //              "<li><a class='dropdown-item' href='customerDetail.aspx?BusinessGuID=" + dr["CustomerGuid"].ToString() + "'>Add Link Contact</a></li>" +
                         //            "</ul></div></td>");
-                        table.Append(@"<td><div class='dropdown'>
-                                  <button class='btn btn-secondary btn-sm dropdown-toggle' type='button' id='Action" + i.ToString() + @"' data-bs-toggle='dropdown' aria-expanded='false'>
-                                    <i class='fas fa-align-justify'></i>
-                                  </button>
-                                  <ul class='dropdown-menu' aria-labelledby='Action" + i.ToString() + @"'>" +
-                                     "<li><a class='dropdown-item' href='#'>Access Portal</ a></li>" +
-                                       "<li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId=" + dr["CustomerGuid"].ToString() + "&InType=Invoice'>Create Invoice</a></li>" +
+                        //table.Append(@"<td><div class='dropdown'>
+                        //          <button class='btn btn-secondary btn-sm dropdown-toggle' type='button' id='Action" + i.ToString() + @"' data-bs-toggle='dropdown' aria-expanded='false'>
+                        //            <i class='fas fa-align-justify'></i>
+                        //          </button>
+                        //          <ul class='dropdown-menu' aria-labelledby='Action" + i.ToString() + @"'>" +
+                        //             "<li><a class='dropdown-item' href='#'>Access Portal</ a></li>" +
+                        //               "<li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId=" + dr["CustomerGuid"].ToString() + "&InType=Invoice'>Create Invoice</a></li>" +
                                  
-                                     "<li><a class='dropdown-item' href='#'>View Invoice</a></li>" +
-                                     "<li><a class='dropdown-item' href='#'>View Files</a></li>" +
-                                       "<li><hr class='dropdown-divider'></li>" +
-                                     "<li><a class='dropdown-item' href='#'>Send E-Mail</a></li>" +
-                                     "<li><a class='dropdown-item' href='#'>E-Mail History</a></li>" +
-                                      "<li><a class='dropdown-item' href='#'>Send Text</a></li>" +
-                                       "<li><a class='dropdown-item' href='#'>Send SMS</a></li>" +
-                                       "<li><a class='dropdown-item' href='#'>Text History</a></li>" );
+                        //             "<li><a class='dropdown-item' href='#'>View Invoice</a></li>" +
+                        //             "<li><a class='dropdown-item' href='#'>View Files</a></li>" +
+                        //               "<li><hr class='dropdown-divider'></li>" +
+                        //             "<li><a class='dropdown-item' href='#'>Send E-Mail</a></li>" +
+                        //             "<li><a class='dropdown-item' href='#'>E-Mail History</a></li>" +
+                        //              "<li><a class='dropdown-item' href='#'>Send Text</a></li>" +
+                        //               "<li><a class='dropdown-item' href='#'>Send SMS</a></li>" +
+                        //               "<li><a class='dropdown-item' href='#'>Text History</a></li>" );
                                      
 
-                        table.Append("</ul></div></td>");
+                        //table.Append("</ul></div></td>");
                         table.Append("<td><a style='color:#526288' href='BusinessContact.aspx?id=" + dr["CustomerGuid"].ToString() + "'>" + (dr["BusinessName"].ToString()) + "</a></td>");
 
                         string FullAddress = string.Empty;

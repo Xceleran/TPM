@@ -1008,7 +1008,7 @@ function loadSiteAppointments(siteId, containerEl) {
 
     $.ajax({
         type: 'POST',
-        url: 'CustomerDetails.aspx/GetCustomerAppoinmetsForView',
+        url: 'AppoinementList.aspx/GetCustomerAppoinmetsForView',
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
         data: JSON.stringify({ customerId: customerId, siteId: siteId }),
@@ -1029,11 +1029,11 @@ function showAppointmentDetailsModal(appointment, siteId) {
     if (!appointment) return;
 
     // Ensure dropdowns are populated
-    //populateDropdown("MainContent_ServiceTypeFilter_Edit", cslServiceTypes, "ServiceTypeID", "ServiceName", "Select Service Type");
-    //populateDropdown("resource_list", cslResources, "Id", "Name", "Unassigned");
-    //if (!$('#resource_list option[value="0"]').length) {
-    //    $('#resource_list').prepend(new Option("Unassigned", "0"));
-    //}
+    populateDropdown("MainContent_ServiceTypeFilter_Edit", cslServiceTypes, "ServiceTypeID", "ServiceName", "Select Service Type");
+    populateDropdown("resource_list", cslResources, "Id", "Name", "Unassigned");
+    if (!$('#resource_list option[value="0"]').length) {
+        $('#resource_list').prepend(new Option("Unassigned", "0"));
+    }
     populateDropdown("MainContent_StatusTypeFilter_Edit", cslApptStatuses, "StatusID", "StatusName", "Select Status");
     populateDropdown("MainContent_TicketStatusFilter_Edit", cslTicketStatuses, "StatusID", "StatusName", "Select Ticket Status");
     populateTimeSlots();
@@ -1189,8 +1189,7 @@ function populateTimeSlots() {
     $timeSlot.empty();
     $timeSlot.append('<option value="">Select Time Slot</option>');
 
-    const genericSlots = ["Morning", "Afternoon", "Evening"];
-    genericSlots.forEach(s => $timeSlot.append(new Option(s, s.toLowerCase())));
+    
 
     // Add 30-min increments from 8 AM to 8 PM
     for (let h = 8; h < 20; h++) {

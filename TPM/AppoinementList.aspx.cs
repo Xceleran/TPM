@@ -18,6 +18,7 @@ using System.Data.SqlClient;
 using FSM;
 using FSM.SMSService;
 using System.IO;
+using FSM.Models.AppoinmentModel;
 
 namespace TPM
 {
@@ -550,6 +551,108 @@ namespace TPM
 
             return customer;
         }
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static List<AppointmentModel> GetCustomerAppoinmetsForView(string customerId, int siteId)
+        {
+            var appoinments = new List<AppointmentModel>();
+            string companyid = HttpContext.Current.Session["CompanyID"]?.ToString();
+            if (string.IsNullOrEmpty(companyid))
+            {
+                System.Diagnostics.Debug.WriteLine("GetCustomerAppoinmets: CompanyID is missing from session");
+                return appoinments;
+            }
+            Database db = new Database();
+            try
+            {
+                db.Open();
+                DataTable dt = new DataTable();
+
+                // Show ALL appointments for the customer across all sites
+                // Handle CustomerID as both string and integer for compatibility
+                string sql = @"SELECT CONVERT(VARCHAR(10), apt.ApptDateTime, 101) AS ApptDateTimeConverted,apt.ApptID,  
+    CASE WHEN apt.Status = 'Deleted' THEN 'N/A' WHEN sts.StatusName = 'Scheduled' THEN 'Confirmed' ELSE sts.StatusName END AS AppStatus, 
+    tkt.StatusName AS AppTicketStatus
+    FROM tbl_Appointment AS apt 
+   -- LEFT JOIN tbl_Resources AS rsc ON apt.ResourceID = rsc.Id AND apt.CompanyID = rsc.CompanyID
+    --LEFT JOIN tbl_ServiceType AS srv ON apt.ServiceType = srv.ServiceTypeID AND apt.CompanyID = srv.CompanyID
+    LEFT JOIN tbl_Status AS sts ON ISNULL(TRY_CAST(apt.Status AS INT), 0) = sts.StatusID AND apt.CompanyID = sts.CompanyID
+    LEFT JOIN tbl_TicketStatus AS tkt ON ISNULL(TRY_CAST(apt.TicketStatus AS INT), 0)= tkt.StatusID AND apt.CompanyID = tkt.CompanyID
+    WHERE CAST(apt.CustomerID AS NVARCHAR(50)) = @CustomerID 
+    AND apt.CompanyID = @CompanyID   AND apt.siteId = @siteId 
+    --AND (apt.SchedulingCal IS NULL OR apt.SchedulingCal != 'CEC')
+    ORDER BY apt.ApptDateTime DESC;";
+
+                //             sql = @"SELECT top 4 CONVERT(VARCHAR(10), apt.ApptDateTime, 101) AS ApptDateTimeConverted,  
+                //apt.*, apt.Note, rsc.Name AS ResourceName, srv.ServiceName, 
+                //CASE WHEN apt.Status = 'Deleted' THEN 'N/A' WHEN sts.StatusName = 'Scheduled' THEN 'Confirmed' ELSE sts.StatusName END AS AppStatus, 
+                //tkt.StatusName AS AppTicketStatus
+                //FROM tbl_Appointment AS apt 
+                //LEFT JOIN tbl_Resources AS rsc ON apt.ResourceID = rsc.Id AND apt.CompanyID = rsc.CompanyID
+                //LEFT JOIN tbl_ServiceType AS srv ON apt.ServiceType = srv.ServiceTypeID AND apt.CompanyID = srv.CompanyID
+                //LEFT JOIN tbl_Status AS sts ON ISNULL(TRY_CAST(apt.Status AS INT), 0) = sts.StatusID AND apt.CompanyID = sts.CompanyID
+                //LEFT JOIN tbl_TicketStatus AS tkt ON ISNULL(TRY_CAST(apt.TicketStatus AS INT), 0)= tkt.StatusID AND apt.CompanyID = tkt.CompanyID
+                //WHERE apt.CompanyID = @CompanyID  
+                //ORDER BY apt.ApptDateTime DESC;";
+
+
+                db.AddParameter("@siteId", siteId, SqlDbType.NVarChar);
+                db.AddParameter("@CustomerID", customerId, SqlDbType.NVarChar);
+                db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+
+                System.Diagnostics.Debug.WriteLine($"GetCustomerAppoinmets: Searching for CustomerID: '{customerId}', CompanyID: '{companyid}'");
+
+                db.ExecuteParam(sql, out dt);
+                db.Close();
+                if (dt != null && dt.Rows.Count > 0)
+                {
+                    foreach (DataRow row in dt.Rows)
+                    {
+                        try
+                        {
+                            var appoinment = new AppointmentModel();
+                            appoinment.AppoinmentId = row["ApptID"]?.ToString() ?? "";
+                            appoinment.CustomerID = customerId;
+                            appoinment.CompanyID = companyid;
+                            appoinment.AppoinmentStatus = row.Field<string>("AppStatus") ?? "";
+                            //   appoinment.TicketStatus = row.Field<string>("AppTicketStatus") ?? "";
+                            //  appoinment.ResourceName = row.Field<string>("ResourceName") ?? "";
+                            //appoinment.ServiceType = row.Field<string>("ServiceName") ?? "";
+                            appoinment.RequestDate = row.Field<string>("ApptDateTimeConverted") ?? "";
+                            //appoinment.TimeSlot = row.Field<string>("TimeSlot") ?? "";
+                            appoinment.AppoinmentDate = row.Field<string>("ApptDateTimeConverted") ?? "";
+                            // appoinment.Note = row.Field<string>("Note") ?? "";
+
+
+
+                            appoinments.Add(appoinment);
+                        }
+                        catch (Exception rowEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Error processing appointment row: {rowEx.Message}");
+                            // Continue with next row
+                        }
+                    }
+                }
+
+                System.Diagnostics.Debug.WriteLine($"GetCustomerAppoinmets: Found {appoinments.Count} appointments for CustomerID={customerId}, SiteID={siteId}");
+            }
+            catch (Exception ex)
+            {
+                db.Close();
+                // Log the exception for debugging
+                System.Diagnostics.Debug.WriteLine($"Error in GetCustomerAppoinmets: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
+                // Return empty list instead of null to prevent JavaScript errors
+                return new List<AppointmentModel>();
+            }
+            finally
+            {
+
+            }
+            return appoinments;
+        }
+
         [WebMethod]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public static List<CustomerSite> GetCustomerSiteData(string customerId,string SiteId)
@@ -575,6 +678,7 @@ namespace TPM
                             Id = Convert.ToInt32(dr["Id"]),
                             CompanyID = companyid,
                             CustomerID = dr["CustomerID"].ToString(),
+                           
                             CustomerGuid = dr["CustomerGuid"].ToString(),
                             SiteName = dr["SiteName"].ToString() ?? "",
                             FirstName = dr["FirstName"].ToString() ?? "",

@@ -3039,76 +3039,93 @@ function setDropdownByTextOrValue(elementId, textOrVal) {
 
 window.saveAppointmentChanges = function () {
     const apptId = $('#editApptId').val();
-
     if (!apptId) return;
 
-    const startMom = moment($('#txt_StartDate').val(), "MM/DD/YYYY hh:mm A");
-    const endMom = moment($('#txt_EndDate').val(), "MM/DD/YYYY hh:mm A");
+    try {
+        const startMom = moment($('#txt_StartDate').val(), "MM/DD/YYYY hh:mm A");
+        const endMom = moment($('#txt_EndDate').val(), "MM/DD/YYYY hh:mm A");
 
-    const appointmentData = {
-        AppoinmentId: apptId,
-        CustomerID: $('#editCustomerId').val(),
-        ServiceType: $('#MainContent_ServiceTypeFilter_Edit').val(),
-        ResourceID: parseInt($('#resource_list').val()) || 0,
-        StatusID: parseInt($('#MainContent_StatusTypeFilter_Edit').val()) || 0,
-        TicketStatusID: parseInt($('#MainContent_TicketStatusFilter_Edit').val()) || 0,
-        RequestDate: startMom.isValid() ? startMom.format("YYYY-MM-DD") : $('#dateInput').val(),
-        TimeSlot: $('#time_slot').val() || "morning",
-        Hour: startMom.isValid() ? startMom.hour() : 0,
-        Minute: startMom.isValid() ? startMom.minute() : 0,
-        Note: $('#editApptNote').val(),
-        SiteId: 0
-    };
+        // Get status text, filtering out placeholder options
+        var statusText = ($('#MainContent_StatusTypeFilter_Edit option:selected').text() || '').trim();
+        if (!statusText || statusText.toLowerCase().indexOf('select') === 0) statusText = '';
+        var ticketStatusText = ($('#MainContent_TicketStatusFilter_Edit option:selected').text() || '').trim();
+        if (!ticketStatusText || ticketStatusText.toLowerCase().indexOf('select') === 0) ticketStatusText = '';
 
-    // Collect Custom Fields
-    const customFieldValues = [];
-    $('[name^="custom_"]').each(function () {
-        const fieldId = parseInt($(this).attr('name').split('_')[1]);
-        if ($(this).is(':checkbox')) {
-            if ($(this).is(':checked')) {
-                let entry = customFieldValues.find(f => f.FieldId === fieldId);
-                if (!entry) {
-                    entry = { FieldId: fieldId, Value: [] };
-                    customFieldValues.push(entry);
-                }
-                const currentVals = typeof entry.Value === 'string' ? JSON.parse(entry.Value) : entry.Value;
-                currentVals.push($(this).val());
-                entry.Value = JSON.stringify(currentVals);
-            }
-        } else {
-            customFieldValues.push({ FieldId: fieldId, Value: $(this).val() });
-        }
-    });
+        var formSiteId = parseInt($('#editAppointmentForm').data('site-id'));
+        if (isNaN(formSiteId)) formSiteId = 0;
+        var pageSiteId = (typeof siteId !== 'undefined') ? siteId : 0;
 
-    const payload = {
-        appointment: appointmentData,
-        customFieldValues: customFieldValues
-    };
+        const appointmentData = {
+            AppoinmentId: apptId,
+            CustomerID: $('#editCustomerId').val(),
+            ServiceType: $('#MainContent_ServiceTypeFilter_Edit').val(),
+            ResourceID: parseInt($('#resource_list').val()) || 0,
+            Status: statusText || 'Pending',
+            TicketStatus: ticketStatusText,
+            RequestDate: startMom.isValid() ? startMom.format("YYYY-MM-DD") : $('#dateInput').val(),
+            StartDateTime: startMom.isValid() ? startMom.format("MM/DD/YYYY hh:mm A") : '',
+            EndDateTime: endMom.isValid() ? endMom.format("MM/DD/YYYY hh:mm A") : '',
+            TimeSlot: ($('#time_slot option:selected').text() || '').trim() || '',
+            Hour: (function () { var d = parseDuration($('#duration').val()); return Math.floor(d / 60); })(),
+            Minute: (function () { var d = parseDuration($('#duration').val()); return d % 60; })(),
+            Note: $('#editApptNote').val(),
+            SiteId: formSiteId || pageSiteId || 0
+        };
 
-    $.ajax({
-        type: "POST",
-        url: "Customer.aspx/UpdateAppointmentWithCustomFields",
-        data: JSON.stringify(payload),
-        contentType: "application/json; charset=utf-8",
-        dataType: "json",
-        success: function (response) {
-            if (response.d) {
-                alert("Appointment updated successfully!");
-                $('#siteAppointmentDetailsModal').modal('hide');
-                if (typeof loadAppointments === 'function') {
-                    loadAppointments();
-                } else {
-                    location.reload();
+        // Collect Custom Fields
+        const customFieldValues = [];
+        $('[name^="custom_"]').each(function () {
+            const fieldId = parseInt($(this).attr('name').split('_')[1]);
+            if ($(this).is(':checkbox')) {
+                if ($(this).is(':checked')) {
+                    let entry = customFieldValues.find(f => f.FieldId === fieldId);
+                    if (!entry) {
+                        entry = { FieldId: fieldId, Value: [] };
+                        customFieldValues.push(entry);
+                    }
+                    const currentVals = typeof entry.Value === 'string' ? JSON.parse(entry.Value) : entry.Value;
+                    currentVals.push($(this).val());
+                    entry.Value = JSON.stringify(currentVals);
                 }
             } else {
-                alert("Failed to update appointment.");
+                customFieldValues.push({ FieldId: fieldId, Value: $(this).val() });
             }
-        },
-        error: function (xhr) {
-            console.error("Update failed", xhr.responseText);
-            alert("An error occurred while updating.");
-        }
-    });
+        });
+
+        const payload = {
+            appointment: appointmentData,
+            customFieldValues: customFieldValues
+        };
+
+        $.ajax({
+            type: "POST",
+            url: "Customer.aspx/UpdateAppointmentWithCustomFields",
+            data: JSON.stringify(payload),
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function (response) {
+                if (response.d) {
+                    alert("Appointment updated successfully!");
+                    $('#siteAppointmentDetailsModal_PopUP').modal('hide');
+                    if (typeof loadAppointments === 'function') {
+                        loadAppointments();
+                    } else {
+                        location.reload();
+                    }
+                } else {
+                    console.error("Update returned false. Full response:", JSON.stringify(response));
+                    alert("Failed to update appointment.");
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error("Update AJAX error:", status, error, xhr.responseText);
+                alert("An error occurred while updating: " + (error || status));
+            }
+        });
+    } catch (e) {
+        console.error('saveAppointmentChanges error:', e.message);
+        alert('Save error: ' + e.message);
+    }
 };
 
 function loadCustomFields(serviceTypeId, appointmentId) {

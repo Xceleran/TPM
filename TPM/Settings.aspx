@@ -198,7 +198,7 @@
                     <div class="col-md-2">
                         <div class="nav flex-column nav-pills nav-pills-vertical" id="v-pills-tab" role="tablist" aria-orientation="vertical">
                             <button class="nav-link active" id="v-pills-templates-tab" data-bs-toggle="pill" data-bs-target="#v-pills-templates" type="button" role="tab" aria-controls="v-pills-templates" aria-selected="true">Automated Messages</button>
-                            <button class="nav-link" id="v-pills-fa-id-tab" data-bs-toggle="pill" data-bs-target="#v-pills-fa-id" type="button" role="tab" aria-controls="v-pills-fa-id" aria-selected="false">FA Messages</button>
+                            <%--<button class="nav-link" id="v-pills-fa-id-tab" data-bs-toggle="pill" data-bs-target="#v-pills-fa-id" type="button" role="tab" aria-controls="v-pills-fa-id" aria-selected="false">FA Messages</button>--%>
                         </div>
                     </div>
 
@@ -495,30 +495,87 @@
 
             <!--Optional Statuses-->
             <div class="tab-pane fade" id="optional-status-content" role="tabpanel" aria-labelledby="optional-status-tab">
-                <div class="card">
-                    <div class="card-header bg-light">
-                        <h5 class="mb-0">Status List Information</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-bordered align-middle">
-                                <thead class="status-table">
-                                    <tr>
-                                        <th>Status</th>
-                                        <th class="text-center">Optional (Y/N)</th>
-                                        <th>Triggered By</th>
-                                        <th>Triggers</th>
-                                        <th>Modify In</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="statusInfoTableBody">
-                                </tbody>
-                            </table>
+                
+                   <div class="card mt-4">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">TPM Required Statuses</h5>
                         </div>
-                        <div class="text-end mt-3">
-                            <button id="btnSaveOptionalStatuses" class="btn btn-primary px-4">
-                                <i class="bi bi-check-circle me-1"></i>Save
-                            </button>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle">
+                                    <thead class="status-table">
+                                        <tr>
+                                            <th>Status</th>
+                                            <th class="text-center">Optional (Y/N)</th>
+                                            <th>Triggered By</th>
+                                            <th>Triggers</th>
+                                            <th>Modify In</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>In Progress Need Part</strong></td>
+                                            <td class="text-center">
+                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </td>
+                                            <td>Status Changes in FSM</td>
+                                            <td>Message to TP</td>
+                                            <td>TPM</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>In Progress need to replace</strong></td>
+                                            <td class="text-center">
+                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </td>
+                                            <td>Status Changes in FSM</td>
+                                            <td>Message to TP</td>
+                                            <td>TPM</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Customer Missed Appointment</strong></td>
+                                            <td class="text-center">
+                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </td>
+                                            <td>Status Changes in FSM</td>
+                                            <td>Message to TP</td>
+                                            <td>TPM</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Waiting on Customer Call Back</strong></td>
+                                            <td class="text-center">
+                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </td>
+                                            <td>Status Changes in FSM</td>
+                                            <td>Message to TP</td>
+                                            <td>TPM</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Incomplete/Cancelled</strong></td>
+                                            <td class="text-center">
+                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </td>
+                                            <td>Status Changes in FSM</td>
+                                            <td>Message to TP</td>
+                                            <td>TPM</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="text-end mt-3">
+                                <button id="btnSaveOptionalStatuses" class="btn btn-primary px-4">
+                                    <i class="bi bi-check-circle me-1"></i>Save
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
