@@ -1322,8 +1322,8 @@ function renderSiteAppointments(siteId, list, containerEl) {
         return `
             <div class="cust-appt-row" data-site-id="${siteId}" data-appt-index="${index}" style="cursor: pointer;">
                 <div class="appt-main">
-                    <div class="appt-date">${escapeHTML(item.AppoinmentDate || item.RequestDate || '—')}</div>
-                    <div class="appt-type">${escapeHTML(item.ServiceType || '—')}</div>
+                    <div class="appt-date">ID: ${escapeHTML(item.AppoinmentId || '—')} Date: ${escapeHTML(item.AppoinmentDate || item.RequestDate || '—')} Type:${escapeHTML(item.ServiceType || '—')}</div>
+                    
                 </div>
                 <div class="appt-status">
                     <span class="badge" style="background-color: ${item.StatusColor || '#3b82f6'} !important;">${escapeHTML(status)}</span>

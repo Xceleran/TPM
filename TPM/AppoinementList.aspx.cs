@@ -570,12 +570,12 @@ namespace TPM
 
                 // Show ALL appointments for the customer across all sites
                 // Handle CustomerID as both string and integer for compatibility
-                string sql = @"SELECT CONVERT(VARCHAR(10), apt.ApptDateTime, 101) AS ApptDateTimeConverted,apt.ApptID,  
+                string sql = @"SELECT CONVERT(VARCHAR(10), apt.ApptDateTime, 101) AS ApptDateTimeConverted,apt.ApptID,srv.ServiceName,  
     CASE WHEN apt.Status = 'Deleted' THEN 'N/A' WHEN sts.StatusName = 'Scheduled' THEN 'Confirmed' ELSE sts.StatusName END AS AppStatus, 
     tkt.StatusName AS AppTicketStatus
     FROM tbl_Appointment AS apt 
    -- LEFT JOIN tbl_Resources AS rsc ON apt.ResourceID = rsc.Id AND apt.CompanyID = rsc.CompanyID
-    --LEFT JOIN tbl_ServiceType AS srv ON apt.ServiceType = srv.ServiceTypeID AND apt.CompanyID = srv.CompanyID
+    LEFT JOIN tbl_ServiceType AS srv ON apt.ServiceType = srv.ServiceTypeID AND apt.CompanyID = srv.CompanyID
     LEFT JOIN tbl_Status AS sts ON ISNULL(TRY_CAST(apt.Status AS INT), 0) = sts.StatusID AND apt.CompanyID = sts.CompanyID
     LEFT JOIN tbl_TicketStatus AS tkt ON ISNULL(TRY_CAST(apt.TicketStatus AS INT), 0)= tkt.StatusID AND apt.CompanyID = tkt.CompanyID
     WHERE CAST(apt.CustomerID AS NVARCHAR(50)) = @CustomerID 
@@ -617,7 +617,7 @@ namespace TPM
                             appoinment.AppoinmentStatus = row.Field<string>("AppStatus") ?? "";
                             //   appoinment.TicketStatus = row.Field<string>("AppTicketStatus") ?? "";
                             //  appoinment.ResourceName = row.Field<string>("ResourceName") ?? "";
-                            //appoinment.ServiceType = row.Field<string>("ServiceName") ?? "";
+                            appoinment.ServiceType = row.Field<string>("ServiceName") ?? "";
                             appoinment.RequestDate = row.Field<string>("ApptDateTimeConverted") ?? "";
                             //appoinment.TimeSlot = row.Field<string>("TimeSlot") ?? "";
                             appoinment.AppoinmentDate = row.Field<string>("ApptDateTimeConverted") ?? "";
