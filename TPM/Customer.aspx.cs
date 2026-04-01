@@ -1137,7 +1137,7 @@ namespace FSM
         }
         [WebMethod]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
-        public static string GetCustomerSiteData(string customerId,int draw, int start, int length, string searchValue, string sortColumn, string sortDirection, string appointmentStartDate = "", string appointmentStatus = "")
+        public static string GetCustomerSiteData(string customerId,int draw, int start, int length, string searchValue, string sortColumn, string sortDirection, string appointmentStartDate = "", string appointmentEndDate = "", string appointmentStatus = "")
         {
             var sites = new List<CustomerSite>();
 
@@ -1161,7 +1161,10 @@ namespace FSM
 
                 if (!string.IsNullOrEmpty(appointmentStartDate))
                 {
-                    strSQL += $" AND CONVERT(DATE, COALESCE(appt.StartDateTime, appt.ApptDateTime)) = '{appointmentStartDate}' ";
+                    if (!string.IsNullOrEmpty(appointmentEndDate))
+                        strSQL += $" AND CONVERT(DATE, COALESCE(appt.StartDateTime, appt.ApptDateTime)) BETWEEN '{appointmentStartDate}' AND '{appointmentEndDate}' ";
+                    else
+                        strSQL += $" AND CONVERT(DATE, COALESCE(appt.StartDateTime, appt.ApptDateTime)) = '{appointmentStartDate}' ";
                 }
                 if (!string.IsNullOrEmpty(appointmentStatus))
                 {
@@ -1172,12 +1175,15 @@ namespace FSM
                 strSQL += $" GROUP BY st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.LastName,st.Address,st.Country,st.State,st.Zip,st.Contact,st.Email,st.PhoneNumber,st.Note ";
                 strSQL += $" ORDER BY st.SiteName {sortDirection} OFFSET {start} ROWS FETCH NEXT {length} ROWS ONLY;";
 
-                strSQL += @"SELECT count(st.Id) as totalRecords  FROM [msSchedulerV3].dbo.tbl_CustomerSite st LEFT JOIN [msSchedulerV3].[dbo].[tbl_Appointment] appt 
+                strSQL += @"SELECT count(st.Id) as totalRecords  FROM [msSchedulerV3].dbo.tbl_CustomerSite st LEFT JOIN [msSchedulerV3].[dbo].[tbl_Appointment] appt
                     ON  appt.CompanyID = st.CompanyID and appt.siteid = st.id and  appt.CustomerID = st.CustomerID  WHERE st.CompanyID='" + companyid + "' AND st.CustomerID='" + customerId + "'";
 
                 if (!string.IsNullOrEmpty(appointmentStartDate))
                 {
-                    strSQL += $" AND CONVERT(DATE, COALESCE(appt.StartDateTime, appt.ApptDateTime)) = '{appointmentStartDate}' ";
+                    if (!string.IsNullOrEmpty(appointmentEndDate))
+                        strSQL += $" AND CONVERT(DATE, COALESCE(appt.StartDateTime, appt.ApptDateTime)) BETWEEN '{appointmentStartDate}' AND '{appointmentEndDate}' ";
+                    else
+                        strSQL += $" AND CONVERT(DATE, COALESCE(appt.StartDateTime, appt.ApptDateTime)) = '{appointmentStartDate}' ";
                 }
                 if (!string.IsNullOrEmpty(appointmentStatus))
                 {

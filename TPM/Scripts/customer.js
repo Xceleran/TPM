@@ -24,6 +24,42 @@ function closeModal(modalId) {
     }
 }
 
+function getDateRangeFromSelection(value) {
+    var today = new Date();
+    var formatDate = function (d) {
+        var yyyy = d.getFullYear();
+        var mm = String(d.getMonth() + 1).padStart(2, '0');
+        var dd = String(d.getDate()).padStart(2, '0');
+        return yyyy + '-' + mm + '-' + dd;
+    };
+    switch (value) {
+        case 'today':
+            var d = formatDate(today);
+            return { startDate: d, endDate: d };
+        case 'this_week':
+            var sun = new Date(today);
+            sun.setDate(today.getDate() - today.getDay());
+            var sat = new Date(sun);
+            sat.setDate(sun.getDate() + 6);
+            return { startDate: formatDate(sun), endDate: formatDate(sat) };
+        case 'this_month':
+            var ms = new Date(today.getFullYear(), today.getMonth(), 1);
+            var me = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            return { startDate: formatDate(ms), endDate: formatDate(me) };
+        case 'this_year':
+            var ys = new Date(today.getFullYear(), 0, 1);
+            var ye = new Date(today.getFullYear(), 11, 31);
+            return { startDate: formatDate(ys), endDate: formatDate(ye) };
+        case 'custom':
+            return {
+                startDate: $('#siteApptDateFrom').val() || '',
+                endDate: $('#siteApptDateTo').val() || ''
+            };
+        default:
+            return { startDate: '', endDate: '' };
+    }
+}
+
 function loadSiteApptStatuses() {
     $.ajax({
         url: "Customer.aspx/GetAppointmentStatuses",
@@ -39,21 +75,34 @@ function loadSiteApptStatuses() {
                 select.append('<option value="' + escapeHTML(s.StatusID) + '">' + escapeHTML(s.StatusName) + '</option>');
             });
             // Restore saved filter values after dropdown is populated
-            var savedDate = sessionStorage.getItem('siteApptDateFilter');
+            var savedRange = sessionStorage.getItem('siteApptDateRangeSelect');
             var savedStatus = sessionStorage.getItem('siteApptStatusFilter');
-            if (savedDate) $('#siteApptDateFilter').val(savedDate);
+            if (savedRange) {
+                $('#siteApptDateRangeSelect').val(savedRange);
+                if (savedRange === 'custom') {
+                    $('#customDateRange').show();
+                    var savedFrom = sessionStorage.getItem('siteApptDateFrom');
+                    var savedTo = sessionStorage.getItem('siteApptDateTo');
+                    if (savedFrom) $('#siteApptDateFrom').val(savedFrom);
+                    if (savedTo) $('#siteApptDateTo').val(savedTo);
+                }
+            }
             if (savedStatus) $('#siteApptStatusFilter').val(savedStatus);
         }
     });
 }
 
 function saveSiteFiltersToSession() {
-    sessionStorage.setItem('siteApptDateFilter', $('#siteApptDateFilter').val() || '');
+    sessionStorage.setItem('siteApptDateRangeSelect', $('#siteApptDateRangeSelect').val() || '');
+    sessionStorage.setItem('siteApptDateFrom', $('#siteApptDateFrom').val() || '');
+    sessionStorage.setItem('siteApptDateTo', $('#siteApptDateTo').val() || '');
     sessionStorage.setItem('siteApptStatusFilter', $('#siteApptStatusFilter').val() || '');
 }
 
 function clearSiteFiltersFromSession() {
-    sessionStorage.removeItem('siteApptDateFilter');
+    sessionStorage.removeItem('siteApptDateRangeSelect');
+    sessionStorage.removeItem('siteApptDateFrom');
+    sessionStorage.removeItem('siteApptDateTo');
     sessionStorage.removeItem('siteApptStatusFilter');
 }
 
@@ -299,11 +348,29 @@ $(document).ready(function () {
 
     // Site appointment filter - Clear button
     $('#siteFilterClearBtn').on('click', function () {
-        $('#siteApptDateFilter').val('');
+        $('#siteApptDateRangeSelect').val('');
+        $('#siteApptDateFrom').val('');
+        $('#siteApptDateTo').val('');
+        $('#customDateRange').hide();
         $('#siteApptStatusFilter').val('');
         clearSiteFiltersFromSession();
         if ($.fn.DataTable.isDataTable('#customerSiteTable')) {
             $('#customerSiteTable').DataTable().draw();
+        }
+    });
+
+    // Show/hide custom date range and auto-search on dropdown change
+    $('#siteApptDateRangeSelect').on('change', function () {
+        if ($(this).val() === 'custom') {
+            $('#customDateRange').show();
+        } else {
+            $('#customDateRange').hide();
+            $('#siteApptDateFrom').val('');
+            $('#siteApptDateTo').val('');
+            saveSiteFiltersToSession();
+            if ($.fn.DataTable.isDataTable('#customerSiteTable')) {
+                $('#customerSiteTable').DataTable().draw();
+            }
         }
     });
 
@@ -590,7 +657,8 @@ function loadCustomerSiteData(customerId) {
                     searchValue: d.search.value,
                     sortColumn: d.columns[d.order[0].column].data,
                     sortDirection: d.order[0].dir,
-                    appointmentStartDate: $('#siteApptDateFilter').val() || '',
+                    appointmentStartDate: getDateRangeFromSelection($('#siteApptDateRangeSelect').val()).startDate,
+                    appointmentEndDate: getDateRangeFromSelection($('#siteApptDateRangeSelect').val()).endDate,
                     appointmentStatus: $('#siteApptStatusFilter').val() || ''
                 });
             },

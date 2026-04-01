@@ -166,8 +166,21 @@
                             </div>
                             <div class="sites-filter-bar" id="sitesFilterBar">
                                 <div class="sites-filter-group">
-                                    <label for="siteApptDateFilter">Appointment Date:</label>
-                                    <input type="date" id="siteApptDateFilter" class="sites-filter-input" />
+                                    <label for="siteApptDateRangeSelect">Appointment Date:</label>
+                                    <select id="siteApptDateRangeSelect" class="sites-filter-input">
+                                        <option value="">All Dates</option>
+                                        <option value="today">Today</option>
+                                        <option value="this_week">This Week</option>
+                                        <option value="this_month">This Month</option>
+                                        <option value="this_year">This Year</option>
+                                        <option value="custom">Custom</option>
+                                    </select>
+                                </div>
+                                <div class="sites-filter-group" id="customDateRange" style="display:none;">
+                                    <label>From:</label>
+                                    <input type="date" id="siteApptDateFrom" class="sites-filter-input" />
+                                    <label>To:</label>
+                                    <input type="date" id="siteApptDateTo" class="sites-filter-input" />
                                 </div>
                                 <div class="sites-filter-group">
                                     <label for="siteApptStatusFilter">Status:</label>
