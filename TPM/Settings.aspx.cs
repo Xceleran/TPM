@@ -277,7 +277,7 @@ namespace FSM
         public static CommunicationSettings loadTemplateData(CommunicationSettings communicationSettings)
         {
             var _CommunicationSettings = new CommunicationSettings();
-            string companyid = HttpContext.Current.Session["CompanyID"].ToString();
+            string companyid = HttpContext.Current.Session["CompanyID"]?.ToString();
             Database db = new Database();
           
             try
