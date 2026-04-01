@@ -256,6 +256,22 @@ document.addEventListener('DOMContentLoaded', () => {
             applyFiltersAppt();
         });
 
+        // Sortable header click handler for Appointments table
+        $(document).on('click', '.sortable-header', function () {
+            const sortColumn = $(this).data('sort');
+            if (apptSortColumn === sortColumn) {
+                apptSortDirection = apptSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                apptSortColumn = sortColumn;
+                apptSortDirection = 'asc';
+            }
+            // Update sort icons
+            $('.sortable-header i').removeClass('fa-sort-up fa-sort-down').addClass('fa-sort');
+            const icon = $(this).find('i');
+            icon.removeClass('fa-sort').addClass(apptSortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+            applyFiltersAppt();
+        });
+
         function getRedirectionURL() {
             const customerId = $('#MainContent_lblCustomerId').text() || $('[id$="lblCustomerId"]').text();
             const customerName = $('#MainContent_lblCustomerName').text();
@@ -1337,7 +1353,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     aVal = (a.ServiceType || '').toLowerCase();
                     bVal = (b.ServiceType || '').toLowerCase();
                     break;
-                case 'Status':
+                case 'AppoinmentStatus':
                     aVal = (a.AppoinmentStatus || '').toLowerCase();
                     bVal = (b.AppoinmentStatus || '').toLowerCase();
                     break;
