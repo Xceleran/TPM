@@ -672,7 +672,7 @@
 
             <!-- Back Button -->
             <div class="custdet-container text-end mt-4">
-                <a href="Customer.aspx" class="btn btn-outline-secondary">Back to Customers</a>
+                <a href="javascript:void(0);" onclick="history.back();" class="btn btn-outline-secondary">Back to Customers</a>
             </div>
             <!-- Status History Modal -->
             <div class="modal fade" id="statusHistoryModal" tabindex="-1" aria-labelledby="statusHistoryModalLabel"

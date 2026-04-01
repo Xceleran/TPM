@@ -470,8 +470,19 @@ function loadCustomers() {
         drawCallback: function () {
             var api = this.api();
             if (api.rows({ page: 'current' }).count() > 0 && !$('#customerTable tbody tr.selected').length) {
-             //   selectFirstVisibleRow(); // Re-added this line
-                IsSiteDataLoading = false;
+                var savedCustomerId = sessionStorage.getItem('selectedCustomerID');
+                if (savedCustomerId) {
+                    api.rows({ page: 'current' }).every(function () {
+                        var rowData = this.data();
+                        if (rowData && rowData.CustomerID == savedCustomerId) {
+                            this.select();
+                            IsSiteDataLoading = false;
+                            generateCustomerDetails(rowData);
+                        }
+                    });
+                } else {
+                    IsSiteDataLoading = false;
+                }
             }
         }
     });
@@ -480,8 +491,9 @@ function loadCustomers() {
         if ($(this).hasClass('selected')) return;
         var data = $('#customerTable').DataTable().row(this).data();
         if (data) {
-         
+
             IsSiteDataLoading = false;
+            sessionStorage.setItem('selectedCustomerID', data.CustomerID);
             generateCustomerDetails(data);
         }
     });
