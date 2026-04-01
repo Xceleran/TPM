@@ -221,6 +221,8 @@
                                                 <label for="messageTypeDropdown" class="form-label fw-bold">Select Message Type</label>
                                                 <select id="messageTypeDropdown" class="form-select">
                                                     <option value="AcceptTPWorkOrder">Accept TP Work Order</option>
+                                                    <option value="Incomplete">Incomplete</option>
+                                                    <option value="Cancelled">Cancelled</option>
                                                    <%-- <option value="Confirmation">Appointment Confirmation</option>
                                                     <option value="Dispatch">Field Agent Assigned</option>
                                                     <option value="FA-ID">Field Agent ID</option>
@@ -1096,7 +1098,9 @@
                 "AcceptTPWorkOrder": { status: "Accept", faIdSwitch: false, ynAllowed: true },
                 "Dispatch": { status: "Dispatched", faIdSwitch: true, ynAllowed: true },
                 "FA-ID": { status: "Dispatched", faIdSwitch: false, ynAllowed: false },
-                "In-Route": { status: "In-Route", faIdSwitch: false, ynAllowed: false }
+                "In-Route": { status: "In-Route", faIdSwitch: false, ynAllowed: false },
+                "Incomplete": { status: "Incomplete", faIdSwitch: false, ynAllowed: true },
+                "Cancelled": { status: "Cancelled", faIdSwitch: false, ynAllowed: true }
         };
 
         function initializeMessageTemplates() {
