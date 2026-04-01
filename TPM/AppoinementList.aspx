@@ -92,7 +92,6 @@
                           <th>Site Name</th>
                                <th>Date</th>
                             <th>Status</th>
-                            <th>Actions</th>
                         </tr>
                     </thead>
                 </table>

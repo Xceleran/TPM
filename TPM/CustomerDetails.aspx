@@ -12,6 +12,18 @@
 
         <link rel="stylesheet" href="Content/customerdetails.css">
         <link rel="stylesheet" href="Content/customer.css">
+        <style>
+            #siteAppointmentDetailsModal_PopUP .modal-dialog {
+                max-width: 95vw;
+                width: 95vw;
+                margin: auto;
+            }
+            #siteAppointmentDetailsModal_PopUP .modal-content {
+                max-width: 100%;
+                width: 100%;
+                height: 90vh;
+            }
+        </style>
 
         <!-- Inline Styles -->
         <style>
@@ -926,7 +938,7 @@
         <!-- Site Appointment Details Modal (Refactored to Bootstrap) -->
         <div class="modal fade" id="siteAppointmentDetailsModal_PopUP" tabindex="-1"
             aria-labelledby="siteAppointmentDetailsModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-xl modal-dialog-scrollable" style="max-width: 98%; width: 98%;">
+            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div
                         class="modal-header d-flex justify-content-between align-items-center bg-white shadow-sm rounded-top">

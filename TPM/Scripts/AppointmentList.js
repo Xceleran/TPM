@@ -450,16 +450,6 @@ function LoadAppointments() {
                     return `<span class="badge ${statusClass}">${statusText}</span>`; // Used statusText
                 }
             },
-            {
-                data: null,
-                orderable: false,
-                width: "100px",
-                render: function (data, type, row) {
-                    const smsBtn = `<button class="cust-action-btn sms-btn" title="Send SMS" onclick="OpenCustomerChatHistory('${escapeHTML(row.Phone)}', '${escapeHTML(row.FirstName + " " + row.LastName)}', '${escapeHTML(row.CustomerID)}')"><i class="fa fa-comment-dots"></i></button>`;
-                    const editBtn = `<button class="cust-table-edit-btn" title="Edit Customer"><i class="fa-solid fa-user-pen"></i></button>`;
-                    return `<div class="cust-action-btns">${smsBtn}${editBtn}</div>`;
-                }
-            }
         ],
         drawCallback: function () {
             var api = this.api();
