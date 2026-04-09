@@ -278,6 +278,11 @@ namespace TPM
                             strSQL = @"Update [msSchedulerV3].dbo.tbl_Appointment set IsApproved=1 WHERE CompanyID=@CompanyID AND ApptID=@ApptID";
                             break;
                         }
+                    case AppointmentStatus.Pending:
+                        {
+                            strSQL = @"Update [msSchedulerV3].dbo.tbl_Appointment set IsApproved=0 WHERE CompanyID=@CompanyID AND ApptID=@ApptID";
+                            break;
+                        }
                     case AppointmentStatus.Cancel:
                         {
                             strSQL = @"Update [msSchedulerV3].dbo.tbl_Appointment set IsApproved=0 WHERE CompanyID=@CompanyID AND ApptID=@ApptID";
@@ -1197,7 +1202,7 @@ namespace TPM
     }
     public enum AppointmentStatus
     {
-        Accept, Confirm, Cancel
+        Accept, Confirm, Pending, Cancel
     }
     public enum SchedulingEvent
     {
