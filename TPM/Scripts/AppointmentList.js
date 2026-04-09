@@ -614,7 +614,7 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                <div class="container">
                                   <div class="row justify-content-start">
                                     <div class="col-3">
-                                      Appointments Status :<select onchange="ApptStatusChanged_Event(event,${ApptID},${customerId},${site.Id})" aria-controls="Appt_Status" class="form-select form-select-sm " style="width:150px;" id="dt-length-0"><option value="0">Select</option><option ${IsApproved ? 'selected' : ''} value="Accept">Accept</option><option value="Confirm">Confirm</option><option value="Cancel">Cancel</option></select>
+                                      Appointments Status :<select onchange="ApptStatusChanged_Event(event,${ApptID},${customerId},${site.Id})" aria-controls="Appt_Status" class="form-select form-select-sm " style="width:150px;" id="dt-length-0"><option value="0">Select</option><option ${IsApproved ? 'selected' : ''} value="Accept">Accept</option><option value="Confirm">Confirm</option><option ${!IsApproved ? 'selected' : ''} value="Pending">Pending</option><option value="Cancel">Cancel</option></select>
 
                                     </div>
                                     <div class="col-3">

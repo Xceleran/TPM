@@ -145,12 +145,8 @@ namespace FSM
               
       
 
-                string finalSql = $@"
-                  
-                        SELECT
-                            c.*,
-                            apptData.StatusName,
-                            apptData.LatestAppointmentID AS LatestAppointmentID -- Added LatestAppointmentID
+                // Build FROM + WHERE once and reuse for both the count query and the paged data query.
+                string fromAndWhere = $@"
                         FROM [msSchedulerV3].[dbo].[tbl_Customer] c
                         OUTER APPLY (
                             SELECT TOP 1
@@ -167,19 +163,18 @@ namespace FSM
                             ORDER BY a.ApptDateTime DESC
                         ) AS apptData
                         WHERE c.warrentycompanyid > 0 and  c.CompanyID = '{companyid}'
-                   
                      ";
 
                 // Apply searchValue filter
                 if (!string.IsNullOrEmpty(searchValue))
                 {
-                    finalSql += $" AND (cst.FirstName LIKE '%{searchValue}%' OR cst.LastName LIKE '%{searchValue}%' OR cst.Email LIKE '%{searchValue}%')";
+                    fromAndWhere += $" AND (cst.FirstName LIKE '%{searchValue}%' OR cst.LastName LIKE '%{searchValue}%' OR cst.Email LIKE '%{searchValue}%')";
                 }
 
                 // Apply additional filters
                 if (cslViewFilter == "current")
                 {
-                    finalSql += @"AND EXISTS (
+                    fromAndWhere += @"AND EXISTS (
                         SELECT 1 FROM [msSchedulerV3].[dbo].[tbl_Appointment] a
                         WHERE a.CustomerID = c.CustomerID
                           AND a.CompanyID = c.CompanyID
@@ -189,14 +184,36 @@ namespace FSM
                 }
                 if (hideNoAppointments)
                 {
-                    finalSql += " and apptData.LatestAppointmentID  > 0 ";
+                    fromAndWhere += " and apptData.LatestAppointmentID  > 0 ";
                 }
-                if (sortColumn == "fullname")
+
+                // Whitelist sort column -> real DB column. Anything unrecognized falls back to FirstName.
+                string safeSortColumn;
+                switch (sortColumn)
                 {
-                    sortColumn = "FirstName";
+                    case "fullname":   safeSortColumn = "FirstName"; break;
+                    case "StatusName": safeSortColumn = "apptData.StatusName"; break;
+                    default:           safeSortColumn = "FirstName"; break;
                 }
-                finalSql += $" ORDER BY {sortColumn} {sortDirection} OFFSET {start} ROWS FETCH NEXT {length} ROWS ONLY;";
-            
+                string safeSortDirection = (sortDirection == "desc") ? "DESC" : "ASC";
+
+                // Count query - mirrors the data query's WHERE clause so totals match.
+                string countSql = "SELECT COUNT(*) AS Cnt " + fromAndWhere;
+
+                DataSet countSet = db.Get_DataSet(countSql, companyid);
+                if (countSet.Tables.Count > 0 && countSet.Tables[0].Rows.Count > 0)
+                {
+                    totalRecords = Convert.ToInt32(countSet.Tables[0].Rows[0]["Cnt"]);
+                }
+
+                string finalSql = @"
+                        SELECT
+                            c.*,
+                            apptData.StatusName,
+                            apptData.LatestAppointmentID AS LatestAppointmentID
+                    " + fromAndWhere
+                    + $" ORDER BY {safeSortColumn} {safeSortDirection} OFFSET {start} ROWS FETCH NEXT {length} ROWS ONLY;";
+
                 DataSet dataSet = db.Get_DataSet(finalSql, companyid);
                 dt = dataSet.Tables[0];
 
@@ -662,7 +679,7 @@ namespace FSM
             }
         }
 
-        [WebMethod]
+        [WebMethod(EnableSession = true)]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public static object GetAppointmentDetails(string appointmentId)
         {

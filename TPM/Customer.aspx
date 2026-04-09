@@ -98,10 +98,7 @@
                 <table id="customerTable" class="display" style="width: 100%">
                     <thead>
                         <tr>
-                         <th>Tp Name</th>
-                            <th>Email</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>Tp Name</th>
                         </tr>
                     </thead>
                 </table>

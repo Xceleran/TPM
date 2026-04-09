@@ -560,7 +560,18 @@
                                             <td>TPM</td>
                                         </tr>
                                         <tr>
-                                            <td><strong>Incomplete/Cancelled</strong></td>
+                                            <td><strong>Incomplete</strong></td>
+                                            <td class="text-center">
+                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </td>
+                                            <td>Status Changes in FSM</td>
+                                            <td>Message to TP</td>
+                                            <td>TPM</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Cancelled</strong></td>
                                             <td class="text-center">
                                                 <div class="form-check form-switch d-flex justify-content-center">
                                                     <input class="form-check-input" type="checkbox" checked>

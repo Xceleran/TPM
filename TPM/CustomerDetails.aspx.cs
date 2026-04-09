@@ -471,16 +471,16 @@ namespace TPM
                         apt.ApptID, apt.Note, apt.TimeSlot, apt.Hour, apt.Minute,
                         apt.StartDateTime, apt.EndDateTime,
                         CONVERT(VARCHAR(10), apt.ApptDateTime, 120) as RequestDate,
-                        rsc.Name as ResourceName,
+                        COALESCE(rsc.Name, NULLIF(LTRIM(RTRIM(CAST(apt.ResourceID AS NVARCHAR))), '0'), '') as ResourceName,
                         srv.ServiceTypeID,
-                        srv.ServiceName,
+                        COALESCE(NULLIF(srv.ServiceName, ''), NULLIF(apt.ServiceType, ''), '') AS ServiceName,
                         srv.CalenderColor AS ServiceColor,
                         sts.CalenderColor AS StatusColor,
                         CASE
                             WHEN sts.StatusName = 'Scheduled' THEN 'Confirmed'
                             ELSE COALESCE(sts.StatusName, apt.Status, 'Unknown')
                         END AS AppoinmentStatus,
-                        COALESCE(tkt.StatusName, apt.TicketStatus, 'Unknown') AS TicketStatus,
+                        COALESCE(NULLIF(tkt.StatusName, ''), NULLIF(apt.TicketStatus, ''), '') AS TicketStatus,
                         gen.AppointmentPrefix
                     FROM
                         tbl_Appointment apt
@@ -489,15 +489,17 @@ namespace TPM
                     LEFT JOIN
                         tbl_ServiceType AS srv ON apt.CompanyID = srv.CompanyID AND (TRY_CAST(apt.ServiceType AS INT) = srv.ServiceTypeID OR apt.ServiceType = srv.ServiceName)
                     LEFT JOIN
-                        tbl_Status AS sts ON apt.CompanyID = sts.CompanyID AND (TRY_CAST(apt.Status AS INT) = sts.StatusID OR apt.Status = sts.StatusName)
+                        tbl_Status AS sts ON apt.CompanyID = sts.CompanyID AND
+                            (CASE WHEN apt.Status = '0' OR apt.Status IS NULL OR apt.Status = '' THEN 1 ELSE TRY_CAST(apt.Status AS INT) END = sts.StatusID OR apt.Status = sts.StatusName)
                     LEFT JOIN
-                        tbl_TicketStatus AS tkt ON apt.CompanyID = tkt.CompanyID AND (TRY_CAST(apt.TicketStatus AS INT) = tkt.StatusID OR apt.TicketStatus = tkt.StatusName)
+                        tbl_TicketStatus AS tkt ON apt.CompanyID = tkt.CompanyID AND
+                            (CASE WHEN apt.TicketStatus = '0' OR apt.TicketStatus IS NULL OR apt.TicketStatus = '' THEN 1 ELSE TRY_CAST(apt.TicketStatus AS INT) END = tkt.StatusID OR apt.TicketStatus = tkt.StatusName)
                     LEFT JOIN
                         tbl_AppointmentAutoGenerate gen ON apt.CompanyID = gen.CompanyID
-                    WHERE apt.CompanyID = @CompanyID AND apt.CustomerID = @CustomerID 
-                      AND apt.SiteID = @SiteID  
-                      AND apt.Status != 'Deleted' 
-                      AND (apt.SchedulingCal = 'FSM') 
+                    WHERE apt.CompanyID = @CompanyID AND apt.CustomerID = @CustomerID
+                      AND apt.SiteID = @SiteID
+                      AND apt.Status != 'Deleted'
+                      AND (apt.SchedulingCal = 'FSM')
                     ORDER BY
                         apt.ApptDateTime DESC";
 

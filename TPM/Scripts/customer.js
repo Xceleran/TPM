@@ -494,45 +494,9 @@ function loadCustomers() {
         paging: true,
         pageLength: 10,
         select: { style: 'single' },
+        order: [[0, 'asc']],
         columns: [
-            { data: "fullname", name: "TP Name", autoWidth: true },
-            { data: "Email", name: "Email", autoWidth: true },
-            {
-                data: "StatusName",
-                name: "Status",
-                autoWidth: true,
-                render: function (data) {
-                    let statusText = data || 'N/A'; // Changed from const status to let statusText
-                    let statusClass = 'status-na';
-                    switch (statusText.toLowerCase()) { // Used statusText.toLowerCase()
-                        case 'pending': statusClass = 'status-pending'; break;
-                        case 'confirmed': statusClass = 'status-confirmed'; break;
-                        case 'dispatched': statusClass = 'status-dispatched'; break;
-                        case 'in-route': statusClass = 'status-in-route'; break;
-                        case 'fa-id sent': statusClass = 'status-fa-id-sent'; break;
-                        case 'arrived': statusClass = 'status-arrived'; break;
-                        case 'completed': statusClass = 'status-completed'; break;
-                        case 'closed': statusClass = 'status-closed'; break;
-                        case 'on-hold': statusClass = 'status-on-hold'; break;
-                        case '0':
-                            statusClass = 'status-default';
-                            statusText = 'Multiple'; // Changed displayed text
-                            break;
-                        case 'cancelled': statusClass = 'status-cancelled'; break;
-                    }
-                    return `<span class="badge ${statusClass}">${statusText}</span>`; // Used statusText
-                }
-            },
-            {
-                data: null,
-                orderable: false,
-                width: "100px",
-                render: function (data, type, row) {
-                    const smsBtn = `<button class="cust-action-btn sms-btn" title="Send SMS" onclick="OpenCustomerChatHistory('${escapeHTML(row.Phone)}', '${escapeHTML(row.FirstName + " " + row.LastName)}', '${escapeHTML(row.CustomerID)}')"><i class="fa fa-comment-dots"></i></button>`;
-                    const editBtn = `<button class="cust-table-edit-btn" title="Edit Customer"><i class="fa-solid fa-user-pen"></i></button>`;
-                    return `<div class="cust-action-btns">${smsBtn}${editBtn}</div>`;
-                }
-            }
+            { data: "fullname", name: "TP Name", autoWidth: true }
         ],
         drawCallback: function () {
             var api = this.api();
