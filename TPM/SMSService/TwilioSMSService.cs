@@ -133,7 +133,7 @@ namespace FSM.SMSService
                 var credentials = GetTwilioCredentials(companyId);
                 TwilioClient.Init(credentials.AccountSid, credentials.AuthToken);
 
-                var to = new PhoneNumber(recipientNumber);
+                var to = new PhoneNumber( Common.getValidPhoneNumber(recipientNumber));
                 var msg = MessageResource.Create(
                     to,
                     from: new PhoneNumber(credentials.PhoneNumber),
@@ -169,7 +169,7 @@ namespace FSM.SMSService
                 var credentials = GetTwilioCredentials(companyId);
                 TwilioClient.Init(credentials.AccountSid, credentials.AuthToken);
 
-                var to = new PhoneNumber(recipientNumber);
+                var to = new PhoneNumber(Common.getValidPhoneNumber(recipientNumber));
                 var msg = MessageResource.Create(
                     to,
                     from: new PhoneNumber(credentials.PhoneNumber),

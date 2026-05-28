@@ -108,7 +108,7 @@ namespace TPM
             string orderby = string.Empty;
 
 
-            table.Append("<thead><tr><th>...</th><th>Business Name</th><th>Title</th><th>Address</th><th>Mobile</th><th>Phone</th><th>Email</th></thead>");
+            table.Append("<thead><tr><th>Business Name</th><th>Title</th><th>Address</th><th>Mobile</th><th>Phone</th><th>Email</th></thead>");
             query = @"  SELECT  [CompanyID]
                               ,[BusinessID],CustomerID
                               ,[CustomerGuid]
@@ -168,7 +168,7 @@ namespace TPM
                 }
             }
 
-            checkCompanyID = " and CompanyID= '" + Session["CompanyID"].ToString() + "' and WarrentyCompanyID is not null";
+            checkCompanyID = " and CompanyID= '" + Session["CompanyID"].ToString() + "' and WarrentyCompanyID > 0";
             orderby = " order by BusinessName  asc";
 
 
@@ -279,261 +279,7 @@ namespace TPM
 
         }
 
-        public void LoadTable(string searchPerameter, string searchValue, string SearchFor, string selectedTags)
-        {
-            searchPerameter = Common.CleanInput(searchPerameter);
-            searchValue = Common.CleanInput(searchValue);
-            table.Append("<div><table id='example' class='table table-striped table-bordered nowrap'  style='border: 1px solid #ccc;font-size: 9pt;font-family:Arial;width:100%' >");
-
-
-
-            string IssearchValue = "";
-            bool IsSearchForContact = false;
-            if (!string.IsNullOrEmpty(SearchFor.Trim()))
-            {
-                if (SearchFor == "Contact") IsSearchForContact = true;
-            }
-
-            string query = " select CustomerID,CustomerGuid,BusinessID,BusinessName,FirstName + ' ' + LastName as name,jobtitle,Address1,City,State,ZipCode,Phone,Mobile,Email  from tbl_Customer where IsBusinessContact=0 ";
-            string checkCompanyID = string.Empty;
-            string orderby = string.Empty;
-
-
-            if (IsSearchForContact)
-            {
-                table.Append("<thead><tr><th>...</th><th>Name</th><th>Job Title</th><th>Address</th><th>Mobile</th><th>Phone</th><th>Email</th></thead>");
-
-                query = " select CustomerID,CustomerGuid,BusinessID,BusinessName,FirstName + ' ' + LastName as name,jobtitle,Address1,City,State,ZipCode,Phone,Mobile,Email  from tbl_Customer where IsBusinessContact=0 and BusinessID != '0' ";
-
-
-                //query = @"  SELECT tbl_BusinessContact.BusinessID,tbl_BusinessContact.BusinessName,tbl_BusinessContact.BusinesGuid,tbl_Customer.CustomerID,tbl_Customer.CustomerGuid, 
-                //        tbl_Customer.FirstName + ' ' +tbl_Customer.LastName as name,tbl_Customer.jobtitle,tbl_Customer.Address1 + ', ' + tbl_Customer.City + ', ' +tbl_Customer.State + ' ' +tbl_Customer.ZipCode as Address, 
-                //        tbl_Customer.Phone,tbl_Customer.Mobile,tbl_Customer.Email,tbl_Customer.CreatedDateTime,tbl_Customer.IsPrimaryContact,tbl_Customer.QboId,tbl_Customer.CallPopAppId
-                //        FROM [msSchedulerV3].[dbo].tbl_BusinessContact INNER JOIN [msSchedulerV3].[dbo].tbl_Customer ON tbl_BusinessContact.BusinessID = tbl_Customer.BusinessID where 1=1";
-
-
-                if (!string.IsNullOrEmpty(searchPerameter.Trim()) && !string.IsNullOrEmpty(searchValue.Trim()))
-                {
-                    if (searchPerameter == "All") IssearchValue = "  and 1=1 ";
-                    if (searchPerameter == "FirstName") IssearchValue = " and ( FirstName like '" + searchValue.Trim() + "%') ";
-                    if (searchPerameter == "LastName") IssearchValue = " and ( LastName like '" + searchValue + "%' ) ";
-                    if (searchPerameter == "BusinessName") IssearchValue = " and ( BusinessName like '%" + searchValue.Trim() + "%') ";
-                    if (searchPerameter == "City") IssearchValue = " and  City like '%" + searchValue.Trim() + "%' ";
-                    if (searchPerameter == "JobTitle") IssearchValue = " and  JobTitle like '%" + searchValue.Trim() + "%' ";
-                    if (searchPerameter == "Address") IssearchValue = " and concat(Address1 , ', ' , City , ', ', State , ' ' , ZipCode) like '%" + searchValue.Trim() + "%' ";
-                    if (searchPerameter == "Mobile") IssearchValue = " and  Mobile like '%" + searchValue.Trim() + "%' ";
-                    if (searchPerameter == "Phone") IssearchValue = " and  Phone like '%" + searchValue.Trim() + "%' ";
-                    if (searchPerameter == "Email") IssearchValue = " and  Email like '%" + searchValue.Trim() + "%' ";
-
-                }
-                // Search by multiple tags using CSLTagString
-                if (!string.IsNullOrEmpty(selectedTags))
-                {
-                    string[] tagIds = selectedTags.Split(',');
-
-                    if (tagIds.Length > 0)
-                    {
-                        string tagCondition = " and (";
-
-                        for (int tagIndex = 0; tagIndex < tagIds.Length; tagIndex++)
-                        {
-                            string tagId = tagIds[tagIndex].Trim();
-
-                            if (!string.IsNullOrEmpty(tagId))
-                            {
-                                if (tagIndex > 0) tagCondition += " OR ";
-
-                                // Check if CSLTagString contains this tag ID safely
-                                tagCondition +=
-                                    "(CSLTagString = '" + tagId +
-                                    "' OR CSLTagString LIKE '" + tagId + ",%'" +
-                                    " OR CSLTagString LIKE '%," + tagId + ",%'" +
-                                    " OR CSLTagString LIKE '%," + tagId + "')";
-                            }
-                        }
-
-                        tagCondition += ")";
-                        IssearchValue += tagCondition;
-                    }
-                }
-
-                checkCompanyID = " and CompanyID= '" + Session["CompanyID"].ToString() + "'";
-                orderby = " order by FirstName  asc;";
-            }
-            else
-            {
-                table.Append("<thead><tr><th>...</th><th>Name</th><th>Job Title</th><th>Address</th><th>Mobile</th><th>Phone</th><th>Email</th></thead>");
-                if (!string.IsNullOrEmpty(searchPerameter.Trim()) && !string.IsNullOrEmpty(searchValue.Trim()))
-                {
-                    if (searchPerameter == "All") IssearchValue = "  and 1=1 ";
-                    if (searchPerameter == "FirstName") IssearchValue = " and ( FirstName like '" + searchValue.Trim() + "%') ";
-                    if (searchPerameter == "LastName") IssearchValue = " and ( LastName like '" + searchValue + "%' ) ";
-                    if (searchPerameter == "BusinessName") IssearchValue = " and ( BusinessName like '%" + searchValue.Trim() + "%') ";
-                    if (searchPerameter == "City") IssearchValue = " and  City like '%" + searchValue.Trim() + "%' ";
-                    if (searchPerameter == "JobTitle") IssearchValue = " and  JobTitle like '%" + searchValue.Trim() + "%' ";
-                    if (searchPerameter == "Address") IssearchValue = " and concat(Address1 , ', ' , City , ', ', State , ' ' , ZipCode) like '%" + searchValue.Trim() + "%' ";
-                    if (searchPerameter == "Mobile") IssearchValue = " and  Mobile like '%" + searchValue.Trim() + "%' ";
-                    if (searchPerameter == "Phone") IssearchValue = " and  Phone like '%" + searchValue.Trim() + "%' ";
-                    if (searchPerameter == "Email") IssearchValue = " and  Email like '%" + searchValue.Trim() + "%' ";
-
-                }
-                // Search by multiple tags using CSLTagString
-                if (!string.IsNullOrEmpty(selectedTags))
-                {
-                    string[] tagIds = selectedTags.Split(',');
-
-                    if (tagIds.Length > 0)
-                    {
-                        string tagCondition = " and (";
-
-                        for (int tagIndex = 0; tagIndex < tagIds.Length; tagIndex++)
-                        {
-                            string tagId = tagIds[tagIndex].Trim();
-
-                            if (!string.IsNullOrEmpty(tagId))
-                            {
-                                if (tagIndex > 0) tagCondition += " OR ";
-
-                                // Check if CSLTagString contains this tag ID safely
-                                tagCondition +=
-                                    "(CSLTagString = '" + tagId +
-                                    "' OR CSLTagString LIKE '" + tagId + ",%'" +
-                                    " OR CSLTagString LIKE '%," + tagId + ",%'" +
-                                    " OR CSLTagString LIKE '%," + tagId + "')";
-                            }
-                        }
-
-                        tagCondition += ")";
-                        IssearchValue += tagCondition;
-                    }
-                }
-                checkCompanyID = " and CompanyID= '" + Session["CompanyID"].ToString() + "'";
-                orderby = " order by FirstName  asc;";
-            }
-
-
-
-
-
-
-            query = query + checkCompanyID + IssearchValue + orderby;
-            Database db = new Database(connStr);
-
-
-            DataTable dt = new DataTable();
-
-
-
-
-            DataSet dataSet = db.Get_DataSet(query, Session["CompanyID"].ToString());
-            dt = dataSet.Tables[0];
-
-
-
-
-            table.Append(" <tbody>");
-
-            int i = 0;
-            if (dt != null)
-            {
-                if (dt.Rows.Count > 0)
-
-                {
-                    foreach (DataRow dr in dt.Rows)
-                    {
-                        i++;
-                        //string sUrl = "Customer.aspx?ID=" + dr["CustomerGuid"].ToString();
-
-
-
-                        string sUrl = "customerDetail.aspx?m=2&cid=" + dr["CustomerID"].ToString();
-
-                        table.Append("<tr>");
-                        table.Append(@"<td><div class='dropdown'>
-                                  <button class='btn btn-secondary btn-sm dropdown-toggle' type='button' id='Action" + i.ToString() + @"' data-bs-toggle='dropdown' aria-expanded='false'>
-                                    <i class='fas fa-align-justify'></i>
-                                  </button>
-                                  <ul class='dropdown-menu' aria-labelledby='Action" + i.ToString() + @"'>" +
-                                      "<li><a class='dropdown-item' href='calendar.aspx?CustomerID=" + dr["CustomerID"].ToString() + "'>Create Appointment</a></li>" +
-                                      "<li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId=" + dr["CustomerGuid"].ToString() + "&InType=Invoice'>Create Invoice</a></li>" +
-                                      "<li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId=" + dr["CustomerGuid"].ToString() + "&InType=Proposal'>Create Estimate</a></li>" +
-                                        "<li><hr class='dropdown-divider'></li>" +
-                                      "<li><a class='dropdown-item' href='Invoices.aspx?Id=" + dr["CustomerID"].ToString() + "&Type=Invoice&Form=CustomerList'>Invoices</a></li>" +
-                                      "<li><a class='dropdown-item' href='Invoices.aspx?Id=" + dr["CustomerID"].ToString() + "&Type=Proposal&Form=CustomerList'>Estimates</a></li>" +
-                                      "<li><a class='dropdown-item' href='View_Appointment.aspx?Id=" + dr["CustomerID"].ToString() + "&Form=CustomerList'>Appointments</a></li>" +
-                                      "<li><hr class='dropdown-divider'></li>" +
-                                      "<li><a class='dropdown-item' href='CustomerFiles.aspx?Id=" + dr["CustomerID"].ToString() + "'>Files</a></li>" +
-                                      "<li><a class='dropdown-item' href='EmailHistory_List.aspx?Id=" + dr["CustomerID"].ToString() + "&Type=Proposal'>E-Mails</a></li>" +
-                                      "<li><hr class='dropdown-divider'></li>" +
-                                      "<li><a class='dropdown-item' onclick='OpenMailPopUp(\"" + dr["CustomerID"].ToString() + "\")' href='#'>Send Email</a></li>" +
-                                      "<li><a class='dropdown-item' onclick='OpenSurveyMailPopUp(\"" + dr["Email"].ToString() + "\",\"" + dr["CustomerID"].ToString() + "\")' href='#'>Send Rating Email</a></li>" +
-                                       "<li><hr class='dropdown-divider'></li>" +
-                                        "<li><a class='dropdown-item' onclick='OpenSMSHistory(\"" + dr["Mobile"].ToString() + "\",\"" + dr["name"].ToString() + "\",\"" + dr["CustomerID"].ToString() + "\")' href='#'>SMS Chat</a></li>" +
-
-                                      "<li><a class='dropdown-item' onclick='OpenAllHistory(\"" + dr["Mobile"].ToString() + "\",\"" + dr["name"].ToString() + "\",\"" + dr["CustomerID"].ToString() + "\")' href='#'>Text History</a></li>" +
-
-                                       "<li><a class='dropdown-item' onclick='OpenSMSPopUp(\"" + dr["Mobile"].ToString() + "\",\"" + dr["CustomerID"].ToString() + "\")' href='#'>Send Texts</a></li>");
-                        LoginObject _loginObject = (LoginObject)Session["LoginObj"];
-
-                        if (_loginObject.IsMMSAllowed)
-                        {
-                            table.Append("<li><a class='dropdown-item' onclick='OpenMMSPopUp(\"" + dr["Mobile"].ToString() + "\",\"" + dr["CustomerID"].ToString() + "\")' href='#'>Send MMS</a></li>");
-                        }
-
-                        table.Append("</ul></div></td>");
-                        //if (IsSearchForContact)
-                        //{
-                        //    table.Append("<td><a style='color:#526288' href='BusinessContact.aspx?Bid=" + dr["BusinessID"].ToString() + "'>" + (dr["BusinessName"].ToString()) + "</a></td>");
-                        //}
-
-                        table.Append("<td><a style='color:#526288' href='" + sUrl + "'>" + (dr["name"].ToString()) + "</a></td>");
-                        table.Append("<td><a style='color:#526288' href='" + sUrl + "'>" + (dr["Jobtitle"].ToString()) + "</a></td>");
-
-                        string FullAddress = string.Empty;
-
-                        if (!string.IsNullOrEmpty(dr["Address1"].ToString()))
-                        {
-                            FullAddress += dr["Address1"].ToString() + ", ";
-                        }
-                        if (!string.IsNullOrEmpty(dr["City"].ToString()))
-                        {
-
-                            FullAddress += dr["City"].ToString() + ", ";
-                        }
-                        if (!string.IsNullOrEmpty(dr["State"].ToString()))
-                        {
-                            FullAddress += dr["State"].ToString() + ", ";
-                        }
-                        if (!string.IsNullOrEmpty(dr["ZipCode"].ToString()))
-                        {
-                            FullAddress += dr["ZipCode"].ToString();
-                        }
-
-                        if (FullAddress.EndsWith(", "))
-                        {
-                            FullAddress = FullAddress.Substring(0, FullAddress.Length - 2);
-                        }
-
-
-                        table.Append("<td>" + FullAddress + "</td>");
-                        table.Append("<td><a style='color:#526288' href='tel: " + dr["Mobile"].ToString() + "'>" + dr["Mobile"].ToString() + "</a></td>");
-                        table.Append("<td><a style='color:#526288' href='tel: " + dr["Phone"].ToString() + "'>" + dr["Phone"].ToString() + "</a></td>");
-                        table.Append("<td><a href='mailto:" + dr["Email"].ToString() + "'>" + dr["Email"].ToString() + "</a></td>");
-
-
-
-                        table.Append("</tr>");
-                    }
-                }
-
-            }
-            table.Append(" </tbody>");
-            table.Append("</table></div>");
-            ListTable.Controls.Add(new Literal { Text = table.ToString() });
-
-
-        }
-
+      
 
         [WebMethod]
         public static List<CustomerEntity> GetAllCustomer()
@@ -610,15 +356,9 @@ namespace TPM
 
 
 
-            if (ddl_SearchFor.SelectedValue.Trim() == "Business")
-            {
+            
                 LoadBusinessontactTable(searchPerameter, searchValue, selectedTags);
-            }
-            else
-            {
-                LoadTable(searchPerameter, searchValue, ddl_SearchFor.SelectedValue.Trim(), selectedTags);
-            }
-
+          
 
 
 

@@ -73,15 +73,15 @@
         <div class="row">
             <div class="row">
 
-                <asp:HiddenField ID="hdCompanyName" runat="server" />
-                <asp:HiddenField ID="hdCompanyTag" runat="server" />
-                <asp:HiddenField ID="BusinessID" runat="server" />
-                <asp:HiddenField ID="hf_BusinessGuid" runat="server" />
-                <asp:HiddenField ID="PrimaryCustomerid" Value="0" runat="server" />
-                <asp:HiddenField ID="BusinessGuID" runat="server" />
-                <asp:HiddenField ID="hdMode" runat="server" />
-                <asp:HiddenField ID="hdCustomerGUID" runat="server" />
-                <asp:HiddenField ID="RetVal" runat="server" />
+                <asp:HiddenField ID="hdCompanyName"  ClientIDMode ="Static"  runat="server" />
+                <asp:HiddenField ID="hdCompanyTag"  ClientIDMode ="Static"  runat="server" />
+                <asp:HiddenField ID="BusinessID" ClientIDMode ="Static" runat="server" />
+                <asp:HiddenField ID="hf_BusinessGuid"  ClientIDMode ="Static"  runat="server" />
+                <asp:HiddenField ID="PrimaryCustomerid"   ClientIDMode ="Static" Value="0" runat="server" />
+                <asp:HiddenField ID="BusinessGuID"  ClientIDMode ="Static"  runat="server" />
+                <asp:HiddenField ID="hdMode" ClientIDMode ="Static"    runat="server" />
+                <asp:HiddenField ID="hdCustomerGUID" ClientIDMode ="Static"   runat="server" />
+                <asp:HiddenField ID="RetVal" ClientIDMode ="Static"   runat="server" />
 
                 <div class="col-md-12">
                     <div class="card mb-2">
@@ -591,6 +591,6 @@
             initializeSelectPicker();
         });
     </script>
-    <script src="js/BusinessContact.js?v=8" type="text/javascript"></script>
+    <script src="Scripts/BusinessContact.js?v=8" type="text/javascript"></script>
    
 </asp:Content>

@@ -479,6 +479,9 @@
                                                     <option value="">Select a ticket status..</option>
                                                 </select>
                                             </div>
+                                             <div class="mb-1 col-6">
+                                                <button type="button" class="btn btn-primary" onclick="Open_TPStatusPopup()" >TP Status</button>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -538,6 +541,8 @@
             </div>
         </div>
     </div>
+
+
 
     <div class="cust-modal" id="addSiteModal">
         <div class="cust-modal-content">
@@ -642,7 +647,36 @@
         </div>
     </div>
 
+    
+      <div class="cust-modal" id="mdl_CheckDuplicate">
+        <div class="cust-modal-content">
+            <button class="cust-modal-close" id="close_mdl_CheckDuplicate">×</button>
+            <h2 class="cust-modal-title">Duplicate Check</h2>
+                <!-- Site Name -->
+                <div class="form-row">
+                    <div class="cust-modal-field full-width">
 
+                         <table id="DuplicatecustomerSiteTable" class="display" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                             <th>Select Main Site</th>
+                                            <th>Select Sub Site</th>
+                                            <th>Site</th>
+                                            <th>Address</th>
+                                            <th>Phone</th>
+                                        </tr>
+                                    </thead>
+                                </table>
+                    </div>
+                </div>
+                <!-- Buttons -->
+                <div class="cust-modal-btns">
+                    <button type="button" class="cust-modal-cancel" id="btn_CloseCheckDuplicate">Cancel</button>
+                    <button type="button" onclick="saveSite(event )" class="cust-modal-submit">Submit</button>
+                </div>
+
+        </div>
+    </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/2.2.2/js/dataTables.min.js"></script>
@@ -704,5 +738,73 @@
             }
         });
     </script>
-      <script src="Scripts/customer.js?v=13"></script>
+      <script language="javascript" type="text/javascript">
+        var bRBSelected = false;
+        var chkdCount = 0;
+    //var SelectedCompanyId = "";
+    //function RBClicked() {
+    //    bRBClicked = 0;
+    //    SelectedCompanyId = "";
+      
+    //    if ($('input[type=radio]:checked').length > 0) {
+    //        bRBClicked = 1;
+    //        SelectedCompanyId = $('input[type=radio]:checked').val();
+    //    }
+       
+        //}
+
+        function RadioCheck(rb) {
+            bRBSelected = true;
+            var gv = document.getElementById("wer");
+            var rbs = gv.getElementsByTagName("input");
+            var row = rb.parentNode.parentNode;
+            for (var i = 0; i < rbs.length; i++) {
+                if (rbs[i].type == "radio") {
+                    if (rbs[i].checked && rbs[i] != rb) {
+                        rbs[i].checked = false;
+                        //break;
+                    }
+                    if (rbs[i] == rb) {
+
+                        rbs[i + 2].checked = "Checked";
+                        //alert(rbs[i + 2].type);
+                    }
+                }
+                
+            }
+        }
+
+        function CountChkdSites() {
+
+            chkdCount = 0;
+
+            var gv = document.getElementById("wer");
+            var chks = gv.getElementsByTagName("input");
+            for (var i = 0; i < chks.length; i++) {
+                if (chks[i].type == "checkbox" && chks[i].checked) {
+                    chkdCount++;
+                    //alert(chkdCount);
+                }
+            }
+        }
+
+    function SubmitSte() 
+    {
+        CountChkdSites();
+
+        if (!bRBSelected) {
+            alert("Please select a Site");
+            return false;
+        }
+
+        if (chkdCount < 2) {
+            alert("Please select at least two sites to combine");
+            return false;
+        }
+
+        return true;
+       
+    }
+          </script>
+      <script src="Scripts/customer.js?v=17"></script>
 </asp:Content>

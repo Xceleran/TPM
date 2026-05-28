@@ -21,7 +21,7 @@ namespace FSM
 
         private void SetLogoPathsAndStyle() 
         {
-            SidebarLogoUrl = "images/LHLogowhite.png";     // Default for dark theme
+                // Default for dark theme
             SidebarLogoUrlLight = "images/lhlogo.png";     // Default for light theme
             LogoContainerClass = "logo-lhg";               // Default class
 
@@ -37,6 +37,9 @@ namespace FSM
                 SidebarLogoUrlLight = "images/lhlogo.png";
                 LogoContainerClass = "logo-lhg";
             }
+            LogoContainerClass = "logo-mxp";
+            SidebarLogoUrlLight = "images/TPM.png";
+            SidebarLogoUrl = "images/TPM.png";
         }
     }
 }

@@ -236,6 +236,108 @@ $(document).ready(function () {
         updateIsActiveLabel();
     });
 
+
+    $('#sites').on('click', '.cust-site-Duplicate-btn', function () {
+        const siteId = $(this).data('siteid');
+
+        const customerId = $(this).attr('data-CustomerID');
+
+        const Sitename = $(this).attr('data-Site-Name');
+
+      
+        //if ($.fn.DataTable.isDataTable('#DuplicatecustomerSiteTable')) {
+
+        //    $('#DuplicatecustomerSiteTable').DataTable().destroy();
+        //    $('#DuplicatecustomerSiteTable').empty(); // Manually empty the table's DOM
+        //}
+
+        $.ajax({
+            type: "POST",
+            url: "Customer.aspx/GetDuplicatecustomerSiteTable",
+            data: function (d) {
+                // Save current filter values on every request
+
+                return JSON.stringify({
+                    customerId: customerId,
+                    siteId: siteId,
+                    Sitename: Sitename
+                });
+            },
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function (response) {
+                console.log(response.d);
+               
+                $('.ajax-loader').css("visibility", "hidden");
+            },
+            error: function (xhr) {
+                console.error("Error loading message: ", xhr.responseText);
+                $('.ajax-loader').css("visibility", "hidden");
+
+            }
+        });
+
+
+
+        //$('#DuplicatecustomerSiteTable').DataTable({
+        //    processing: true,
+        //    serverSide: true,
+        //    filter: true,
+        //    ajax: {
+        //        url: "Customer.aspx/GetDuplicatecustomerSiteTable",
+        //        type: "POST",
+        //        contentType: "application/json; charset=utf-8",
+        //        dataType: "json",
+
+        //        data: function (d) {
+        //            // Save current filter values on every request
+
+        //            return JSON.stringify({
+        //                customerId: customerId,
+        //                siteId: siteId,
+        //                Sitename: Sitename
+        //            });
+        //        },
+
+        //        dataSrc: function (json) {
+        //            if (json.error) {
+        //                alert("Error loading customers: " + json.error);
+        //                return [];
+        //            }
+        //            return json.data;
+        //        }
+        //    },
+        //    paging: true,
+        //    pageLength: 10,
+        //    select: { style: 'single' },
+        //    columns: [
+
+        //        {
+        //            data: "SiteName",
+        //            name: "Select Main Site",
+        //            autoWidth: true,
+        //            render: function (data, type, row) {
+        //                return '<input type="radio" name="row-selection" value="0">';
+
+        //            }
+        //        },
+        //        {
+        //            data: "SiteName",
+        //            name: "Select Sub Site",
+        //            autoWidth: true,
+        //            render: function (data, type, row) {
+        //                return '<input type="radio" name="row-selection" value="0">';
+
+        //            }
+        //        }
+
+        //    ]
+        //});
+
+        openModal('mdl_CheckDuplicate');
+
+    });
+
     $('#sites').on('click', '.cust-site-msgview-btn', function () {
         $('#div_Msg').html('');
         openModal('MsgViewModal');
@@ -572,7 +674,8 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                     <h3 class="cust-site-title">${escapeHTML(site.SiteName)}</h3>
                                 </div>
                                 <div class="cust-site-actions">
-                                    
+                                    <button class="cust-site-icon-btn cust-site-Duplicate-btn" title="Check Duplicate"  data-Site-Name="${site.SiteName}"  data-siteid="${site.Id}" data-CustomerID="${site.CustomerID}" >
+                                   <i class="fa fa-eye"></i> </button>
                                  <button class="cust-site-icon-btn cust-site-msgview-btn" title="View Original Message" data-site-id="${ApptID}" data-is-default="${isDefaultSite}">
                                    <i class="fa fa-eye"></i> </button>
                                     ${editButton}

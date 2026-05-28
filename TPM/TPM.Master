@@ -262,11 +262,15 @@
                      
 
 
-                        <%--     <li id="settings-link" class="sidebar-nav-item">
-                            <a href="SMSSettings.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="SMS Settings">  
-                                <span class="sidebar-text"><i class="fas fa-cog default-icon me-2"></i> SMS Settings</span>
+                             <li id="SupportedTPProviders-link" class="sidebar-nav-item">
+                                   <a href="ThirdPartyProviders.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Supported TP Providers">
+                                <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01m-.01 4h.01"></path>
+                                </svg>
+                                <span class="sidebar-text">Supported TP Providers</span>
                             </a>
-                        </li>--%>
+
+                        </li>
 
 
                       <%--  
@@ -352,6 +356,147 @@
             </div>
         </div>
 
+
+            <div class="modal fade" id="m_Staus" tabindex="-1" role="dialog"  aria-labelledby="replyModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-scrollable" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="replyModalLabel">Status</h5>
+                                </div>
+                                <div class="modal-body">
+
+            <table width="400px" style="text-align:center">
+                
+                <tr>
+                    <td align="left" colspan="2">
+                        
+                    </td>
+                </tr>
+                <tr>
+                    <td align="center">
+                        <asp:Label ID="Label1" runat="server" Font-Size="15px" Font-Bold="true" Text="Status" Font-Names="Arial"></asp:Label>
+                    </td>
+                    <td align="center">                        
+                        <asp:Label ID="Label2" runat="server" Font-Size="15px" Text="Timestamp" Font-Bold="true" Font-Names="Arial"></asp:Label>
+                        
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        &nbsp;
+                    </td>
+                    <td>
+                        &nbsp;
+                    </td>
+                </tr>
+                <tr>
+                    <td valign="top">
+                        <asp:Button ID="btnInRoute1" runat="server" Text="In Route" Width="210px" 
+                            OnClientClick="return UserMessage(this)" />
+                    </td>
+                    <td align="center" valign="top">
+                       <nobr><asp:Label ID="lblInRoute1" runat="server" Font-Names="Arial" Font-Size="15px"></asp:Label></nobr>
+                    </td>
+                </tr>
+                <tr>
+                    <td valign="top">
+                        <asp:Button ID="btnArrived" runat="server" Text="Arrived" Width="210px" 
+                            OnClientClick="return UserMessage(this)" />
+                    </td>
+                    <td align="center" valign="top">
+                        &nbsp;
+                        <nobr>
+                        <asp:Label ID="lblArrived1" runat="server" Font-Names="Arial" 
+                            Font-Size="15px"></asp:Label></nobr>
+                    </td>
+                </tr>
+                <tr>
+                    <td valign="top">
+                        <asp:Button ID="btnComplete1" runat="server" 
+                            OnClientClick="return UserMessage(this)" Text="Complete" Width="210px" />
+                    </td>
+                    <td align="center" valign="top">
+                        <nobr>
+                        <asp:Label ID="lblComplete1" runat="server" Font-Names="Arial" Font-Size="15px"></asp:Label>
+                        </nobr>
+                    </td>
+                </tr>
+                <tr>
+                    <td valign="top">
+                        <asp:Button ID="btnInProgressNeedParts" runat="server" 
+                             OnClientClick="return UserMessage(this)" 
+                            Text="In Progress: Needs  Parts" Width="210px" />
+                    </td>
+                    <td align="center" valign="top">
+                        <nobr>
+                        <asp:Label ID="lblInProgParts" runat="server" Font-Names="Arial" 
+                            Font-Size="15px"></asp:Label>
+                        </nobr>
+                    </td>
+                </tr>
+                <tr>
+                    <td valign="top">
+                        <asp:Button ID="btnReplace1" runat="server" 
+                            OnClientClick="return UserMessage(this)" Text="In Progress: Need to Replace" 
+                            Width="210px" />
+                    </td>
+                    <td align="center" valign="top">
+                        <nobr>
+                        <asp:Label ID="lblInProgReplace" runat="server" Font-Names="Arial" 
+                            Font-Size="15px"></asp:Label>
+                        </nobr>
+                    </td>
+                </tr>
+                <tr>
+                    <td valign="top">
+                        <asp:Button ID="btnMissedApp" runat="server"  
+                            OnClientClick="return UserMessage(this)" Text="Customer Missed Appointment" 
+                            Width="210px"  />
+                    </td>
+                    <td align="center" valign="top">
+                        <nobr>
+                        <asp:Label ID="lblMissedApp" runat="server" Font-Names="Arial" Font-Size="15px"></asp:Label>
+                        </nobr>
+                    </td>
+                </tr>
+                <tr style ="display:none;">
+                    <td  valign="top">
+                        <asp:Button ID="btnWaiting" runat="server" 
+                            OnClientClick="return UserMessage(this)" Text="Waiting on Customer Call Back" 
+                            Width="210px"  Visible="False" />
+                    </td>
+                    <td align="right" valign="top">
+                        <nobr>
+                        <asp:Label ID="lblWaiting" runat="server" Font-Names="Arial" 
+                            Font-Size="15px"></asp:Label>
+                        </nobr>
+                    </td>
+                </tr>
+                <tr style ="display:none;">
+                    <td  valign="top">
+                        <asp:Button ID="btnContractor" runat="server" 
+                            OnClientClick="return UserMessage(this)" Text="Contractor Missed Appointment" 
+                            Width="210px"  Visible="False" />
+                    </td>
+                    <td align="right" valign="top">
+                        <nobr>
+                        <asp:Label ID="lblContractor" runat="server" Font-Names="Arial" 
+                            Font-Size="15px"></asp:Label>
+                        &nbsp;</nobr></td>
+                </tr>
+              
+            </table>
+   
+                                </div>
+                                <div class="modal-footer justify-content-lg-end">
+                                    <hr />
+                                    <button type="button" id="btnCloseModal" class="btn btn-warning justify-content-lg-start" data-dismiss="modal">Close</button>
+                                   
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
         <!-- Timeout Modal -->
         <div id="timeoutModal" style="display: none;">
             <div class="modal-contents">
@@ -426,6 +571,10 @@
         function resetTitle() {
             document.title = "<%: Page.Title %> - TPM";
         }
+        
+        $("#btnCloseModal").click(function () {
+            $("#m_Staus").modal("hide");
+        });
 
         // Function to show the timeout modal
         function showTimeoutModal() {
@@ -603,7 +752,7 @@
             try {
                 localStorage.clear();
                 sessionStorage.clear();
-                window.location.href = '/Login/Logout';
+                window.location.href = 'logout.aspx';
             } catch (error) {
                 console.error('Error in confirmSidebarLogout:', error);
             }

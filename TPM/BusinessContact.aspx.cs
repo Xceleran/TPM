@@ -283,8 +283,8 @@ namespace TPM
                 state.Value = businessContact.State;
                 province.Value = businessContact.State;
                 zip.Value = businessContact.ZipCode;
-                phone.Value = businessContact.Phone;
-                mobile.Value = businessContact.Mobile;
+                phone.Value = Common.GetFormatedPhoneNumber(businessContact.Phone)  ;
+                mobile.Value = Common.GetFormatedPhoneNumber(businessContact.Mobile);
                 email.Value = businessContact.Email;
                 BusinessID.Value = businessContact.CustomerID;
                 hf_BusinessGuid.Value = businessContact.CustomerGuid;
@@ -331,11 +331,11 @@ namespace TPM
                 div_More.Visible = true;
 
                 string CustomerID = businessContact.CustomerID;
-                string Sql = "Select FORMAT( (select ISNULL(Sum(Total-AmountCollect),0) from msSchedulerV3.tbl_invoice where Type='Invoice' and CompnyID='" + CompanyID + "' and CustomerID='" + CustomerID + "'), 'N2') as TotalDueForInvoice," +
-               "FORMAT((select ISNULL(Sum(Total-AmountCollect),0) from msSchedulerV3.tbl_invoice where Type='Proposal' and IsConverted = 0 and CompnyID='" + CompanyID + "' and CustomerID='" + CustomerID + "'), 'N2') as TotalDueForEstimate," +
-               "(select count(Type) from msSchedulerV3.tbl_invoice where Type='Proposal' and IsConverted = 0 and CompnyID='" + CompanyID + "' and CustomerID='" + CustomerID + "') as TotalEstimate," +
-               "(select count(Type) from msSchedulerV3.tbl_invoice where Type='Invoice' and CompnyID='" + CompanyID + "' and CustomerID='" + CustomerID + "') as TotalInvoice," +
-               "(select count(CompanyID) from msSchedulerV3.tbl_Appointment where CompanyID='" + CompanyID + "' and CustomerID='" + CustomerID + "') as TotalAppoinment ";
+                string Sql = "Select FORMAT( (select ISNULL(Sum(Total-AmountCollect),0) from [msSchedulerV3].[dbo].tbl_invoice where Type='Invoice' and CompnyID='" + CompanyID + "' and CustomerID='" + CustomerID + "'), 'N2') as TotalDueForInvoice," +
+               "FORMAT((select ISNULL(Sum(Total-AmountCollect),0) from [msSchedulerV3].[dbo].tbl_invoice where Type='Proposal' and IsConverted = 0 and CompnyID='" + CompanyID + "' and CustomerID='" + CustomerID + "'), 'N2') as TotalDueForEstimate," +
+               "(select count(Type) from [msSchedulerV3].[dbo].tbl_invoice where Type='Proposal' and IsConverted = 0 and CompnyID='" + CompanyID + "' and CustomerID='" + CustomerID + "') as TotalEstimate," +
+               "(select count(Type) from [msSchedulerV3].[dbo].tbl_invoice where Type='Invoice' and CompnyID='" + CompanyID + "' and CustomerID='" + CustomerID + "') as TotalInvoice," +
+               "(select count(CompanyID) from [msSchedulerV3].[dbo].tbl_Appointment where CompanyID='" + CompanyID + "' and CustomerID='" + CustomerID + "') as TotalAppoinment ";
 
                 Database db = new Database();
                 DataTable dt = new DataTable();

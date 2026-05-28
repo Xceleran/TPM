@@ -1494,7 +1494,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <tr class="${highlightClass}" style="cursor: default;">
                     <td>
                         <button type="button" class="btn btn-sm btn-outline-primary" onclick="showAppointmentDetailsModal('${apt.AppoinmentId}')">
-                            ${apt.AppoinmentId || '-'}${highlightIcon}
+                            ${apt.AppoinmentUId || '-'}${highlightIcon}
                         </button>
                     </td>
                     <td>${apt.RequestDate || apt.AppoinmentDate || '-'}</td>
@@ -3240,11 +3240,12 @@ window.saveAppointmentChanges = function () {
     const endMom = moment($('#txt_EndDate').val(), "MM/DD/YYYY hh:mm A");
 
     // Get status text, filtering out placeholder options
-    var statusText = ($('#MainContent_StatusTypeFilter_Edit option:selected').text() || '').trim();
-    if (!statusText || statusText.toLowerCase().indexOf('select') === 0) statusText = '';
-    var ticketStatusText = ($('#MainContent_TicketStatusFilter_Edit option:selected').text() || '').trim();
-    if (!ticketStatusText || ticketStatusText.toLowerCase().indexOf('select') === 0) ticketStatusText = '';
+    var statusText = ($('#MainContent_StatusTypeFilter_Edit option:selected').val() || '0').trim();
+    if (!statusText || statusText.toLowerCase().indexOf('select') === 0) statusText = '0';
+    var ticketStatusText = ($('#MainContent_TicketStatusFilter_Edit option:selected').val() || '0').trim();
+    if (!ticketStatusText || ticketStatusText.toLowerCase().indexOf('select') === 0) ticketStatusText = '0';
 
+     
     var formSiteId = parseInt($('#editAppointmentForm').data('site-id'));
     if (isNaN(formSiteId)) formSiteId = 0;
     var pageSiteId = (typeof siteId !== 'undefined') ? siteId : 0;
@@ -3254,7 +3255,7 @@ window.saveAppointmentChanges = function () {
         CustomerID: $('#editCustomerId').val(),
         ServiceType: $('#MainContent_ServiceTypeFilter_Edit').val(),
         ResourceID: parseInt($('#resource_list').val()) || 0,
-        Status: statusText || 'Pending',
+        Status: statusText || '0',
         TicketStatus: ticketStatusText,
         RequestDate: startMom.isValid() ? startMom.format("YYYY-MM-DD") : $('#dateInput').val(),
         StartDateTime: startMom.isValid() ? startMom.format("MM/DD/YYYY hh:mm A") : '',

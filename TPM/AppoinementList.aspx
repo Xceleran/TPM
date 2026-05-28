@@ -165,6 +165,35 @@
             </div>
         </section>
     </div>
+
+          <div class="cust-modal" id="mdl_CheckDuplicate">
+        <div class="cust-modal-content">
+            <button class="cust-modal-close" id="close_mdl_CheckDuplicate">×</button>
+            <h2 class="cust-modal-title">Duplicate Check</h2>
+                <!-- Site Name -->
+                <div class="form-row">
+                    <div class="cust-modal-field full-width">
+
+                         <table id="DuplicatecustomerSiteTable" class="display" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                             <th>Select Main Site</th>
+                                            <th>Select Sub Site</th>
+                                          
+                                        </tr>
+                                    </thead>
+                                </table>
+                    </div>
+                </div>
+                <!-- Buttons -->
+                <div class="cust-modal-btns">
+                    <button type="button" class="cust-modal-cancel" id="clossadaseAddSite">Cancel</button>
+                    <button type="button" onclick="saveSite(event )" class="cust-modal-submit">Submit</button>
+                </div>
+
+        </div>
+    </div>
+
     <div class="cust-modal" id="MsgViewModal">
         <div class="cust-modal-content">
             <button class="cust-modal-close" id="closeMsgView">×</button>

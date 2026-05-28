@@ -575,7 +575,7 @@ namespace TPM
 
                 // Show ALL appointments for the customer across all sites
                 // Handle CustomerID as both string and integer for compatibility
-                string sql = @"SELECT CONVERT(VARCHAR(10), apt.ApptDateTime, 101) AS ApptDateTimeConverted,apt.ApptID,srv.ServiceName,  
+                string sql = @"SELECT CONVERT(VARCHAR(10), apt.ApptDateTime, 101) AS ApptDateTimeConverted,apt.ApptID,apt.AppoinmentUId,srv.ServiceName,  
     CASE WHEN apt.Status = 'Deleted' THEN 'N/A' WHEN sts.StatusName = 'Scheduled' THEN 'Confirmed' ELSE sts.StatusName END AS AppStatus, 
     tkt.StatusName AS AppTicketStatus
     FROM tbl_Appointment AS apt 
@@ -616,6 +616,8 @@ namespace TPM
                         try
                         {
                             var appoinment = new AppointmentModel();
+                         
+                                appoinment.AppoinmentUId = row["AppoinmentUId"]?.ToString() ?? "";
                             appoinment.AppoinmentId = row["ApptID"]?.ToString() ?? "";
                             appoinment.CustomerID = customerId;
                             appoinment.CompanyID = companyid;
@@ -694,8 +696,8 @@ namespace TPM
                             Zip = dr["Zip"].ToString() ?? "",
                             Contact = dr["Contact"].ToString() ?? "",
                             Email = dr["Email"].ToString() ?? "",
-                            PhoneNumber = dr["PhoneNumber"].ToString() ?? "",
-                            MobileNumber = dr["MobileNumber"].ToString() ?? "",
+                            PhoneNumber = Common.GetFormatedPhoneNumber(dr["PhoneNumber"].ToString()),
+                            MobileNumber = Common.GetFormatedPhoneNumber(dr["MobileNumber"].ToString()),
                             Note = dr["Note"].ToString() ?? "",
                             IsActive = Convert.ToBoolean(dr["IsActive"]),
                             CreatedDateTime = Convert.ToDateTime(dr["CreatedDateTime"])

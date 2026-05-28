@@ -216,11 +216,13 @@
     <Content Include="images\invoice\bgtopin.png" />
     <Content Include="images\LHLogo.png" />
     <Content Include="images\LHLogowhite.png" />
+    <Content Include="images\TPM.png" />
     <Content Include="images\TPM_IMG.png" />
     <Content Include="images\xceleran.png" />
     <Content Include="images\xceleranwhite.png" />
     <Content Include="images\xinator.png" />
     <Content Include="images\xinatorwhite.png" />
+    <Content Include="logout.aspx" />
     <Content Include="QboConnection.aspx" />
     <Content Include="FormResponse.aspx" />
     <Content Include="Content\appointments.css" />
@@ -281,7 +283,9 @@
     <Content Include="Settings.aspx" />
     <Content Include="SMSSettings.aspx" />
     <Content Include="ViewSwitcher.ascx" />
-    <Content Include="Web.config" />
+    <Content Include="Web.config">
+      <SubType>Designer</SubType>
+    </Content>
     <Content Include="Bundle.config" />
     <Content Include="Site.Mobile.Master" />
   </ItemGroup>
@@ -326,6 +330,13 @@
     <Compile Include="Entity\CommonClass.cs" />
     <Compile Include="Entity\EmailCommunicationAndContent.cs" />
     <Compile Include="Entity\Notes\Note.cs" />
+    <Compile Include="logout.aspx.cs">
+      <DependentUpon>logout.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="logout.aspx.designer.cs">
+      <DependentUpon>logout.aspx</DependentUpon>
+    </Compile>
     <Compile Include="Processors\AppointmentStatusCommunicationProcessor.cs" />
     <Compile Include="Processors\EmailProcessor.cs" />
     <Compile Include="QboConnection.aspx.cs">

@@ -8,6 +8,8 @@ namespace FSM.Models.AppoinmentModel
 {
     public class AppointmentModel
     {
+        
+             public string AppoinmentUId { get; set; }
         public string AppoinmentId { get; set; }
         public string AppoinmentDate { get; set; }
         public string StatusColor { get; set; }

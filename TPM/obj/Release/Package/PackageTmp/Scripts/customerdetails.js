@@ -256,6 +256,22 @@ document.addEventListener('DOMContentLoaded', () => {
             applyFiltersAppt();
         });
 
+        // Sortable header click handler for Appointments table
+        $(document).on('click', '.sortable-header', function () {
+            const sortColumn = $(this).data('sort');
+            if (apptSortColumn === sortColumn) {
+                apptSortDirection = apptSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                apptSortColumn = sortColumn;
+                apptSortDirection = 'asc';
+            }
+            // Update sort icons
+            $('.sortable-header i').removeClass('fa-sort-up fa-sort-down').addClass('fa-sort');
+            const icon = $(this).find('i');
+            icon.removeClass('fa-sort').addClass(apptSortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+            applyFiltersAppt();
+        });
+
         function getRedirectionURL() {
             const customerId = $('#MainContent_lblCustomerId').text() || $('[id$="lblCustomerId"]').text();
             const customerName = $('#MainContent_lblCustomerName').text();
@@ -1337,7 +1353,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     aVal = (a.ServiceType || '').toLowerCase();
                     bVal = (b.ServiceType || '').toLowerCase();
                     break;
-                case 'Status':
+                case 'AppoinmentStatus':
                     aVal = (a.AppoinmentStatus || '').toLowerCase();
                     bVal = (b.AppoinmentStatus || '').toLowerCase();
                     break;
@@ -2719,6 +2735,7 @@ var cslServiceTypes = [];
 var cslResources = [];
 var cslApptStatuses = [];
 var cslTicketStatuses = [];
+var allTimeSlotsCD = [];
 
 window.dropdownDataPromise = null;
 
@@ -2792,9 +2809,44 @@ window.loadDropdownDataForModal = function () {
         });
     });
 
-    window.dropdownDataPromise = Promise.all([p1, p2, p3, p4]);
+    const p5 = new Promise((resolve) => {
+        if (allTimeSlotsCD.length > 0) return resolve();
+        getTimeSlotsForCustomerDetails().then(() => resolve()).catch(() => resolve());
+    });
+
+    window.dropdownDataPromise = Promise.all([p1, p2, p3, p4, p5]);
     return window.dropdownDataPromise;
 };
+
+function getTimeSlotsForCustomerDetails() {
+    return $.ajax({
+        type: "POST",
+        url: "Appointments.aspx/GetTimeSlots",
+        data: '{}',
+        contentType: "application/json; charset=utf-8",
+        dataType: "json"
+    }).then(function (response) {
+        let slots = response.d || [];
+        slots.sort(function (a, b) {
+            var parseTime = function (timeStr) {
+                if (!timeStr) return 0;
+                var match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                if (!match) return 0;
+                var hours = parseInt(match[1], 10);
+                var mins = parseInt(match[2], 10);
+                if (match[3].toUpperCase() === 'PM' && hours !== 12) hours += 12;
+                if (match[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
+                return hours * 60 + mins;
+            };
+            return parseTime(a.StartTime || a.TimeBlockSchedule) - parseTime(b.StartTime || b.TimeBlockSchedule);
+        });
+        allTimeSlotsCD = slots;
+        return slots;
+    }).catch(function (xhr, status, error) {
+        console.error("Error fetching time slots for CustomerDetails:", error);
+        return [];
+    });
+}
 
 function populateDropdown(elementId, data, valueField, textField, defaultText) {
     const $el = $(`#${elementId}`);
@@ -2809,29 +2861,28 @@ function populateDropdown(elementId, data, valueField, textField, defaultText) {
     }
 }
 
-function populateTimeSlots() {
+function populateTimeSlots(slots) {
     const $timeSlot = $('#time_slot');
     if (!$timeSlot.length) return;
     $timeSlot.empty();
     $timeSlot.append('<option value="">Select Time Slot</option>');
 
-    const genericSlots = ["Morning", "Afternoon", "Evening"];
-    genericSlots.forEach(s => $timeSlot.append(new Option(s, s.toLowerCase())));
-
-    // Add 30-min increments from 8 AM to 8 PM
-    for (let h = 8; h < 20; h++) {
-        for (let m = 0; m < 60; m += 30) {
-            let hh = h % 12 || 12;
-            let ampm = h >= 12 ? "PM" : "AM";
-            let h_next = m === 30 ? h + 1 : h;
-            let m_next = m === 30 ? 0 : 30;
-            let hh_next = h_next % 12 || 12;
-            let ampm_next = h_next >= 12 ? "PM" : "AM";
-
-            let slotText = `${hh.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')} ${ampm} - ${hh_next.toString().padStart(2, '0')}:${m_next.toString().padStart(2, '0')} ${ampm_next}`;
-            $timeSlot.append(new Option(slotText, slotText.toLowerCase()));
-        }
+    if (!slots || slots.length === 0) {
+        console.warn('populateTimeSlots: No time slots provided');
+        return;
     }
+
+    slots.forEach(function (slot) {
+        var value = slot.StartTime;
+        var displayText = slot.TimeBlockSchedule || slot.TimeBlock || slot.StartTime;
+        var option = $('<option></option>')
+            .val(value)
+            .text(displayText)
+            .attr('data-id', slot.ID)
+            .attr('data-start', slot.StartTime)
+            .attr('data-end', slot.EndTime);
+        $timeSlot.append(option);
+    });
 }
 
 function parseDuration(durationString) {
@@ -2865,7 +2916,7 @@ window.showAppointmentDetailsModal = async function (appointmentId) {
     }
     populateDropdown("MainContent_StatusTypeFilter_Edit", cslApptStatuses, "StatusID", "StatusName", "Select Status");
     populateDropdown("MainContent_TicketStatusFilter_Edit", cslTicketStatuses, "StatusID", "StatusName", "Select Ticket Status");
-    populateTimeSlots();
+    populateTimeSlots(allTimeSlotsCD);
 
     // Fetch full details
     $.ajax({
@@ -2911,33 +2962,99 @@ window.showAppointmentDetailsModal = async function (appointmentId) {
 
                 setDropdownByTextOrValue('MainContent_StatusTypeFilter_Edit', details.Status);
                 setDropdownByTextOrValue('MainContent_TicketStatusFilter_Edit', details.TicketStatus);
-                setDropdownByTextOrValue('time_slot', details.TimeSlot);
+                // Match time slot using TimeBlockSchedule, TimeBlock, or StartTime fallback
+                var timeSlotValue = (details.TimeSlot || '').trim();
+                var matchingSlot = allTimeSlotsCD.find(function (slot) {
+                    return (slot.TimeBlockSchedule || '').trim() === timeSlotValue ||
+                           (slot.TimeBlock || '').trim() === timeSlotValue;
+                });
+                // Fallback: match by StartTime from appointment's Hour/Minute
+                if (!matchingSlot && details.Hour !== undefined && details.Minute !== undefined) {
+                    var h = parseInt(details.Hour, 10);
+                    var m = parseInt(details.Minute, 10);
+                    if (!isNaN(h)) {
+                        var ampm = h >= 12 ? 'PM' : 'AM';
+                        var hh = h % 12 || 12;
+                        var startTime = hh.toString().padStart(2, '0') + ':' + (m || 0).toString().padStart(2, '0') + ' ' + ampm;
+                        matchingSlot = allTimeSlotsCD.find(function (slot) {
+                            return slot.StartTime === startTime;
+                        });
+                    }
+                }
+                $('#time_slot').val(matchingSlot ? matchingSlot.StartTime : '');
 
                 $('#dateInput').val(details.Date);
 
-                let startMoment = null;
-                if (details.Date) {
-                    startMoment = moment(`${details.Date} ${details.Hour}:${details.Minute}`, "YYYY-MM-DD H:m");
-                    $('#txt_StartDate').val(startMoment.format("MM/DD/YYYY hh:mm A"));
-                } else {
-                    $('#txt_StartDate').val('');
-                }
-
+                // Set duration from DB Hour/Minute first
                 $('#duration').val(details.Duration || "");
 
-                // Calculate End Date
-                if (startMoment && startMoment.isValid() && details.Duration) {
-                    const totalMinutes = parseDuration(details.Duration);
-                    if (totalMinutes > 0) {
-                        const newEndDateTime = startMoment.clone().add(totalMinutes, 'minutes');
-                        $('#txt_EndDate').val(newEndDateTime.format('MM/DD/YYYY hh:mm A'));
+                // Recalculate Start/End from Time Slot + Date + Duration
+                var selectedSlotOption = $('#time_slot option:selected');
+                var slotStart = selectedSlotOption.attr('data-start');
+                if (!slotStart) {
+                    var slotText = selectedSlotOption.text() || '';
+                    var slotMatches = slotText.match(/(\d{1,2}:\d{2}\s*[AP]M)/gi);
+                    if (slotMatches && slotMatches.length >= 1) slotStart = slotMatches[0].replace(/([AP]M)/i, ' $1').trim();
+                }
+                var loadDateVal = $('#dateInput').val();
+
+                if (slotStart && loadDateVal) {
+                    var calcStart = moment(loadDateVal + ' ' + slotStart, 'YYYY-MM-DD hh:mm A');
+                    if (calcStart.isValid()) {
+                        $('#txt_StartDate').val(calcStart.format('MM/DD/YYYY hh:mm A'));
+                        var durMinutes = parseDuration($('#duration').val());
+                        if (durMinutes > 0) {
+                            var calcEnd = calcStart.clone().add(durMinutes, 'minutes');
+                            $('#txt_EndDate').val(calcEnd.format('MM/DD/YYYY hh:mm A'));
+                        } else {
+                            // Fallback: use slot end time
+                            var slotEnd = selectedSlotOption.attr('data-end');
+                            if (!slotEnd && slotMatches && slotMatches.length >= 2) slotEnd = slotMatches[1].replace(/([AP]M)/i, ' $1').trim();
+                            if (slotEnd) {
+                                var calcEnd = moment(loadDateVal + ' ' + slotEnd, 'YYYY-MM-DD hh:mm A');
+                                if (calcEnd.isValid()) $('#txt_EndDate').val(calcEnd.format('MM/DD/YYYY hh:mm A'));
+                            }
+                        }
+                    }
+                } else {
+                    // No time slot available — fall back to DB StartDateTime/EndDateTime
+                    var startMoment = details.StartDateTime ? moment(details.StartDateTime, 'MM/DD/YYYY hh:mm A') : null;
+                    var endMoment = details.EndDateTime ? moment(details.EndDateTime, 'MM/DD/YYYY hh:mm A') : null;
+                    if (startMoment && startMoment.isValid()) {
+                        $('#txt_StartDate').val(startMoment.format("MM/DD/YYYY hh:mm A"));
+                    } else {
+                        $('#txt_StartDate').val('');
+                    }
+                    if (endMoment && endMoment.isValid()) {
+                        $('#txt_EndDate').val(endMoment.format('MM/DD/YYYY hh:mm A'));
                     } else {
                         $('#txt_EndDate').val('');
                     }
-                } else if (details.EndDateTime) {
-                    $('#txt_EndDate').val(moment(details.EndDateTime).format('MM/DD/YYYY hh:mm A'));
-                } else {
-                    $('#txt_EndDate').val('');
+                }
+
+                // Fetch correct Time Required from DB based on service type and recalculate End
+                var stId = parseInt(details.ServiceTypeID) || 0;
+                if (stId > 0) {
+                    $.ajax({
+                        url: "Appointments.aspx/GetDuration",
+                        type: "POST",
+                        contentType: "application/json; charset=utf-8",
+                        dataType: "json",
+                        data: JSON.stringify({ serviceTypeID: stId }),
+                        success: function (response) {
+                            var duration = response.d || "0";
+                            if (duration && duration !== "0") {
+                                $('#duration').val(duration);
+                                // Recalculate End from Start + new Duration
+                                var curStart = moment($('#txt_StartDate').val(), 'MM/DD/YYYY hh:mm A');
+                                var newDur = parseDuration(duration);
+                                if (curStart.isValid() && newDur > 0) {
+                                    var newEnd = curStart.clone().add(newDur, 'minutes');
+                                    $('#txt_EndDate').val(newEnd.format('MM/DD/YYYY hh:mm A'));
+                                }
+                            }
+                        }
+                    });
                 }
 
                 $('#editApptNote').val(details.Note);
@@ -2966,6 +3083,44 @@ window.calculateTimeRequired = function (event) {
     const $end = $('#txt_EndDate');
     const $duration = $('#duration');
     const $error = $('#customer_EndDate');
+    const $dateInput = $('#dateInput');
+    const $timeSlot = $('#time_slot');
+
+    // If triggered by time slot change, sync Start/End dates and return
+    if (event && event.target && event.target.id === 'time_slot') {
+        var selectedOption = $timeSlot.find('option:selected');
+        var slotStartTime = selectedOption.attr('data-start');
+        var slotEndTime = selectedOption.attr('data-end');
+        var dateVal = $dateInput.val();
+
+        // Also try extracting times from the display text as fallback
+        if (!slotStartTime || !slotEndTime) {
+            var displayText = selectedOption.text() || '';
+            var timeMatches = displayText.match(/(\d{1,2}:\d{2}\s*[AP]M)/gi);
+            if (timeMatches && timeMatches.length >= 1 && !slotStartTime) slotStartTime = timeMatches[0].replace(/([AP]M)/i, ' $1').trim();
+            if (timeMatches && timeMatches.length >= 2 && !slotEndTime) slotEndTime = timeMatches[1].replace(/([AP]M)/i, ' $1').trim();
+        }
+
+        if (slotStartTime && dateVal) {
+            var newStart = moment(dateVal + ' ' + slotStartTime, 'YYYY-MM-DD hh:mm A');
+            if (newStart.isValid()) {
+                $start.val(newStart.format('MM/DD/YYYY hh:mm A'));
+
+                // End = Start + Time Required (if available), otherwise use slot end time
+                var durationMinutes = parseDuration($duration.val());
+                if (durationMinutes > 0) {
+                    var newEnd = newStart.clone().add(durationMinutes, 'minutes');
+                    $end.val(newEnd.format('MM/DD/YYYY hh:mm A'));
+                } else if (slotEndTime) {
+                    var newEnd = moment(dateVal + ' ' + slotEndTime, 'YYYY-MM-DD hh:mm A');
+                    if (newEnd.isValid()) {
+                        $end.val(newEnd.format('MM/DD/YYYY hh:mm A'));
+                    }
+                }
+            }
+        }
+        return; // Don't recalculate duration — it should stay as the original Time Required
+    }
 
     const start = moment($start.val(), 'MM/DD/YYYY hh:mm A');
     const end = moment($end.val(), 'MM/DD/YYYY hh:mm A');
@@ -2991,6 +3146,45 @@ window.calculateTimeRequired = function (event) {
 
     if ($duration.length) $duration.val(`${hours} Hr : ${minutes} Min`);
 };
+
+window.updateEndDateFromDuration = function () {
+    var startVal = $('#txt_StartDate').val();
+    var durationVal = $('#duration').val();
+    if (!startVal || !durationVal) return;
+
+    var start = moment(startVal, 'MM/DD/YYYY hh:mm A');
+    if (!start.isValid()) return;
+
+    var durationMinutes = parseDuration(durationVal);
+    if (durationMinutes <= 0) return;
+
+    var newEnd = start.clone().add(durationMinutes, 'minutes');
+    $('#txt_EndDate').val(newEnd.format('MM/DD/YYYY hh:mm A'));
+};
+
+// Update Time Required from DB when Service Type changes
+$(document).on('change', '[id$="ServiceTypeFilter_Edit"]', function () {
+    var serviceTypeId = parseInt($(this).val()) || 0;
+    if (serviceTypeId > 0) {
+        $.ajax({
+            url: "CustomerDetails.aspx/GetDuration",
+            type: "POST",
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            data: JSON.stringify({ serviceTypeID: serviceTypeId }),
+            success: function (response) {
+                var duration = response.d || "0";
+                if (duration && duration !== "0") {
+                    $('#duration').val(duration);
+                    updateEndDateFromDuration();
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error("Error fetching duration:", error);
+            }
+        });
+    }
+});
 
 window.updateDate = function (event) {
     const newDate = event.target.value;
@@ -3039,25 +3233,37 @@ function setDropdownByTextOrValue(elementId, textOrVal) {
 
 window.saveAppointmentChanges = function () {
     const apptId = $('#editApptId').val();
-
     if (!apptId) return;
 
+    try {
     const startMom = moment($('#txt_StartDate').val(), "MM/DD/YYYY hh:mm A");
     const endMom = moment($('#txt_EndDate').val(), "MM/DD/YYYY hh:mm A");
+
+    // Get status text, filtering out placeholder options
+    var statusText = ($('#MainContent_StatusTypeFilter_Edit option:selected').text() || '').trim();
+    if (!statusText || statusText.toLowerCase().indexOf('select') === 0) statusText = '';
+    var ticketStatusText = ($('#MainContent_TicketStatusFilter_Edit option:selected').text() || '').trim();
+    if (!ticketStatusText || ticketStatusText.toLowerCase().indexOf('select') === 0) ticketStatusText = '';
+
+    var formSiteId = parseInt($('#editAppointmentForm').data('site-id'));
+    if (isNaN(formSiteId)) formSiteId = 0;
+    var pageSiteId = (typeof siteId !== 'undefined') ? siteId : 0;
 
     const appointmentData = {
         AppoinmentId: apptId,
         CustomerID: $('#editCustomerId').val(),
         ServiceType: $('#MainContent_ServiceTypeFilter_Edit').val(),
         ResourceID: parseInt($('#resource_list').val()) || 0,
-        StatusID: parseInt($('#MainContent_StatusTypeFilter_Edit').val()) || 0,
-        TicketStatusID: parseInt($('#MainContent_TicketStatusFilter_Edit').val()) || 0,
+        Status: statusText || 'Pending',
+        TicketStatus: ticketStatusText,
         RequestDate: startMom.isValid() ? startMom.format("YYYY-MM-DD") : $('#dateInput').val(),
-        TimeSlot: $('#time_slot').val() || "morning",
-        Hour: startMom.isValid() ? startMom.hour() : 0,
-        Minute: startMom.isValid() ? startMom.minute() : 0,
+        StartDateTime: startMom.isValid() ? startMom.format("MM/DD/YYYY hh:mm A") : '',
+        EndDateTime: endMom.isValid() ? endMom.format("MM/DD/YYYY hh:mm A") : '',
+        TimeSlot: ($('#time_slot option:selected').text() || '').trim() || '',
+        Hour: (function() { var d = parseDuration($('#duration').val()); return Math.floor(d / 60); })(),
+        Minute: (function() { var d = parseDuration($('#duration').val()); return d % 60; })(),
         Note: $('#editApptNote').val(),
-        SiteId: 0
+        SiteId: formSiteId || pageSiteId || 0
     };
 
     // Collect Custom Fields
@@ -3094,21 +3300,26 @@ window.saveAppointmentChanges = function () {
         success: function (response) {
             if (response.d) {
                 alert("Appointment updated successfully!");
-                $('#siteAppointmentDetailsModal').modal('hide');
+                $('#siteAppointmentDetailsModal_PopUP').modal('hide');
                 if (typeof loadAppointments === 'function') {
                     loadAppointments();
                 } else {
                     location.reload();
                 }
             } else {
+                console.error("Update returned false. Full response:", JSON.stringify(response));
                 alert("Failed to update appointment.");
             }
         },
-        error: function (xhr) {
-            console.error("Update failed", xhr.responseText);
-            alert("An error occurred while updating.");
+        error: function (xhr, status, error) {
+            console.error("Update AJAX error:", status, error, xhr.responseText);
+            alert("An error occurred while updating: " + (error || status));
         }
     });
+    } catch (e) {
+        console.error('saveAppointmentChanges error:', e.message);
+        alert('Save error: ' + e.message);
+    }
 };
 
 function loadCustomFields(serviceTypeId, appointmentId) {

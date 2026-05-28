@@ -289,12 +289,98 @@ $(document).ready(function () {
         openModal('addSiteModal');
         updateIsActiveLabel();
     });
+    
+    $('#sites').on('click', '.cust-site-Duplicate-btn', function () {
+        const siteId = $(this).data('siteid');
+     
+        const customerId = $(this).attr('data-CustomerID');
 
+        const Sitename = $(this).attr('data-Site-Name'); 
+
+        if ($.fn.DataTable.isDataTable('#DuplicatecustomerSiteTable')) {
+
+            $('#DuplicatecustomerSiteTable').DataTable().destroy();
+            $('#DuplicatecustomerSiteTable').empty(); // Manually empty the table's DOM
+        }
+
+
+
+        $('#DuplicatecustomerSiteTable').on('error.dt', function (e, settings, techNote, message) {
+            alert(message)
+            console.error('An error has been reported by DataTables: ', message);
+        });
+
+        $('#DuplicatecustomerSiteTable').DataTable({
+            processing: true,
+            serverSide: true,
+            filter: true,
+            select: {
+                style: 'none'
+            },
+            ajax: {
+                url: "Customer.aspx/GetDuplicatecustomerSiteTable",
+                type: "POST",
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+
+                data: function (d) {
+                    // Save current filter values on every request
+                   
+                    return JSON.stringify({
+                        customerId: customerId,
+                        siteId: siteId,
+                        Sitename: Sitename
+                    });
+                },
+
+                dataSrc: function (json) {
+                    if (json.error) {
+                        alert("Error loading customers: " + json.error);
+                        return [];
+                    }
+                    return json.data;
+                },
+                error: function (err) {
+                    console.log(err);
+                }
+            },
+            paging: true,
+            pageLength: 10,
+            select: { style: 'single' },
+            columns: [
+
+                {
+                    data: "SiteName",
+                    name: "Select Main Site",
+                    autoWidth: true,
+                    render: function (data, type, row) {
+                        return `<input type="radio" name="row-selection" value="${row.id}">`;
+
+                    }
+                },
+                {
+                    data: 'id', // Map to your data property
+                    render: function (data, type, row) {
+                        // Return a checkbox with the ID as the value
+                        return `<input type="checkbox" name="id" value="${row.id}">`;
+                    },
+                    orderable: false // Prevent sorting on the checkbox column
+                },
+                { data: 'SiteName' },
+                { data: 'Address' },
+                { data: 'PhoneNumber'}
+
+            ]
+        });
+       
+        openModal('mdl_CheckDuplicate');
+       
+    });
 
     $('#sites').on('click', '.cust-site-edit-btn', function () {
         const siteId = $(this).data('site-id');
         const isDefault = $(this).data('is-default') === true;
-       // alert(siteId);
+        // alert(siteId);
         const site = sites.find(s => String(s.Id) === String(siteId));
         if (!site) {
             alert('Error: Could not find site data.');
@@ -303,14 +389,15 @@ $(document).ready(function () {
 
         $('.cust-modal-title').text(isDefault ? 'Edit Default Site (Customer Info)' : 'Edit Site');
         $('.cust-modal-submit').text('Update');
-        
+
         // For default site, disable Site Name editing or make it read-only
         if (isDefault) {
             $('#siteName').prop('readonly', true).addClass('bg-light');
         } else {
             $('#siteName').prop('readonly', false).removeClass('bg-light');
         }
-
+        
+        
         $('#SiteId').val(site.Id);
         $('#CustomerID').val(site.CustomerID);
         $('#CustomerGuid').val(site.CustomerGuid);
@@ -337,6 +424,11 @@ $(document).ready(function () {
     $('#closeAddSite, #closeAddSiteIcon').on('click', function () {
         closeModal('addSiteModal');
     });
+    $('#btn_CloseCheckDuplicate, #close_mdl_CheckDuplicate').on('click', function () {
+        closeModal('mdl_CheckDuplicate');
+    });
+
+    
 
     // Site appointment filter - Search button
     $('#siteFilterSearchBtn').on('click', function () {
@@ -377,7 +469,7 @@ $(document).ready(function () {
     $('#statusFilter').on('change', function () {
         if (table) table.draw(false);
     });
-    
+
     $('#cslViewFilter').on('change', function () {
         if (table) {
             table.draw(false);
@@ -386,7 +478,7 @@ $(document).ready(function () {
 
     $('#hideNA').on('change', function () {
         if (table) {
-            table.ajax.reload(null, false); 
+            table.ajax.reload(null, false);
         }
     });
 
@@ -398,9 +490,9 @@ $(document).ready(function () {
     $('#sites').on('click', '.cust-site-appts-toggle', function () {
         const siteId = parseInt($(this).data('site-id'), 10);
         const apptsEl = $(`#site-appts-${siteId}`);
-     
+
         loadSiteAppointments(siteId, apptsEl);
-        
+
     });
 
 
@@ -462,7 +554,7 @@ function loadCustomers() {
     sitesListContainer.empty();
 
     sitesHeaderContainer.append('<h4 class="cust-details-title" >Select a Customer to view sites.</h4>');
-   $('#customerTable').DataTable({
+    $('#customerTable').DataTable({
         processing: true,
         serverSide: true,
         filter: true,
@@ -494,9 +586,45 @@ function loadCustomers() {
         paging: true,
         pageLength: 10,
         select: { style: 'single' },
-        order: [[0, 'asc']],
         columns: [
-            { data: "fullname", name: "TP Name", autoWidth: true }
+            { data: "fullname", name: "TP Name", autoWidth: true },
+            { data: "Email", name: "Email", autoWidth: true },
+            {
+                data: "StatusName",
+                name: "Status",
+                autoWidth: true,
+                render: function (data) {
+                    let statusText = data || 'N/A'; // Changed from const status to let statusText
+                    let statusClass = 'status-na';
+                    switch (statusText.toLowerCase()) { // Used statusText.toLowerCase()
+                        case 'pending': statusClass = 'status-pending'; break;
+                        case 'confirmed': statusClass = 'status-confirmed'; break;
+                        case 'dispatched': statusClass = 'status-dispatched'; break;
+                        case 'in-route': statusClass = 'status-in-route'; break;
+                        case 'fa-id sent': statusClass = 'status-fa-id-sent'; break;
+                        case 'arrived': statusClass = 'status-arrived'; break;
+                        case 'completed': statusClass = 'status-completed'; break;
+                        case 'closed': statusClass = 'status-closed'; break;
+                        case 'on-hold': statusClass = 'status-on-hold'; break;
+                        case '0':
+                            statusClass = 'status-default';
+                            statusText = 'Multiple'; // Changed displayed text
+                            break;
+                        case 'cancelled': statusClass = 'status-cancelled'; break;
+                    }
+                    return `<span class="badge ${statusClass}">${statusText}</span>`; // Used statusText
+                }
+            },
+            {
+                data: null,
+                orderable: false,
+                width: "100px",
+                render: function (data, type, row) {
+                    const smsBtn = `<button class="cust-action-btn sms-btn" title="Send SMS" onclick="OpenCustomerChatHistory('${escapeHTML(row.Phone)}', '${escapeHTML(row.FirstName + " " + row.LastName)}', '${escapeHTML(row.CustomerID)}')"><i class="fa fa-comment-dots"></i></button>`;
+                    const editBtn = `<button class="cust-table-edit-btn" title="Edit Customer"><i class="fa-solid fa-user-pen"></i></button>`;
+                    return `<div class="cust-action-btns">${smsBtn}${editBtn}</div>`;
+                }
+            }
         ],
         drawCallback: function () {
             var api = this.api();
@@ -575,16 +703,16 @@ function generateCustomerDetails(data) {
     $('#CustomerID').val(safe(data.CustomerID));
     $('#CustomerGuid').val(safe(data.CustomerGuid));
 
-    
+
 }
 function showSpinner() {
     $('#loading-spinner').show();
-  //  document.getElementById('loading-spinner').hide();
+    //  document.getElementById('loading-spinner').hide();
 }
 hideSpinner();
 // Function to hide the spinner
 function hideSpinner() {
-  
+
     $('#loading-spinner').hide();
 }
 function loadCustomerSiteData(customerId) {
@@ -626,7 +754,7 @@ function loadCustomerSiteData(customerId) {
                     appointmentStatus: $('#siteApptStatusFilter').val() || ''
                 });
             },
-         
+
             dataSrc: function (json) {
                 if (json.error) {
                     alert("Error loading customers: " + json.error);
@@ -639,7 +767,7 @@ function loadCustomerSiteData(customerId) {
         pageLength: 10,
         select: { style: 'single' },
         columns: [
-          
+
             {
                 data: "SiteName",
                 name: "Status",
@@ -663,6 +791,8 @@ function loadCustomerSiteData(customerId) {
                         <button class="cust-site-icon-btn delete-btn cust-site-delete-btn" title="${isDefaultSite ? 'Default site cannot be deleted' : 'Delete Site'}" data-site-id="${site.Id}" data-is-default="${isDefaultSite}" ${isDefaultSite ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.58.22-2.365.468a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193v-.443A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" /></svg>
                         </button>`;
+                    
+                 
 
                     const siteCardHTML = `
                         <div class="cust-site-card" data-site-id="${site.Id}">
@@ -671,7 +801,10 @@ function loadCustomerSiteData(customerId) {
                                     <div class="cust-site-status-indicator ${statusClass}" title="${statusTitle}"></div>
                                     <h3 class="cust-site-title">${escapeHTML(site.SiteName)}</h3>
                                 </div>
-                                <div class="cust-site-actions">    
+                                <div class="cust-site-actions">
+                                    <button class="cust-site-icon-btn cust-site-Duplicate-btn" title="Check Duplicate"  data-Site-Name="${site.SiteName}"  data-siteid="${site.Id}" data-CustomerID="${site.CustomerID}" >
+                                   <i class="fa fa-eye"></i> </button>
+                                   
                                     ${editButton}
                                     ${deleteButton}
                                     <a href="CustomerDetails.aspx?siteId=${site.Id}&custId=${encodeURIComponent(site.CustomerID)}" class="cust-site-icon-btn ${!site.IsActive ? 'd-none' : ''}" title="View Details">
@@ -707,22 +840,22 @@ function loadCustomerSiteData(customerId) {
                     return siteCardHTML;
                 }
             }
-            
+
         ],
         drawCallback: function () {
 
 
-                //IsSiteDataLoading = false;
-                //hideSpinner();
+            //IsSiteDataLoading = false;
+            //hideSpinner();
 
             siteAppointmentsCache = {};
 
-                const sitesHeaderContainer = $('#sites .sites-header');
-               
+            const sitesHeaderContainer = $('#sites .sites-header');
 
-                sitesHeaderContainer.empty();
-              
-                sitesHeaderContainer.append('<button id="addSiteBtn" type="button">+ Add Site</button>');
+
+            sitesHeaderContainer.empty();
+
+            sitesHeaderContainer.append('<button id="addSiteBtn" type="button">+ Add Site</button>');
 
 
 
@@ -830,7 +963,7 @@ function loadCustomerSiteData_EX(customerId) {
 function loadCustomerSiteData_OLD(customerId) {
     if (!customerId) return;
     if (IsSiteDataLoading) return;
-  
+
     showSpinner();
     $.ajax({
         type: "POST",
@@ -904,7 +1037,7 @@ function loadCustomerSiteData_OLD(customerId) {
                             </div>
                         </div>`;
                     sitesListContainer.append(siteCardHTML);
-                   // loadAppointmentCount(site.CustomerID, site.Id);
+                    // loadAppointmentCount(site.CustomerID, site.Id);
                 });
             } else {
                 hideSpinner();
@@ -959,7 +1092,7 @@ function saveSite(event) {
     if (validateSiteForm()) {
         const siteId = parseInt($('#SiteId').val());
         const isDefaultSite = siteId === 0 && $('.cust-modal-title').text().includes('Default');
-        
+
         const site = {
             Id: siteId,
             CustomerID: $('#CustomerID').val(),
@@ -1096,8 +1229,8 @@ function loadSiteAppointments(siteId, containerEl) {
         containerEl.html('<div class="text-danger small">Missing customer ID.</div>');
         return;
     }
-   // $('#ApptListModal').show();
-   
+    // $('#ApptListModal').show();
+
     containerEl.html('<div class="text-muted small">Loading appointments…</div>');
 
     //if (siteAppointmentsCache[siteId]) {
@@ -1159,10 +1292,10 @@ function showAppointmentDetailsModal(appointment, siteId) {
                 $('#editAppointmentForm').data('site-id', siteId);
 
                 // Populate Customer/Site Info (Left Column)
-              
+
                 $('#custModal_CustomerName').val(details.CustomerName);
                 $('#custModal_SiteName').val(details.SiteName || '');
-                    // For email, phone, mobile, country - ensure we use the correct property names from site object
+                // For email, phone, mobile, country - ensure we use the correct property names from site object
                 $('#custModal_Address').val(details.Address || '');
                 $('#custModal_City').val(details.City || '');
                 $('#custModal_State').val(details.State || '');
@@ -1171,7 +1304,7 @@ function showAppointmentDetailsModal(appointment, siteId) {
                 $('#custModal_Email').val(details.Email || '');
                 $('#custModal_Phone').val(details.PhoneNumber || '');
                 $('#custModal_Mobile').val(details.MobileNumber || '');
-               
+
 
                 $('#MainContent_ServiceTypeFilter_Edit').val(details.ServiceTypeID || "");
                 $('#resource_list').val(details.ResourceID || "0");
@@ -1223,8 +1356,8 @@ function showAppointmentDetailsModal(appointment, siteId) {
                 // Actually loadAppointmentSpecificLinks loads them for the side panel. 
                 // But for the Forms TAB, we need to populate #selectedFormsEdit
                 // We will call a helper function here.
-               // loadFormsForModal(details.ApptID);
-               // loadCustomFields(null, details.ApptID);
+                // loadFormsForModal(details.ApptID);
+                // loadCustomFields(null, details.ApptID);
 
                 // Use Bootstrap modal syntax
                 $('#siteAppointmentDetailsModal').modal('show');
@@ -1289,7 +1422,7 @@ function populateTimeSlots() {
     $timeSlot.empty();
     $timeSlot.append('<option value="">Select Time Slot</option>');
 
-    
+
 
     // Add 30-min increments from 8 AM to 8 PM
     for (let h = 8; h < 20; h++) {
@@ -1366,7 +1499,7 @@ function renderSiteAppointments(siteId, list, containerEl) {
         return `
             <div class="cust-appt-row" data-site-id="${siteId}" data-appt-index="${index}" style="cursor: pointer;">
                 <div class="appt-main">
-                    <div class="appt-date">ID: ${escapeHTML(item.AppoinmentId || '—')} Date: ${escapeHTML(item.AppoinmentDate || item.RequestDate || '—')} Type:${escapeHTML(item.ServiceType || '—')}</div>
+                    <div class="appt-date">ID: ${escapeHTML(item.AppoinmentUId || '—')} Date: ${escapeHTML(item.AppoinmentDate || item.RequestDate || '—')} Type:${escapeHTML(item.ServiceType || '—')}</div>
                     
                 </div>
                 <div class="appt-status">
@@ -1391,4 +1524,7 @@ function OpenCustomerChatHistory(mobile, name, customerId) {
         return;
     }
     window.open(`CustomerChatHistory.aspx?mobile=${encodeURIComponent(mobile)}&name=${encodeURIComponent(name)}&customerId=${encodeURIComponent(customerId)}`, '_blank');
+}
+function Open_TPStatusPopup() {
+    $("#m_Staus").modal("show");
 }

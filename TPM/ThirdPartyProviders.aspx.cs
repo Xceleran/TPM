@@ -140,7 +140,8 @@ namespace TPM
                               ,[State]
                               ,[Zip]
                           FROM [msSchedulerV3].[dbo].[tbl_WarrantyCompany] where [IsActive] = 1 order by CompanyName;";
-                sql += "select [CompanyID],[WarrantyCompanyUID] from tbl_AssignWarrantyCompany where companyid=@CompanyId;";
+
+                sql += "select WarrentyCompanyID,CustomerID from tbl_WarrentyCompanyCustomer where companyid=@CompanyId;";
                 DataSet dataSet= db.Get_DataSet(sql, companyid);
 
                 dt = dataSet.Tables[0];
@@ -159,7 +160,7 @@ namespace TPM
                         item.WarrantyCompanyGuID = row.Field<string>("WarrantyCompanyGuID") ?? "";
                         foreach (DataRow _row in dataSet.Tables[1].Rows)
                         {
-                            if (string.Equals(row["WarrantyCompanyUID"].ToString().Trim(), _row["WarrantyCompanyUID"].ToString().Trim()))
+                            if (string.Equals(row["WarrantyCompanyUID"].ToString().Trim(), _row["WarrentyCompanyID"].ToString().Trim()))
                             {
                                 item.IsEnable = true;
                                 break;

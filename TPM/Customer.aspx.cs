@@ -14,7 +14,7 @@ using System.Web.UI;
 using System.Web.UI.WebControls;
 using System.Xml.Linq;
 using System.Configuration;
-
+using System.Web.UI.HtmlControls;
 
 namespace FSM
 {
@@ -221,6 +221,10 @@ namespace FSM
                 {
                     foreach (DataRow dr in dt.Rows)
                     {
+
+                        string Mobile =  string.Format("{0:(###) ###-####}", dr["Mobile"].ToString());
+                        string Phone = string.Format("{0:(###) ###-####}", dr["Phone"].ToString());
+
                         customers.Add(new CustomerEntity
                         {
                             CompanyID = dr["CompanyID"].ToString(),
@@ -241,8 +245,8 @@ namespace FSM
                             City = dr["City"].ToString(),
                             State = dr["State"].ToString(),
                             ZipCode = dr["ZipCode"].ToString(),
-                            Phone = dr["Phone"].ToString(),
-                            Mobile = dr["Mobile"].ToString(),
+                            Phone = Phone,
+                            Mobile = Mobile,
                             Email = dr["Email"].ToString(),
                             // Notes = dr["Notes"].ToString(),
                             CompanyName = dr["CompanyName"].ToString(),
@@ -1152,6 +1156,82 @@ namespace FSM
 
             return customer;
         }
+
+        
+             [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static string GetDuplicatecustomerSiteTable(string customerId, string siteId,string Sitename)
+        {
+            var sites = new List<CustomerSite>();
+
+
+            string companyid = HttpContext.Current.Session["CompanyID"].ToString();
+            Database db = new Database();
+            int totalRecords = 0;
+            DataTable dt = new DataTable();
+         
+            try
+            {
+                //db.Open();
+                string strSQL = @"SELECT st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.LastName,st.Address,st.Country,st.State,st.Zip,st.Contact,st.Email,st.PhoneNumber 
+                            FROM [msSchedulerV3].dbo.tbl_CustomerSite st WHERE st.CompanyID='" + companyid + "' AND st.SiteName like'%" + Sitename + "%' ";
+
+               
+                strSQL += $" ORDER BY st.SiteName ;";
+
+             
+               
+
+                DataSet dataSet = db.Get_DataSet(strSQL, companyid);
+                dt = dataSet.Tables[0];
+
+               
+                if (dt.Rows.Count > 0)
+                {
+                    totalRecords = dt.Rows.Count;
+                    foreach (DataRow dr in dt.Rows)
+                    {
+                        sites.Add(new CustomerSite
+                        {
+                            Id = Convert.ToInt32(dr["Id"]),
+                            CustomerID = dr["CustomerID"].ToString(),
+                            SiteName = dr["SiteName"].ToString() ?? "",
+                            FirstName = dr["FirstName"].ToString() ?? "",
+                            LastName = dr["LastName"].ToString() ?? "",
+                            Address = dr["Address"].ToString() ?? "",
+                            Country = dr["Country"].ToString() ?? "",
+                            State = LocationHelper.GetFullName(dr["State"].ToString() ?? ""),
+                            Zip = dr["Zip"].ToString() ?? "",
+                            Contact = dr["Contact"].ToString() ?? "",
+                            Email = dr["Email"].ToString() ?? "",
+                            PhoneNumber = Common.GetFormatedPhoneNumber(dr["PhoneNumber"].ToString())
+                        });
+                    }
+                }
+               
+            }
+            catch (Exception ex)
+            {
+                if (db.Connection.State == ConnectionState.Open) db.Close();
+
+            }
+            finally
+            {
+                if (db.Connection.State == ConnectionState.Open) db.Close();
+            }
+
+            var response = new
+            {
+                draw = 1,
+                recordsTotal = totalRecords,
+                recordsFiltered = totalRecords,
+                data = sites
+            };
+
+            return JsonConvert.SerializeObject(response);
+        }
+
+
         [WebMethod]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public static string GetCustomerSiteData(string customerId,int draw, int start, int length, string searchValue, string sortColumn, string sortDirection, string appointmentStartDate = "", string appointmentEndDate = "", string appointmentStatus = "")
@@ -1167,7 +1247,7 @@ namespace FSM
             try
             {
                 //db.Open();
-                string strSQL = @"SELECT st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.LastName,st.Address,st.Country,st.State,st.Zip,st.Contact,st.Email,st.PhoneNumber,st.Note,COUNT(appt.CompanyID) AS appointment_count 
+                string strSQL = @"SELECT st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.MobileNumber,st.LastName,st.Address,st.Country,st.State,st.Zip,st.Contact,st.Email,st.PhoneNumber,st.Note,COUNT(appt.CompanyID) AS appointment_count 
                             FROM [msSchedulerV3].dbo.tbl_CustomerSite st LEFT JOIN [msSchedulerV3].[dbo].[tbl_Appointment] appt 
                     ON  appt.CompanyID = st.CompanyID and appt.siteid = st.id and  appt.CustomerID = st.CustomerID      WHERE st.CompanyID='" + companyid + "' AND st.CustomerID='" + customerId + "' ";
 
@@ -1189,10 +1269,12 @@ namespace FSM
                     strSQL += $" AND appt.status = '{appointmentStatus}' ";
                 }
 
-                strSQL += $" GROUP BY st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.LastName,st.Address,st.Country,st.State,st.Zip,st.Contact,st.Email,st.PhoneNumber,st.Note ";
+                strSQL += $" GROUP BY st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.LastName,st.Address,st.Country,st.State,st.Zip,st.MobileNumber,st.Contact,st.Email,st.PhoneNumber,st.Note ";
                 strSQL += $" ORDER BY st.SiteName {sortDirection} OFFSET {start} ROWS FETCH NEXT {length} ROWS ONLY;";
 
-                strSQL += @"SELECT count(st.Id) as totalRecords  FROM [msSchedulerV3].dbo.tbl_CustomerSite st LEFT JOIN [msSchedulerV3].[dbo].[tbl_Appointment] appt
+
+                // For TOTAL RECORDS
+                strSQL += @"SELECT count(st.Id) as totalRecords,st.Id  FROM [msSchedulerV3].dbo.tbl_CustomerSite st LEFT JOIN [msSchedulerV3].[dbo].[tbl_Appointment] appt
                     ON  appt.CompanyID = st.CompanyID and appt.siteid = st.id and  appt.CustomerID = st.CustomerID  WHERE st.CompanyID='" + companyid + "' AND st.CustomerID='" + customerId + "'";
 
                 if (!string.IsNullOrEmpty(appointmentStartDate))
@@ -1210,11 +1292,11 @@ namespace FSM
 
                 if (!string.IsNullOrEmpty(searchValue))
                 {
-                    strSQL += $" AND (st.SiteName LIKE '%{searchValue}%' OR st.FirstName LIKE '%{searchValue}%' OR st.Email LIKE '%{searchValue}%') ;";
+                    strSQL += $" AND (st.SiteName LIKE '%{searchValue}%' OR st.FirstName LIKE '%{searchValue}%' OR st.Email LIKE '%{searchValue}%') GROUP BY st.Id ;";
                 }
                 else
                 {
-                    strSQL += $" ;";
+                    strSQL += $" GROUP BY st.Id;";
                 }
 
                 DataSet dataSet = db.Get_DataSet(strSQL, companyid);
@@ -1222,12 +1304,13 @@ namespace FSM
 
                 if (dataSet.Tables[1].Rows.Count > 0)
                 {
-                    totalRecords = Convert.ToInt32(dataSet.Tables[1].Rows[0]["totalRecords"]);
+                    totalRecords = dataSet.Tables[1].Rows.Count;
                 }
                 if (dt.Rows.Count > 0)
                 {
                     foreach (DataRow dr in dt.Rows)
                     {
+                       
                         sites.Add(new CustomerSite
                         {
                             Id = Convert.ToInt32(dr["Id"]),
@@ -1244,7 +1327,8 @@ namespace FSM
                             Contact = dr["Contact"].ToString() ?? "",
                             Email = dr["Email"].ToString() ?? "",
                             IsActive = true,
-                            PhoneNumber = dr["PhoneNumber"].ToString() ?? "",
+                            PhoneNumber = Common.GetFormatedPhoneNumber(dr["PhoneNumber"].ToString()) ,
+                            MobileNumber = Common.GetFormatedPhoneNumber(dr["MobileNumber"].ToString()),
                             TotalAppointment = Convert.ToInt32(dr["appointment_count"]),
                             Note = dr["Note"].ToString() ?? ""
                         });
@@ -1273,7 +1357,9 @@ namespace FSM
                             FirstName = cust["FirstName"].ToString(),
                             LastName = cust["LastName"].ToString(),
                             Address = string.Join(", ", new[] { cust["Address1"].ToString(), cust["City"].ToString(), cust["State"].ToString(), cust["ZipCode"].ToString() }.Where(s => !string.IsNullOrEmpty(s))),
-                            PhoneNumber = cust["Phone"].ToString(),
+                            PhoneNumber = Common.GetFormatedPhoneNumber(cust["Phone"].ToString()),
+                            MobileNumber = Common.GetFormatedPhoneNumber(cust["Mobile"].ToString()),
+
                             Email = cust["Email"].ToString(),
                             IsActive = true,
                             Note = "This is the primary customer location."
@@ -1432,6 +1518,83 @@ namespace FSM
                 db.Close();
             }
             return success;
+        }
+        protected void btnSubmit_Click(object sender, EventArgs e)
+        {
+
+            //string companyid = Session["CompanyID"].ToString();
+
+            //string baseSiteID = "";
+            //string baseCustomerID = pCustomerID;
+
+            //List<string> TobeChangedSiteIDs = new List<string>();
+
+            //HiddenField hdBaseSiteID;
+            //RadioButton rb;
+
+            //foreach (GridViewRow row in gvTempSiteMatches.Rows)
+            //{
+            //    rb = (RadioButton)row.Cells[0].FindControl("rbSiteId");
+            //    hdBaseSiteID = (HiddenField)row.Cells[0].FindControl("hdSiteId");
+            //    HtmlInputCheckBox chk = (HtmlInputCheckBox)row.Cells[1].FindControl("chkSiteID");
+
+            //    if (rb != null)
+            //    {
+            //        if (rb.Checked == true)
+            //        {
+            //            baseSiteID = hdBaseSiteID.Value;
+            //        }
+
+            //        if (chk != null && chk.Checked)
+            //        {
+            //            if (baseSiteID != chk.Value)
+            //            {
+            //                TobeChangedSiteIDs.Add(chk.Value);
+            //            }
+            //        }
+            //    }
+
+            //}
+
+            //if (!string.IsNullOrEmpty(baseSiteID) && TobeChangedSiteIDs.Count > 0)
+            //{
+            //    string sQuery = "";
+
+            //    Database db = new Database();
+            //    db.Open();
+
+            //    foreach (string tSiteID in TobeChangedSiteIDs)
+            //    {
+            //        int iErr = 0;
+
+            //        db.Init("sp_TransferSiteData");
+            //        db.AddParameter("@CompanyId", companyid, System.Data.SqlDbType.NVarChar);
+            //        db.AddParameter("@CustomerId", baseCustomerID, System.Data.SqlDbType.NVarChar);
+            //        db.AddParameter("@SiteId", tSiteID, System.Data.SqlDbType.NVarChar);
+            //        db.AddParameter("@TargetCustomerId", baseCustomerID, System.Data.SqlDbType.NVarChar);
+            //        db.AddParameter("@TargetSiteId", baseSiteID, System.Data.SqlDbType.NVarChar);
+            //        db.AddParameter("@UserId","", System.Data.SqlDbType.NVarChar);
+            //        db.AddParameter("@Err", iErr, 10, System.Data.SqlDbType.Int);
+            //        db.Execute();
+
+            //        sQuery = "Delete from tbl_Site where CompanyId ='" + companyid + "'" +
+            //                " And CustomerId = '" + baseCustomerID + "'" +
+            //                " And SiteId = '" + tSiteID + "'";
+
+            //        db.Execute(sQuery);
+            //    }
+
+            //    sQuery = "Update tbl_Site Set IsTempSite =0 where CompanyId ='" + companyid + "'" +
+            //                " And CustomerId = '" + baseCustomerID + "'" +
+            //                " And SiteId = '" + baseSiteID + "'";
+
+            //    db.Execute(sQuery);
+            //    db.Close();
+
+            //    //Response.Redirect("~/Sites/TempSiteMatches.aspx?Siteid=" + pSiteID + "&cid=" + pCustomerID);
+            //    Response.Redirect(Page.Request.RawUrl, false);
+            //}
+
         }
 
         public static bool UpdateCustomerSiteInfo(CustomerSite site)

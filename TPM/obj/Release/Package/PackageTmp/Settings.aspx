@@ -8,8 +8,8 @@
 
         <!-- Main Tab Navigation -->
         <ul class="nav nav-tabs" id="settingsTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="custom-fields-tab" data-bs-toggle="tab" data-bs-target="#custom-fields" type="button" role="tab" aria-controls="custom-fields" aria-selected="true">
+            <li class="nav-item" role="presentation" style="display:none;">
+                <button class="nav-link" id="custom-fields-tab" data-bs-toggle="tab" data-bs-target="#custom-fields" type="button" role="tab" aria-controls="custom-fields" aria-selected="false">
                     <i class="bi bi-ui-checks me-2"></i>Custom Fields
                 </button>
             </li>
@@ -19,7 +19,7 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="automated-messages-main-tab" data-bs-toggle="tab" data-bs-target="#automated-messages-container" type="button" role="tab" aria-controls="automated-messages-container" aria-selected="false">
+                <button class="nav-link active" id="automated-messages-main-tab" data-bs-toggle="tab" data-bs-target="#automated-messages-container" type="button" role="tab" aria-controls="automated-messages-container" aria-selected="true">
                     <i class="bi bi-robot me-2"></i>Communication
                 </button>
             </li>
@@ -33,8 +33,8 @@
         <!-- Main Tab Content -->
         <div class="tab-content" id="settingsTabContent">
 
-            <!--  Custom Fields Tab -->
-            <div class="tab-pane fade show active" id="custom-fields" role="tabpanel" aria-labelledby="custom-fields-tab">
+            <!--  Custom Fields Tab (hidden) -->
+            <div class="tab-pane fade" id="custom-fields" role="tabpanel" aria-labelledby="custom-fields-tab">
                 <div class="d-flex justify-content-end align-items-center mb-4">
                     <div>
                         <button type="button" id="btnCreateNew" class="btn btn-success">
@@ -192,13 +192,13 @@
             </div>
 
             <!--  Messages Tab Container -->
-            <div class="tab-pane fade" id="automated-messages-container" role="tabpanel" aria-labelledby="automated-messages-main-tab">
+            <div class="tab-pane fade show active" id="automated-messages-container" role="tabpanel" aria-labelledby="automated-messages-main-tab">
                 <div class="row">
                     <!-- Vertical Navigation -->
                     <div class="col-md-2">
                         <div class="nav flex-column nav-pills nav-pills-vertical" id="v-pills-tab" role="tablist" aria-orientation="vertical">
                             <button class="nav-link active" id="v-pills-templates-tab" data-bs-toggle="pill" data-bs-target="#v-pills-templates" type="button" role="tab" aria-controls="v-pills-templates" aria-selected="true">Automated Messages</button>
-                            <button class="nav-link" id="v-pills-fa-id-tab" data-bs-toggle="pill" data-bs-target="#v-pills-fa-id" type="button" role="tab" aria-controls="v-pills-fa-id" aria-selected="false">FA Messages</button>
+                            <%--<button class="nav-link" id="v-pills-fa-id-tab" data-bs-toggle="pill" data-bs-target="#v-pills-fa-id" type="button" role="tab" aria-controls="v-pills-fa-id" aria-selected="false">FA Messages</button>--%>
                         </div>
                     </div>
 
@@ -221,6 +221,8 @@
                                                 <label for="messageTypeDropdown" class="form-label fw-bold">Select Message Type</label>
                                                 <select id="messageTypeDropdown" class="form-select">
                                                     <option value="AcceptTPWorkOrder">Accept TP Work Order</option>
+                                                    <option value="Incomplete">Incomplete</option>
+                                                    <option value="Cancelled">Cancelled</option>
                                                    <%-- <option value="Confirmation">Appointment Confirmation</option>
                                                     <option value="Dispatch">Field Agent Assigned</option>
                                                     <option value="FA-ID">Field Agent ID</option>
@@ -495,30 +497,98 @@
 
             <!--Optional Statuses-->
             <div class="tab-pane fade" id="optional-status-content" role="tabpanel" aria-labelledby="optional-status-tab">
-                <div class="card">
-                    <div class="card-header bg-light">
-                        <h5 class="mb-0">Status List Information</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-bordered align-middle">
-                                <thead class="status-table">
-                                    <tr>
-                                        <th>Status</th>
-                                        <th class="text-center">Optional (Y/N)</th>
-                                        <th>Triggered By</th>
-                                        <th>Triggers</th>
-                                        <th>Modify In</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="statusInfoTableBody">
-                                </tbody>
-                            </table>
+                
+                   <div class="card mt-4">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">TPM Required Statuses</h5>
                         </div>
-                        <div class="text-end mt-3">
-                            <button id="btnSaveOptionalStatuses" class="btn btn-primary px-4">
-                                <i class="bi bi-check-circle me-1"></i>Save
-                            </button>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle">
+                                    <thead class="status-table">
+                                        <tr>
+                                            <th>Status</th>
+                                            <th class="text-center">Optional (Y/N)</th>
+                                            <th>Triggered By</th>
+                                            <th>Triggers</th>
+                                            <th>Modify In</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>In Progress Need Part</strong></td>
+                                            <td class="text-center">
+                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </td>
+                                            <td>Status Changes in FSM</td>
+                                            <td>Message to TP</td>
+                                            <td>TPM</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>In Progress need to replace</strong></td>
+                                            <td class="text-center">
+                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </td>
+                                            <td>Status Changes in FSM</td>
+                                            <td>Message to TP</td>
+                                            <td>TPM</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Customer Missed Appointment</strong></td>
+                                            <td class="text-center">
+                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </td>
+                                            <td>Status Changes in FSM</td>
+                                            <td>Message to TP</td>
+                                            <td>TPM</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Waiting on Customer Call Back</strong></td>
+                                            <td class="text-center">
+                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </td>
+                                            <td>Status Changes in FSM</td>
+                                            <td>Message to TP</td>
+                                            <td>TPM</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Incomplete</strong></td>
+                                            <td class="text-center">
+                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </td>
+                                            <td>Status Changes in FSM</td>
+                                            <td>Message to TP</td>
+                                            <td>TPM</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Cancelled</strong></td>
+                                            <td class="text-center">
+                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </td>
+                                            <td>Status Changes in FSM</td>
+                                            <td>Message to TP</td>
+                                            <td>TPM</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="text-end mt-3">
+                                <button id="btnSaveOptionalStatuses" class="btn btn-primary px-4">
+                                    <i class="bi bi-check-circle me-1"></i>Save
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1039,7 +1109,9 @@
                 "AcceptTPWorkOrder": { status: "Accept", faIdSwitch: false, ynAllowed: true },
                 "Dispatch": { status: "Dispatched", faIdSwitch: true, ynAllowed: true },
                 "FA-ID": { status: "Dispatched", faIdSwitch: false, ynAllowed: false },
-                "In-Route": { status: "In-Route", faIdSwitch: false, ynAllowed: false }
+                "In-Route": { status: "In-Route", faIdSwitch: false, ynAllowed: false },
+                "Incomplete": { status: "Incomplete", faIdSwitch: false, ynAllowed: true },
+                "Cancelled": { status: "Cancelled", faIdSwitch: false, ynAllowed: true }
         };
 
         function initializeMessageTemplates() {

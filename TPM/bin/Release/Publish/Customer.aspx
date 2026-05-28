@@ -6,7 +6,7 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/select/3.0.0/css/select.dataTables.min.css">
 
     <!-- Local Styles and Scripts -->
-    <link rel="stylesheet" href="Content/customer.css">
+    <link rel="stylesheet" href="Content/customer.css?v=1">
 
     <style>
         .loading-overlay {
@@ -98,10 +98,7 @@
                 <table id="customerTable" class="display" style="width: 100%">
                     <thead>
                         <tr>
-                         <th>Tp Name</th>
-                            <th>Email</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>Tp Name</th>
                         </tr>
                     </thead>
                 </table>
@@ -163,6 +160,33 @@
                         <button class="cust-section-toggle" data-section="sites" id="sitesBtn">Sites & Locations</button>
                         <div class="cust-section-content" id="sites">
                             <div class="sites-header">
+                            </div>
+                            <div class="sites-filter-bar" id="sitesFilterBar">
+                                <div class="sites-filter-group">
+                                    <label for="siteApptDateRangeSelect">Appointment Date:</label>
+                                    <select id="siteApptDateRangeSelect" class="sites-filter-input">
+                                        <option value="">All Dates</option>
+                                        <option value="today">Today</option>
+                                        <option value="this_week">This Week</option>
+                                        <option value="this_month">This Month</option>
+                                        <option value="this_year">This Year</option>
+                                        <option value="custom">Custom</option>
+                                    </select>
+                                </div>
+                                <div class="sites-filter-group" id="customDateRange" style="display:none;">
+                                    <label>From:</label>
+                                    <input type="date" id="siteApptDateFrom" class="sites-filter-input" />
+                                    <label>To:</label>
+                                    <input type="date" id="siteApptDateTo" class="sites-filter-input" />
+                                </div>
+                                <div class="sites-filter-group">
+                                    <label for="siteApptStatusFilter">Status:</label>
+                                    <select id="siteApptStatusFilter" class="sites-filter-input">
+                                        <option value="">All Statuses</option>
+                                    </select>
+                                </div>
+                                <button type="button" id="siteFilterSearchBtn" class="sites-filter-btn"><i class="fas fa-search" style="margin-right:5px;"></i>Search</button>
+                                <button type="button" id="siteFilterClearBtn" class="sites-filter-btn sites-filter-clear-btn"><i class="fas fa-times" style="margin-right:5px;"></i>Clear</button>
                             </div>
                              <div class="loading-overlay" id="loading-spinner">
                                 <div class="spinner-border text-primary" role="status">
@@ -515,6 +539,8 @@
         </div>
     </div>
 
+
+
     <div class="cust-modal" id="addSiteModal">
         <div class="cust-modal-content">
             <button class="cust-modal-close" id="closeAddSiteIcon">×</button>
@@ -618,12 +644,41 @@
         </div>
     </div>
 
+    
+      <div class="cust-modal" id="mdl_CheckDuplicate">
+        <div class="cust-modal-content">
+            <button class="cust-modal-close" id="close_mdl_CheckDuplicate">×</button>
+            <h2 class="cust-modal-title">Duplicate Check</h2>
+                <!-- Site Name -->
+                <div class="form-row">
+                    <div class="cust-modal-field full-width">
 
+                         <table id="DuplicatecustomerSiteTable" class="display" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                             <th>Select Main Site</th>
+                                            <th>Select Sub Site</th>
+                                            <th>Site</th>
+                                            <th>Address</th>
+                                            <th>Phone</th>
+                                        </tr>
+                                    </thead>
+                                </table>
+                    </div>
+                </div>
+                <!-- Buttons -->
+                <div class="cust-modal-btns">
+                    <button type="button" class="cust-modal-cancel" id="btn_CloseCheckDuplicate">Cancel</button>
+                    <button type="button" onclick="saveSite(event )" class="cust-modal-submit">Submit</button>
+                </div>
+
+        </div>
+    </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/2.2.2/js/dataTables.min.js"></script>
     <script type="text/javascript" src="https://cdn.datatables.net/select/3.0.0/js/dataTables.select.min.js"></script>
-    <script src="Scripts/customer.js?v=11"></script>
+  
     <script>
 
         $(document).ready(function () {
@@ -680,4 +735,73 @@
             }
         });
     </script>
+      <script language="javascript" type="text/javascript">
+        var bRBSelected = false;
+        var chkdCount = 0;
+    //var SelectedCompanyId = "";
+    //function RBClicked() {
+    //    bRBClicked = 0;
+    //    SelectedCompanyId = "";
+      
+    //    if ($('input[type=radio]:checked').length > 0) {
+    //        bRBClicked = 1;
+    //        SelectedCompanyId = $('input[type=radio]:checked').val();
+    //    }
+       
+        //}
+
+        function RadioCheck(rb) {
+            bRBSelected = true;
+            var gv = document.getElementById("wer");
+            var rbs = gv.getElementsByTagName("input");
+            var row = rb.parentNode.parentNode;
+            for (var i = 0; i < rbs.length; i++) {
+                if (rbs[i].type == "radio") {
+                    if (rbs[i].checked && rbs[i] != rb) {
+                        rbs[i].checked = false;
+                        //break;
+                    }
+                    if (rbs[i] == rb) {
+
+                        rbs[i + 2].checked = "Checked";
+                        //alert(rbs[i + 2].type);
+                    }
+                }
+                
+            }
+        }
+
+        function CountChkdSites() {
+
+            chkdCount = 0;
+
+            var gv = document.getElementById("wer");
+            var chks = gv.getElementsByTagName("input");
+            for (var i = 0; i < chks.length; i++) {
+                if (chks[i].type == "checkbox" && chks[i].checked) {
+                    chkdCount++;
+                    //alert(chkdCount);
+                }
+            }
+        }
+
+    function SubmitSte() 
+    {
+        CountChkdSites();
+
+        if (!bRBSelected) {
+            alert("Please select a Site");
+            return false;
+        }
+
+        if (chkdCount < 2) {
+            alert("Please select at least two sites to combine");
+            return false;
+        }
+
+        return true;
+       
+    }
+          </script>
+      <script src="Scripts/customer.js?v=15"></script>
 </asp:Content>

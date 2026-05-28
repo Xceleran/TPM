@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Web;
 
 public class Common
@@ -148,6 +149,118 @@ public class Common
         sInput = sInput.Replace("&quot", "");
 
         return sInput;
+
+    }
+
+    public static string getValidPhoneNumber(string sInput)
+    {
+
+        string formatted = sInput;
+        try
+        {
+            if (sInput.Contains("+"))
+            {
+
+                string result = "";
+
+                foreach (char c in sInput)
+                {
+                    if (char.IsDigit(c))
+                    {
+                        result += c;
+                    }
+                }
+
+
+
+                Int64 number = Int64.Parse(result);
+
+                formatted = "+" + number.ToString();
+            }
+            else
+            {
+                string result = "";
+
+                foreach (char c in sInput)
+                {
+                    if (char.IsDigit(c))
+                    {
+                        result += c;
+                    }
+                }
+
+
+
+                Int64 number = Int64.Parse(result);
+
+                formatted =  number.ToString();
+            }
+
+
+        }
+        catch (Exception ex)
+        {
+
+        }
+
+
+        return formatted;
+
+    }
+
+    public static string GetFormatedPhoneNumber(string sInput)
+    {
+
+        string formatted = sInput;
+        try
+        {
+            if(sInput.Contains("+"))
+            {
+
+                string result = "";
+
+                foreach (char c in sInput)
+                {
+                    if (char.IsDigit(c))
+                    {
+                        result += c;
+                    }
+                }
+
+
+
+                Int64 number = Int64.Parse(result);
+
+                formatted = string.Format("{0:(+###) ###-####}", number);
+            }
+            else
+            {
+                string result = "";
+
+                foreach (char c in sInput)
+                {
+                    if (char.IsDigit(c))
+                    {
+                        result += c;
+                    }
+                }
+
+
+
+                Int64 number = Int64.Parse(result);
+
+                formatted = string.Format("{0:(###) ###-####}", number);
+            }
+           
+
+        }
+        catch (Exception ex)
+        {
+            
+        }
+
+
+        return formatted;
 
     }
 

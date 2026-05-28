@@ -71,7 +71,7 @@ function DeleteCustomer() {
                 data: "{BusinessID:" + BusinessID + "}",
                 dataType: 'json',
                 success: function (sR) {
-                    window.location.href = 'CustomerList.aspx?m=2&Type=Business';
+                    window.location.href = 'TpList.aspx?m=2&Type=Business';
                 },
                 error: function (error) {
                     console.log(error);
@@ -145,7 +145,7 @@ function CreateAppt() {
 }
 
 function BackClicked() {
-    window.location.href = 'CustomerList.aspx?m=2&Type=Business';
+    window.location.href = 'TpList.aspx?m=2&Type=Business';
 }
 function CreateInvoice() {
     var RefId = $('#hf_BusinessGuid%>').val();

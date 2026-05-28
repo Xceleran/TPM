@@ -1736,5 +1736,5 @@
                 });
             });
         </script>
-               <script src="Scripts/customerdetails.js?v=7"></script>
+               <script src="Scripts/customerdetails.js?v=10"></script>
     </asp:Content>

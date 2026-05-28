@@ -24,9 +24,92 @@ function closeModal(modalId) {
     }
 }
 
+function getDateRangeFromSelection(value) {
+    var today = new Date();
+    var formatDate = function (d) {
+        var yyyy = d.getFullYear();
+        var mm = String(d.getMonth() + 1).padStart(2, '0');
+        var dd = String(d.getDate()).padStart(2, '0');
+        return yyyy + '-' + mm + '-' + dd;
+    };
+    switch (value) {
+        case 'today':
+            var d = formatDate(today);
+            return { startDate: d, endDate: d };
+        case 'this_week':
+            var sun = new Date(today);
+            sun.setDate(today.getDate() - today.getDay());
+            var sat = new Date(sun);
+            sat.setDate(sun.getDate() + 6);
+            return { startDate: formatDate(sun), endDate: formatDate(sat) };
+        case 'this_month':
+            var ms = new Date(today.getFullYear(), today.getMonth(), 1);
+            var me = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            return { startDate: formatDate(ms), endDate: formatDate(me) };
+        case 'this_year':
+            var ys = new Date(today.getFullYear(), 0, 1);
+            var ye = new Date(today.getFullYear(), 11, 31);
+            return { startDate: formatDate(ys), endDate: formatDate(ye) };
+        case 'custom':
+            return {
+                startDate: $('#siteApptDateFrom').val() || '',
+                endDate: $('#siteApptDateTo').val() || ''
+            };
+        default:
+            return { startDate: '', endDate: '' };
+    }
+}
+
+function loadSiteApptStatuses() {
+    $.ajax({
+        url: "Customer.aspx/GetAppointmentStatuses",
+        type: "POST",
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        data: "{}",
+        success: function (response) {
+            var select = $('#siteApptStatusFilter');
+            select.find('option:gt(0)').remove();
+            var statuses = response.d || [];
+            statuses.forEach(function (s) {
+                select.append('<option value="' + escapeHTML(s.StatusID) + '">' + escapeHTML(s.StatusName) + '</option>');
+            });
+            // Restore saved filter values after dropdown is populated
+            var savedRange = sessionStorage.getItem('siteApptDateRangeSelect');
+            var savedStatus = sessionStorage.getItem('siteApptStatusFilter');
+            if (savedRange) {
+                $('#siteApptDateRangeSelect').val(savedRange);
+                if (savedRange === 'custom') {
+                    $('#customDateRange').show();
+                    var savedFrom = sessionStorage.getItem('siteApptDateFrom');
+                    var savedTo = sessionStorage.getItem('siteApptDateTo');
+                    if (savedFrom) $('#siteApptDateFrom').val(savedFrom);
+                    if (savedTo) $('#siteApptDateTo').val(savedTo);
+                }
+            }
+            if (savedStatus) $('#siteApptStatusFilter').val(savedStatus);
+        }
+    });
+}
+
+function saveSiteFiltersToSession() {
+    sessionStorage.setItem('siteApptDateRangeSelect', $('#siteApptDateRangeSelect').val() || '');
+    sessionStorage.setItem('siteApptDateFrom', $('#siteApptDateFrom').val() || '');
+    sessionStorage.setItem('siteApptDateTo', $('#siteApptDateTo').val() || '');
+    sessionStorage.setItem('siteApptStatusFilter', $('#siteApptStatusFilter').val() || '');
+}
+
+function clearSiteFiltersFromSession() {
+    sessionStorage.removeItem('siteApptDateRangeSelect');
+    sessionStorage.removeItem('siteApptDateFrom');
+    sessionStorage.removeItem('siteApptDateTo');
+    sessionStorage.removeItem('siteApptStatusFilter');
+}
+
 $(document).ready(function () {
 
     loadCustomers();
+    loadSiteApptStatuses();
 
     $('.cust-section-toggle').on('click', function () {
         const sectionId = $(this).data('section');
@@ -206,12 +289,98 @@ $(document).ready(function () {
         openModal('addSiteModal');
         updateIsActiveLabel();
     });
+    
+    $('#sites').on('click', '.cust-site-Duplicate-btn', function () {
+        const siteId = $(this).data('siteid');
+     
+        const customerId = $(this).attr('data-CustomerID');
 
+        const Sitename = $(this).attr('data-Site-Name'); 
+
+        if ($.fn.DataTable.isDataTable('#DuplicatecustomerSiteTable')) {
+
+            $('#DuplicatecustomerSiteTable').DataTable().destroy();
+            $('#DuplicatecustomerSiteTable').empty(); // Manually empty the table's DOM
+        }
+
+
+
+        $('#DuplicatecustomerSiteTable').on('error.dt', function (e, settings, techNote, message) {
+            alert(message)
+            console.error('An error has been reported by DataTables: ', message);
+        });
+
+        $('#DuplicatecustomerSiteTable').DataTable({
+            processing: true,
+            serverSide: true,
+            filter: true,
+            select: {
+                style: 'none'
+            },
+            ajax: {
+                url: "Customer.aspx/GetDuplicatecustomerSiteTable",
+                type: "POST",
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+
+                data: function (d) {
+                    // Save current filter values on every request
+                   
+                    return JSON.stringify({
+                        customerId: customerId,
+                        siteId: siteId,
+                        Sitename: Sitename
+                    });
+                },
+
+                dataSrc: function (json) {
+                    if (json.error) {
+                        alert("Error loading customers: " + json.error);
+                        return [];
+                    }
+                    return json.data;
+                },
+                error: function (err) {
+                    console.log(err);
+                }
+            },
+            paging: true,
+            pageLength: 10,
+            select: { style: 'single' },
+            columns: [
+
+                {
+                    data: "SiteName",
+                    name: "Select Main Site",
+                    autoWidth: true,
+                    render: function (data, type, row) {
+                        return `<input type="radio" name="row-selection" value="${row.id}">`;
+
+                    }
+                },
+                {
+                    data: 'id', // Map to your data property
+                    render: function (data, type, row) {
+                        // Return a checkbox with the ID as the value
+                        return `<input type="checkbox" name="id" value="${row.id}">`;
+                    },
+                    orderable: false // Prevent sorting on the checkbox column
+                },
+                { data: 'SiteName' },
+                { data: 'Address' },
+                { data: 'PhoneNumber'}
+
+            ]
+        });
+       
+        openModal('mdl_CheckDuplicate');
+       
+    });
 
     $('#sites').on('click', '.cust-site-edit-btn', function () {
         const siteId = $(this).data('site-id');
         const isDefault = $(this).data('is-default') === true;
-       // alert(siteId);
+        // alert(siteId);
         const site = sites.find(s => String(s.Id) === String(siteId));
         if (!site) {
             alert('Error: Could not find site data.');
@@ -220,14 +389,15 @@ $(document).ready(function () {
 
         $('.cust-modal-title').text(isDefault ? 'Edit Default Site (Customer Info)' : 'Edit Site');
         $('.cust-modal-submit').text('Update');
-        
+
         // For default site, disable Site Name editing or make it read-only
         if (isDefault) {
             $('#siteName').prop('readonly', true).addClass('bg-light');
         } else {
             $('#siteName').prop('readonly', false).removeClass('bg-light');
         }
-
+        
+        
         $('#SiteId').val(site.Id);
         $('#CustomerID').val(site.CustomerID);
         $('#CustomerGuid').val(site.CustomerGuid);
@@ -254,11 +424,52 @@ $(document).ready(function () {
     $('#closeAddSite, #closeAddSiteIcon').on('click', function () {
         closeModal('addSiteModal');
     });
+    $('#btn_CloseCheckDuplicate, #close_mdl_CheckDuplicate').on('click', function () {
+        closeModal('mdl_CheckDuplicate');
+    });
+
+    
+
+    // Site appointment filter - Search button
+    $('#siteFilterSearchBtn').on('click', function () {
+        saveSiteFiltersToSession();
+        if ($.fn.DataTable.isDataTable('#customerSiteTable')) {
+            $('#customerSiteTable').DataTable().draw();
+        }
+    });
+
+    // Site appointment filter - Clear button
+    $('#siteFilterClearBtn').on('click', function () {
+        $('#siteApptDateRangeSelect').val('');
+        $('#siteApptDateFrom').val('');
+        $('#siteApptDateTo').val('');
+        $('#customDateRange').hide();
+        $('#siteApptStatusFilter').val('');
+        clearSiteFiltersFromSession();
+        if ($.fn.DataTable.isDataTable('#customerSiteTable')) {
+            $('#customerSiteTable').DataTable().draw();
+        }
+    });
+
+    // Show/hide custom date range and auto-search on dropdown change
+    $('#siteApptDateRangeSelect').on('change', function () {
+        if ($(this).val() === 'custom') {
+            $('#customDateRange').show();
+        } else {
+            $('#customDateRange').hide();
+            $('#siteApptDateFrom').val('');
+            $('#siteApptDateTo').val('');
+            saveSiteFiltersToSession();
+            if ($.fn.DataTable.isDataTable('#customerSiteTable')) {
+                $('#customerSiteTable').DataTable().draw();
+            }
+        }
+    });
 
     $('#statusFilter').on('change', function () {
         if (table) table.draw(false);
     });
-    
+
     $('#cslViewFilter').on('change', function () {
         if (table) {
             table.draw(false);
@@ -267,7 +478,7 @@ $(document).ready(function () {
 
     $('#hideNA').on('change', function () {
         if (table) {
-            table.ajax.reload(null, false); 
+            table.ajax.reload(null, false);
         }
     });
 
@@ -279,9 +490,9 @@ $(document).ready(function () {
     $('#sites').on('click', '.cust-site-appts-toggle', function () {
         const siteId = parseInt($(this).data('site-id'), 10);
         const apptsEl = $(`#site-appts-${siteId}`);
-     
+
         loadSiteAppointments(siteId, apptsEl);
-        
+
     });
 
 
@@ -343,7 +554,7 @@ function loadCustomers() {
     sitesListContainer.empty();
 
     sitesHeaderContainer.append('<h4 class="cust-details-title" >Select a Customer to view sites.</h4>');
-   $('#customerTable').DataTable({
+    $('#customerTable').DataTable({
         processing: true,
         serverSide: true,
         filter: true,
@@ -418,8 +629,19 @@ function loadCustomers() {
         drawCallback: function () {
             var api = this.api();
             if (api.rows({ page: 'current' }).count() > 0 && !$('#customerTable tbody tr.selected').length) {
-             //   selectFirstVisibleRow(); // Re-added this line
-                IsSiteDataLoading = false;
+                var savedCustomerId = sessionStorage.getItem('selectedCustomerID');
+                if (savedCustomerId) {
+                    api.rows({ page: 'current' }).every(function () {
+                        var rowData = this.data();
+                        if (rowData && rowData.CustomerID == savedCustomerId) {
+                            this.select();
+                            IsSiteDataLoading = false;
+                            generateCustomerDetails(rowData);
+                        }
+                    });
+                } else {
+                    IsSiteDataLoading = false;
+                }
             }
         }
     });
@@ -428,8 +650,9 @@ function loadCustomers() {
         if ($(this).hasClass('selected')) return;
         var data = $('#customerTable').DataTable().row(this).data();
         if (data) {
-         
+
             IsSiteDataLoading = false;
+            sessionStorage.setItem('selectedCustomerID', data.CustomerID);
             generateCustomerDetails(data);
         }
     });
@@ -480,16 +703,16 @@ function generateCustomerDetails(data) {
     $('#CustomerID').val(safe(data.CustomerID));
     $('#CustomerGuid').val(safe(data.CustomerGuid));
 
-    
+
 }
 function showSpinner() {
     $('#loading-spinner').show();
-  //  document.getElementById('loading-spinner').hide();
+    //  document.getElementById('loading-spinner').hide();
 }
 hideSpinner();
 // Function to hide the spinner
 function hideSpinner() {
-  
+
     $('#loading-spinner').hide();
 }
 function loadCustomerSiteData(customerId) {
@@ -516,6 +739,8 @@ function loadCustomerSiteData(customerId) {
             dataType: "json",
 
             data: function (d) {
+                // Save current filter values on every request
+                saveSiteFiltersToSession();
                 return JSON.stringify({
                     customerId: customerId,
                     draw: d.draw,
@@ -523,10 +748,13 @@ function loadCustomerSiteData(customerId) {
                     length: d.length,
                     searchValue: d.search.value,
                     sortColumn: d.columns[d.order[0].column].data,
-                    sortDirection: d.order[0].dir
+                    sortDirection: d.order[0].dir,
+                    appointmentStartDate: getDateRangeFromSelection($('#siteApptDateRangeSelect').val()).startDate,
+                    appointmentEndDate: getDateRangeFromSelection($('#siteApptDateRangeSelect').val()).endDate,
+                    appointmentStatus: $('#siteApptStatusFilter').val() || ''
                 });
             },
-         
+
             dataSrc: function (json) {
                 if (json.error) {
                     alert("Error loading customers: " + json.error);
@@ -539,7 +767,7 @@ function loadCustomerSiteData(customerId) {
         pageLength: 10,
         select: { style: 'single' },
         columns: [
-          
+
             {
                 data: "SiteName",
                 name: "Status",
@@ -563,6 +791,8 @@ function loadCustomerSiteData(customerId) {
                         <button class="cust-site-icon-btn delete-btn cust-site-delete-btn" title="${isDefaultSite ? 'Default site cannot be deleted' : 'Delete Site'}" data-site-id="${site.Id}" data-is-default="${isDefaultSite}" ${isDefaultSite ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.58.22-2.365.468a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193v-.443A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" /></svg>
                         </button>`;
+                    
+                 
 
                     const siteCardHTML = `
                         <div class="cust-site-card" data-site-id="${site.Id}">
@@ -571,7 +801,10 @@ function loadCustomerSiteData(customerId) {
                                     <div class="cust-site-status-indicator ${statusClass}" title="${statusTitle}"></div>
                                     <h3 class="cust-site-title">${escapeHTML(site.SiteName)}</h3>
                                 </div>
-                                <div class="cust-site-actions">    
+                                <div class="cust-site-actions">
+                                    <button class="cust-site-icon-btn cust-site-Duplicate-btn" title="Check Duplicate"  data-Site-Name="${site.SiteName}"  data-siteid="${site.Id}" data-CustomerID="${site.CustomerID}" >
+                                   <i class="fa fa-eye"></i> </button>
+                                   
                                     ${editButton}
                                     ${deleteButton}
                                     <a href="CustomerDetails.aspx?siteId=${site.Id}&custId=${encodeURIComponent(site.CustomerID)}" class="cust-site-icon-btn ${!site.IsActive ? 'd-none' : ''}" title="View Details">
@@ -607,22 +840,22 @@ function loadCustomerSiteData(customerId) {
                     return siteCardHTML;
                 }
             }
-            
+
         ],
         drawCallback: function () {
 
 
-                //IsSiteDataLoading = false;
-                //hideSpinner();
+            //IsSiteDataLoading = false;
+            //hideSpinner();
 
             siteAppointmentsCache = {};
 
-                const sitesHeaderContainer = $('#sites .sites-header');
-               
+            const sitesHeaderContainer = $('#sites .sites-header');
 
-                sitesHeaderContainer.empty();
-              
-                sitesHeaderContainer.append('<button id="addSiteBtn" type="button">+ Add Site</button>');
+
+            sitesHeaderContainer.empty();
+
+            sitesHeaderContainer.append('<button id="addSiteBtn" type="button">+ Add Site</button>');
 
 
 
@@ -730,7 +963,7 @@ function loadCustomerSiteData_EX(customerId) {
 function loadCustomerSiteData_OLD(customerId) {
     if (!customerId) return;
     if (IsSiteDataLoading) return;
-  
+
     showSpinner();
     $.ajax({
         type: "POST",
@@ -804,7 +1037,7 @@ function loadCustomerSiteData_OLD(customerId) {
                             </div>
                         </div>`;
                     sitesListContainer.append(siteCardHTML);
-                   // loadAppointmentCount(site.CustomerID, site.Id);
+                    // loadAppointmentCount(site.CustomerID, site.Id);
                 });
             } else {
                 hideSpinner();
@@ -859,7 +1092,7 @@ function saveSite(event) {
     if (validateSiteForm()) {
         const siteId = parseInt($('#SiteId').val());
         const isDefaultSite = siteId === 0 && $('.cust-modal-title').text().includes('Default');
-        
+
         const site = {
             Id: siteId,
             CustomerID: $('#CustomerID').val(),
@@ -996,8 +1229,8 @@ function loadSiteAppointments(siteId, containerEl) {
         containerEl.html('<div class="text-danger small">Missing customer ID.</div>');
         return;
     }
-   // $('#ApptListModal').show();
-   
+    // $('#ApptListModal').show();
+
     containerEl.html('<div class="text-muted small">Loading appointments…</div>');
 
     //if (siteAppointmentsCache[siteId]) {
@@ -1008,7 +1241,7 @@ function loadSiteAppointments(siteId, containerEl) {
 
     $.ajax({
         type: 'POST',
-        url: 'CustomerDetails.aspx/GetCustomerAppoinmetsForView',
+        url: 'AppoinementList.aspx/GetCustomerAppoinmetsForView',
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
         data: JSON.stringify({ customerId: customerId, siteId: siteId }),
@@ -1029,11 +1262,11 @@ function showAppointmentDetailsModal(appointment, siteId) {
     if (!appointment) return;
 
     // Ensure dropdowns are populated
-    //populateDropdown("MainContent_ServiceTypeFilter_Edit", cslServiceTypes, "ServiceTypeID", "ServiceName", "Select Service Type");
-    //populateDropdown("resource_list", cslResources, "Id", "Name", "Unassigned");
-    //if (!$('#resource_list option[value="0"]').length) {
-    //    $('#resource_list').prepend(new Option("Unassigned", "0"));
-    //}
+    populateDropdown("MainContent_ServiceTypeFilter_Edit", cslServiceTypes, "ServiceTypeID", "ServiceName", "Select Service Type");
+    populateDropdown("resource_list", cslResources, "Id", "Name", "Unassigned");
+    if (!$('#resource_list option[value="0"]').length) {
+        $('#resource_list').prepend(new Option("Unassigned", "0"));
+    }
     populateDropdown("MainContent_StatusTypeFilter_Edit", cslApptStatuses, "StatusID", "StatusName", "Select Status");
     populateDropdown("MainContent_TicketStatusFilter_Edit", cslTicketStatuses, "StatusID", "StatusName", "Select Ticket Status");
     populateTimeSlots();
@@ -1059,10 +1292,10 @@ function showAppointmentDetailsModal(appointment, siteId) {
                 $('#editAppointmentForm').data('site-id', siteId);
 
                 // Populate Customer/Site Info (Left Column)
-              
+
                 $('#custModal_CustomerName').val(details.CustomerName);
                 $('#custModal_SiteName').val(details.SiteName || '');
-                    // For email, phone, mobile, country - ensure we use the correct property names from site object
+                // For email, phone, mobile, country - ensure we use the correct property names from site object
                 $('#custModal_Address').val(details.Address || '');
                 $('#custModal_City').val(details.City || '');
                 $('#custModal_State').val(details.State || '');
@@ -1071,7 +1304,7 @@ function showAppointmentDetailsModal(appointment, siteId) {
                 $('#custModal_Email').val(details.Email || '');
                 $('#custModal_Phone').val(details.PhoneNumber || '');
                 $('#custModal_Mobile').val(details.MobileNumber || '');
-               
+
 
                 $('#MainContent_ServiceTypeFilter_Edit').val(details.ServiceTypeID || "");
                 $('#resource_list').val(details.ResourceID || "0");
@@ -1123,8 +1356,8 @@ function showAppointmentDetailsModal(appointment, siteId) {
                 // Actually loadAppointmentSpecificLinks loads them for the side panel. 
                 // But for the Forms TAB, we need to populate #selectedFormsEdit
                 // We will call a helper function here.
-               // loadFormsForModal(details.ApptID);
-               // loadCustomFields(null, details.ApptID);
+                // loadFormsForModal(details.ApptID);
+                // loadCustomFields(null, details.ApptID);
 
                 // Use Bootstrap modal syntax
                 $('#siteAppointmentDetailsModal').modal('show');
@@ -1189,8 +1422,7 @@ function populateTimeSlots() {
     $timeSlot.empty();
     $timeSlot.append('<option value="">Select Time Slot</option>');
 
-    const genericSlots = ["Morning", "Afternoon", "Evening"];
-    genericSlots.forEach(s => $timeSlot.append(new Option(s, s.toLowerCase())));
+
 
     // Add 30-min increments from 8 AM to 8 PM
     for (let h = 8; h < 20; h++) {
@@ -1267,8 +1499,8 @@ function renderSiteAppointments(siteId, list, containerEl) {
         return `
             <div class="cust-appt-row" data-site-id="${siteId}" data-appt-index="${index}" style="cursor: pointer;">
                 <div class="appt-main">
-                    <div class="appt-date">${escapeHTML(item.AppoinmentDate || item.RequestDate || '—')}</div>
-                    <div class="appt-type">${escapeHTML(item.ServiceType || '—')}</div>
+                    <div class="appt-date">ID: ${escapeHTML(item.AppoinmentId || '—')} Date: ${escapeHTML(item.AppoinmentDate || item.RequestDate || '—')} Type:${escapeHTML(item.ServiceType || '—')}</div>
+                    
                 </div>
                 <div class="appt-status">
                     <span class="badge" style="background-color: ${item.StatusColor || '#3b82f6'} !important;">${escapeHTML(status)}</span>

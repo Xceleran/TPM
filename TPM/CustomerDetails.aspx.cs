@@ -103,9 +103,9 @@ namespace TPM
                 lblCustomerName.Text = customerNameDisplay;
                 lblCustomerLocation.Text = "Customer Location (Default)";
                 lblContact.Text = customer.FirstName + " " + customer.LastName;
-                hlPhone.Text = customer.Phone;
+                hlPhone.Text = Common.GetFormatedPhoneNumber(customer.Phone); 
                 hlPhone.NavigateUrl = "tel:" + customer.Phone;
-                hlMobile.Text = customer.Mobile;
+                hlMobile.Text = Common.GetFormatedPhoneNumber(customer.Mobile); 
                 hlMobile.NavigateUrl = "tel:" + customer.Mobile;
                 hlEmail.Text = customer.Email;
                 hlEmail.NavigateUrl = "mailto:" + customer.Email;
@@ -131,9 +131,9 @@ namespace TPM
                     lblCustomerName.Text = customerNameDisplay;
                     lblCustomerLocation.Text = site.SiteName;
                     lblContact.Text = site.FirstName + " " + site.LastName;
-                    hlPhone.Text = site.PhoneNumber;
+                    hlPhone.Text = Common.GetFormatedPhoneNumber(site.PhoneNumber);
                     hlPhone.NavigateUrl = "tel:" + site.PhoneNumber;
-                    hlMobile.Text = site.MobileNumber;
+                    hlMobile.Text = Common.GetFormatedPhoneNumber(site.MobileNumber); 
                     hlMobile.NavigateUrl = "tel:" + site.MobileNumber;
                     hlEmail.Text = site.Email;
                     hlEmail.NavigateUrl = "mailto:" + site.Email;
@@ -177,14 +177,9 @@ namespace TPM
                 Database db = new Database();
                 db.UpdateSql(sql);
 
-                string accountsUrl = System.Configuration.ConfigurationManager.AppSettings["Accounts_Xinator_Url"];
-                if (string.IsNullOrEmpty(accountsUrl))
-                {
-                    btnEmailHistory.Visible = false;
-                    return;
-                }
+                string cecBaseUrl = System.Configuration.ConfigurationManager.AppSettings["cecBaseUrl"];
+               
 
-                string cecBaseUrl = accountsUrl.Replace("AccountsXinator", "cec");
                 string redirectUrl = HttpUtility.UrlEncode($"EmailHistory_List.aspx?Id={customerId}");
 
                 btnEmailHistory.HRef = $"{cecBaseUrl}AuthVerify.aspx?id={newGuid}&redirect={redirectUrl}";
@@ -468,7 +463,7 @@ namespace TPM
 
                 string sql = @"
                     SELECT
-                        apt.ApptID, apt.Note, apt.TimeSlot, apt.Hour, apt.Minute,
+                        apt.ApptID,apt.AppoinmentUId, apt.Note, apt.TimeSlot, apt.Hour, apt.Minute,
                         apt.StartDateTime, apt.EndDateTime,
                         CONVERT(VARCHAR(10), apt.ApptDateTime, 120) as RequestDate,
                         COALESCE(rsc.Name, NULLIF(LTRIM(RTRIM(CAST(apt.ResourceID AS NVARCHAR))), '0'), '') as ResourceName,
@@ -520,7 +515,7 @@ namespace TPM
                             //string rawApptId = row["ApptID"]?.ToString() ?? "";
                             //string prefix = row.Table.Columns.Contains("AppointmentPrefix") && !string.IsNullOrEmpty(row["AppointmentPrefix"]?.ToString()) ? row["AppointmentPrefix"].ToString() : "APPT";
                             //appoinment.AppoinmentId = !string.IsNullOrEmpty(rawApptId) ? $"{prefix}-{companyid}-{rawApptId}" : "";
-
+                            appoinment.AppoinmentUId = row["AppoinmentUId"]?.ToString() ?? "";
                             appoinment.AppoinmentId = row["ApptID"]?.ToString() ?? "";
                             appoinment.CustomerID = customerId;
                             appoinment.CompanyID = companyid;

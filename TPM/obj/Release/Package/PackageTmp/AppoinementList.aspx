@@ -73,9 +73,9 @@
                             <label for="statusFilter" class="form-label">Filter by Status:</label>
                             <asp:DropDownList ID="statusFilter"  ClientIDMode="Static" runat="server" CssClass="form-select w-auto">
                                 <asp:ListItem Text="All Statuses" Value="ALL"></asp:ListItem>
-                                 <asp:ListItem Text="Approved" Value="Approved"></asp:ListItem>
+                                 <asp:ListItem Text="Accept" Value="Accept"></asp:ListItem>
                                 <asp:ListItem Text="Pending" Value="Pending"></asp:ListItem>
-                                <asp:ListItem Text="cancel" Value="cancel"></asp:ListItem>
+                                <asp:ListItem Text="Cancel" Value="Cancel"></asp:ListItem>
                             </asp:DropDownList>
                         </div>
                     </div>
@@ -92,7 +92,6 @@
                           <th>Site Name</th>
                                <th>Date</th>
                             <th>Status</th>
-                            <th>Actions</th>
                         </tr>
                     </thead>
                 </table>
@@ -166,10 +165,39 @@
             </div>
         </section>
     </div>
+
+          <div class="cust-modal" id="mdl_CheckDuplicate">
+        <div class="cust-modal-content">
+            <button class="cust-modal-close" id="close_mdl_CheckDuplicate">×</button>
+            <h2 class="cust-modal-title">Duplicate Check</h2>
+                <!-- Site Name -->
+                <div class="form-row">
+                    <div class="cust-modal-field full-width">
+
+                         <table id="DuplicatecustomerSiteTable" class="display" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                             <th>Select Main Site</th>
+                                            <th>Select Sub Site</th>
+                                          
+                                        </tr>
+                                    </thead>
+                                </table>
+                    </div>
+                </div>
+                <!-- Buttons -->
+                <div class="cust-modal-btns">
+                    <button type="button" class="cust-modal-cancel" id="clossadaseAddSite">Cancel</button>
+                    <button type="button" onclick="saveSite(event )" class="cust-modal-submit">Submit</button>
+                </div>
+
+        </div>
+    </div>
+
     <div class="cust-modal" id="MsgViewModal">
         <div class="cust-modal-content">
             <button class="cust-modal-close" id="closeMsgView">×</button>
-            <h2 class="cust-modal-title">Message</h2>
+            <h2 class="MSg-modal-title">Message</h2>
           <div class="text-center ajax-loader">
   <div class="spinner-border" role="status">
     <span class="visually-hidden">Loading...</span>
@@ -240,7 +268,96 @@
             </form>
         </div>
     </div>
+       <!-- SMS Modal -->
+        <div class="modal fade" id="modalSendSMS" tabindex="-1" role="dialog" aria-labelledby="modalSendSMS"
+            aria-hidden="true">
+            <div class="modal-dialog modal-dialog-scrollable" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="smsModalLongTitle">Send SMS</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mt-3">
+                            <div class="col-12 mt-0">
+                                <label for="txtMobile" class="form-label mb-0">Phone/Mobile Number</label>
+                                <asp:TextBox ID="txtMobile" runat="server" CssClass="form-control" />
+                                <asp:HiddenField ID="txtCustomerId" runat="server" />
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-12 mt-0">
+                                <label for="txtSMS" class="form-label mb-0">Text</label>
+                                <asp:TextBox ID="txtSMS" runat="server" TextMode="MultiLine" Rows="5"
+                                    CssClass="form-control" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer justify-content-between">
+                        <button type="button" class="btn btn-info" onclick="OpenSMSHistoryFromModal()"
+                            title="View SMS History">
+                            <i class="fas fa-history me-1"></i>View History
+                        </button>
+                        <div>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                                onclick="CloseSMSPopup()">Close</button>
+                            <asp:Button ID="btnSendSms" ClientIDMode="Static" runat="server" Text="Send SMS"
+                                CssClass="btn btn-success" OnClick="btnSendSMS_Click" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <!-- MMS Modal -->
+        <div class="modal fade" id="modalSendMMS" tabindex="-1" role="dialog" aria-labelledby="modalSendMMS"
+            aria-hidden="true">
+            <div class="modal-dialog modal-dialog-scrollable" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="mmsModalLongTitle">Send MMS</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mt-3">
+                            <div class="col-12 mt-0">
+                                <label for="txtCustMob" class="form-label mb-0">Phone/Mobile Number</label>
+                                <asp:TextBox ID="txtCustMob" runat="server" CssClass="form-control" />
+                                <asp:HiddenField ID="txtCustId" runat="server" />
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-12 mt-0">
+                                <label for="txtMMSBody" class="form-label mb-0">MMS Body</label>
+                                <asp:TextBox ID="txtMMSBody" runat="server" TextMode="MultiLine" Rows="4"
+                                    CssClass="form-control" />
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12 mt-0">
+                                <label for="fuAttachment" class="form-label mb-0">Attachment</label>
+                                <asp:FileUpload ID="fuAttachment" runat="server" CssClass="form-control" />
+                                <p id="fileHint" class="text-muted small mb-0">Allowed file types: .pdf, .jpg, .jpeg,
+                                    .png (Max size: 20MB)</p>
+                                <span id="fileError" class="text-danger small"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer justify-content-between">
+                        <button type="button" class="btn btn-info" onclick="OpenSMSHistoryFromModal()"
+                            title="View SMS History">
+                            <i class="fas fa-history me-1"></i>View History
+                        </button>
+                        <div>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                                onclick="CloseMMSPopup()">Close</button>
+                            <asp:Button ID="btnSendMMS" ClientIDMode="Static" runat="server" Text="Send MMS"
+                                CssClass="btn btn-success" OnClick="btnSendMMS_Click" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     <div class="cust-modal" id="addSiteModal">
         <div class="cust-modal-content">
             <button class="cust-modal-close" id="closeAddSiteIcon">×</button>
@@ -349,7 +466,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/2.2.2/js/dataTables.min.js"></script>
     <script type="text/javascript" src="https://cdn.datatables.net/select/3.0.0/js/dataTables.select.min.js"></script>
-    <script src="Scripts/AppointmentList.js?v=6"></script>
+   
     <script>
 
         $(document).ready(function () {
@@ -374,6 +491,52 @@
                 '&customerId=' + encodeURIComponent(customerId), '_blank');
         }
 
+        function OpenSMSPopUp(mobile, customerID) {
+            $('#<%= txtMobile.ClientID %>').val(mobile);
+            $('#<%= txtCustomerId.ClientID %>').val(customerID);
+            $('#modalSendSMS').modal('show');
+        }
+
+        function CloseSMSPopup() {
+            $('#<%= txtMobile.ClientID %>').val('');
+            $('#<%= txtCustomerId.ClientID %>').val('');
+            $('#<%= txtSMS.ClientID %>').val('');
+            $('#modalSendSMS').modal('hide');
+        }
+
+        function OpenMMSPopUp(mobile, customerID) {
+            $('#<%= txtCustMob.ClientID %>').val(mobile);
+            $('#<%= txtCustId.ClientID %>').val(customerID);
+            $('#modalSendMMS').modal('show');
+        }
+
+        function CloseMMSPopup() {
+            $('#<%= txtCustMob.ClientID %>').val('');
+            $('#<%= txtCustId.ClientID %>').val('');
+            $('#<%= txtMMSBody.ClientID %>').val('');
+            $('#<%= fuAttachment.ClientID %>').val('');
+            $("#fileError").text('');
+            $("#fileError").removeClass('text-success').addClass('text-danger');
+            $('#modalSendMMS').modal('hide');
+        }
+
+        function OpenSMSHistoryFromModal() {
+            var mobile = $('#<%= txtMobile.ClientID %>').val().trim() || $('#<%= txtCustMob.ClientID %>').val().trim();
+            var customerId = $('#<%= txtCustomerId.ClientID %>').val().trim() || $('#<%= txtCustId.ClientID %>').val().trim();
+            var customerName = $('#customerName').text().trim();
+
+            if (!mobile) {
+                Swal.fire('Validation Error', 'Mobile number is required to view history.', 'warning');
+                return;
+            }
+
+            $('#modalSendSMS').modal('hide');
+            $('#modalSendMMS').modal('hide');
+
+            window.open('CustomerChatHistory.aspx?mobile=' + encodeURIComponent(mobile) +
+                '&name=' + encodeURIComponent(customerName) +
+                '&customerId=' + encodeURIComponent(customerId), '_blank');
+        }
 
     </script>
     <script>
@@ -406,4 +569,6 @@
             }
         });
     </script>
+
+     <script src="Scripts/AppointmentList.js?v=10"></script>
 </asp:Content>
