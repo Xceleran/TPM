@@ -225,26 +225,35 @@
                         </li>
                         
                               
-                         <li id="TpList-link" class="sidebar-nav-item">
-                                <a href="TpList.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Third Party Providers">
-                                    <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                    </svg>
-                                    <span class="sidebar-text">Third Party Providers</span>
-                                </a>
-                            </li>
+                        <li id="TpList-link" class="sidebar-nav-item">
+                            <a href="TpList.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Third Party Providers">
+                                <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                                <span class="sidebar-text">Third Party Providers</span>
+                            </a>
+                        </li>
                         <li id="customers-link" class="sidebar-nav-item">
                             <a href="Customer.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Service Locations">
                                 <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
                                 </svg>
                                 <span class="sidebar-text">Service Locations</span>
                             </a>
                         </li>
-                           <li id="item-link" class="sidebar-nav-item">
-                            <a href="Dashboard.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Policy Holder Portal">
+                        <li id="tp-inquiry-link" class="sidebar-nav-item">
+                            <a href="TPInquiry.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="TP Inquiry Portal">
                                 <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01m-.01 4h.01"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                </svg>
+                                <span class="sidebar-text">TP Inquiry</span>
+                            </a>
+                        </li>
+                        <li id="policy-holder-link" class="sidebar-nav-item">
+                            <a href="PolicyHolderInquiry.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Policy Holder Portal">
+                                <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
                                 </svg>
                                 <span class="sidebar-text">Policy Holder Portal</span>
                             </a>
@@ -263,13 +272,12 @@
 
 
                              <li id="SupportedTPProviders-link" class="sidebar-nav-item">
-                                   <a href="ThirdPartyProviders.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Supported TP Providers">
+                            <a href="ThirdPartyProviders.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Supported TP Providers">
                                 <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01m-.01 4h.01"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
                                 </svg>
                                 <span class="sidebar-text">Supported TP Providers</span>
                             </a>
-
                         </li>
 
 
@@ -920,14 +928,17 @@
                
                 const navItems = {
                     'dashboard': { id: 'dashboard-link', title: 'Dashboard' },
-                    'AppoinementList': { id: 'AppoinementList-link', title: 'New Work Orders' },
-                    'customer': { id: 'customers-link', title: 'Customer Service Locations' },
-                    'customerdetails': { id: 'customers-link', title: 'Customer Service Locations' },
-                    'invoicecreate': { id: 'customers-link', title: 'Customer Service Locations' },
+                    'appoinementlist': { id: 'AppoinementList-link', title: 'New Work Orders' },
+                    'customer': { id: 'customers-link', title: 'Service Locations' },
+                    'customerdetails': { id: 'customers-link', title: 'Service Locations' },
+                    'invoicecreate': { id: 'customers-link', title: 'Service Locations' },
+                    'tplist': { id: 'TpList-link', title: 'Third Party Providers' },
+                    'tpdetail': { id: 'TpList-link', title: 'Third Party Providers' },
+                    'thirdpartyproviders': { id: 'SupportedTPProviders-link', title: 'Supported TP Providers' },
+                    'tpinquiry': { id: 'tp-inquiry-link', title: 'TP Inquiry' },
+                    'policyholderinquiry': { id: 'policy-holder-link', title: 'Policy Holder Portal' },
                     'forms': { id: 'forms-link', title: 'Forms' },
-                    /* 'invoice': { id: 'invoices-link', title: 'Invoices/Estimates' }, */
                     'dispatch': { id: 'dispatch-link', title: 'Dispatch' },
-                    'billableitems': { id: 'item-link', title: 'Billable Items' },
                     'settings': { id: 'settings-link', title: 'Settings' }
                 };
 
@@ -948,19 +959,7 @@
                 }
                 const pageHeader = document.querySelector('.page-header');
                 if (pageHeader) {
-                     
                     pageHeader.textContent = activeNav.title;
-                    if (pageName == 'appoinementlist') {
-                         pageHeader.textContent = 'New Work Orders';
-                    }
-                     if (pageName == 'thirdpartyproviders') {
-                         pageHeader.textContent = 'Third Party Providers';
-                    }
-                   
-                    if (pageName == 'tplist') {
-                         pageHeader.textContent = 'Third Party Providers';
-                    }
-                    
                 }
 
                 // Sidebar toggle functionality

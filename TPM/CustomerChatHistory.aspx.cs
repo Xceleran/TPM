@@ -50,26 +50,35 @@ namespace FSM
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public static object GetMessages(string mobile, string customerId)
         {
-            TwilioSMSService smsService = new TwilioSMSService();
-            //List<Message> messages = smsService.GetSMSHistoryForNumber(mobile);
-            //messages = messages.OrderByDescending(m => m.SendDateTime).ToList();
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            if (string.IsNullOrEmpty(companyId) || string.IsNullOrEmpty(mobile))
+                return new { data = new List<object>() };
 
-            //var rows = messages
-            //    .OrderByDescending(m => m.SendDateTime)  // works if SendDateTime is DateTime
-            //    .Select(m => new
-            //    {
-            //        SendDateTime = m.SendDateTime.ToString("dd MMM yyyy hh:mm tt"),
-            //        Body = m.Body,
-            //        File = m.MediaUrls.FirstOrDefault(),
-            //        Status = m.Type == "outgoing" ? "Delivered" : "Received",
-            //        Mobile = mobile,
-            //        CustomerId = customerId
-            //    })
-            //    .ToList();
-
-
-
-            return new { data = "" }; // ✅ Valid now
+            try
+            {
+                TwilioSMSService smsService = new TwilioSMSService();
+                var messages = smsService.GetSMSHistoryForNumber(mobile, companyId);
+                var rows = new List<object>();
+                if (messages != null)
+                {
+                    foreach (var m in messages)
+                    {
+                        rows.Add(new
+                        {
+                            SendDateTime = m.SendDateTime.ToString("dd MMM yyyy hh:mm tt"),
+                            Body = m.Body,
+                            Status = m.Type == "outgoing" ? "Sent" : "Received",
+                            Mobile = mobile,
+                            CustomerId = customerId
+                        });
+                    }
+                }
+                return new { data = rows };
+            }
+            catch
+            {
+                return new { data = new List<object>() };
+            }
         }
 
         protected void btnSendSMS_Click(object sender, EventArgs e)

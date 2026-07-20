@@ -4,6 +4,7 @@ using FSM.Entity.Customer;
 using FSM.Entity.Enums;
 using FSM.Entity.Notes;
 using FSM.Models.AppoinmentModel;
+using FSM.Models.TPM;
 using FSM.Processors;
 using FSM.SMSService;
 using FSM.Helper;
@@ -3096,6 +3097,78 @@ namespace TPM
                 }
             }
             return duration;
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object GetCoverageItems(int workOrderId)
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            var proc = new CoverageItemProcessor();
+            return new { success = true, items = proc.GetByWorkOrder(companyId, workOrderId) };
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object SaveCoverageItem(CoverageItemEntity item)
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            item.CompanyID = companyId;
+            var proc = new CoverageItemProcessor();
+            int id = proc.SaveCoverageItem(item, HttpContext.Current.Session["LoginUser"]?.ToString());
+            return new { success = id > 0, id = id };
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object CreateNonCoveredCustomer(int workOrderId, int appointmentId, string firstName, string lastName, string email, string phone, string address)
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            var proc = new CoverageItemProcessor();
+            string guid = proc.CreateNonCoveredCustomer(companyId, workOrderId, appointmentId, firstName, lastName, email, phone, address);
+            return new { success = !string.IsNullOrEmpty(guid), customerGuid = guid };
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object SubmitInvoiceToPortal(int workOrderId, int thirdPartyId, string invoiceId, string invoiceNumber, decimal total)
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            var invSvc = new TPMInvoiceService();
+            int tpmInvId = invSvc.CreateTpmInvoiceRecord(companyId, workOrderId, invoiceId, invoiceNumber, total, 0, total,
+                HttpContext.Current.Session["LoginUser"]?.ToString());
+            var result = invSvc.SubmitToPortal(companyId, tpmInvId, thirdPartyId);
+            return new { success = result.Success, message = result.Message, manualUrl = result.ManualUrl };
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object GetInquiryThread(int appointmentId)
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            var chat = new InquiryChatService();
+            var thread = chat.CreateThread(companyId, "PolicyHolder", null, appointmentId, null, null);
+            return new { success = true, token = thread.AccessToken, url = "PolicyHolderInquiry.aspx?token=" + thread.AccessToken };
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object ReconcilePayment(int tpmInvoiceId, decimal amount, string paymentReference, string paymentMethod)
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            var invSvc = new TPMInvoiceService();
+            bool ok = invSvc.ReconcilePayment(companyId, tpmInvoiceId, amount, paymentReference, paymentMethod);
+            return new { success = ok };
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object GetScopedCslData(int appointmentId, int workOrderId, string channel)
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            var scope = new CSLDataScopeProvider();
+            DataScopeChannel ch = channel == "ThirdParty" ? DataScopeChannel.ThirdParty : DataScopeChannel.PolicyHolder;
+            return new { success = true, data = scope.GetScopedData(companyId, appointmentId, workOrderId > 0 ? workOrderId : (int?)null, ch) };
         }
     }
 }

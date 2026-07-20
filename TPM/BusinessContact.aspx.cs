@@ -10,12 +10,15 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Web;
+using System.Web.Script.Services;
+using System.Web.Services;
 using System.Web.UI;
 using System.Web.UI.WebControls;
 using TPM.Entity;
 
 namespace TPM
 {
+    [ScriptService]
     public partial class BusinessContact : System.Web.UI.Page
     {
         public string CustomerID { get; private set; }
@@ -387,13 +390,12 @@ namespace TPM
                                   </button>
                                   <ul class='dropdown-menu' aria-labelledby='Action" + i.ToString() + @"'>" +
                                 "<li><a class='dropdown-item' href='calendar.aspx?CustomerID=" + businessContact.CustomerID + "'>Create Appointment</a></li>" +
-                                "<li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId=" + businessContact.CustomerGuid + "&InType=Invoice'>Create Invoice</a></li>" +
-                                "<li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId=" + businessContact.CustomerGuid + "&InType=Proposal'>Create Estimate</a></li>" +
-                                "<li><a class='dropdown-item' href='Invoices.aspx?Id=" + businessContact.CustomerID + "&Type=Invoice'>View Invoice</a></li>" +
-                                "<li><a class='dropdown-item' href='Invoices.aspx?Id=" + businessContact.CustomerID + "&Type=Proposal'>View Proposal</a></li>" +
-                                "<li><a class='dropdown-item' href='View_Appointment.aspx?Id=" + businessContact.CustomerID + "'>View Appointment</a></li>" +
+                                "<li><a class='dropdown-item' href='InvoiceCreate.aspx?m=0&cId=" + businessContact.CustomerGuid + "'>Create Invoice</a></li>" +
+                                "<li><a class='dropdown-item' href='InvoiceCreate.aspx?m=0&cId=" + businessContact.CustomerGuid + "&type=Proposal'>Create Estimate</a></li>" +
+                                "<li><a class='dropdown-item' href='CustomerDetails.aspx?custId=" + businessContact.CustomerID + "&siteId=0&tab=invoices'>View Invoice</a></li>" +
+                                "<li><a class='dropdown-item' href='CustomerDetails.aspx?custId=" + businessContact.CustomerID + "&siteId=0&tab=appointments'>View Appointment</a></li>" +
                                 "<li><hr class='dropdown-divider'></li>" +
-                                "<li><a class='dropdown-item' href='CustomerFiles.aspx?Id=" + businessContact.CustomerID + "'>View Files</a></li>" +
+                                "<li><a class='dropdown-item' href='CustomerDetails.aspx?custId=" + businessContact.CustomerID + "&siteId=0&tab=files'>View Files</a></li>" +
                                 "<li><a class='dropdown-item' href='EmailHistory_List.aspx?Id=" + businessContact.CustomerID + "&Type=Proposal'>View E-Mails</a></li>" +
                                 "<li><hr class='dropdown-divider'></li>" +
                                 "<li><a class='dropdown-item' onclick='OpenMailPopUp(\"" + businessContact.CustomerID + "\")' href='#'>Send Email</a></li>" +
@@ -585,7 +587,7 @@ namespace TPM
             //}
         }
 
-        [System.Web.Services.WebMethod]
+        [WebMethod(EnableSession = true)]
         public static void DeleteCustomer(string BusinessID)
         {
             BusinessContacts businessContact = new BusinessContacts();
@@ -594,6 +596,205 @@ namespace TPM
             businessContact.CompanyID = HttpContext.Current.Session["CompanyID"].ToString();
             BusinessContactProcessor businessContactProcessor = new BusinessContactProcessor();
             businessContactProcessor.Delete_BusinessContact(businessContact);
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object GetBusinessInvoiceList(string customerId)
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            var list = new List<object>();
+            if (string.IsNullOrEmpty(companyId) || string.IsNullOrEmpty(customerId))
+                return new { success = false, message = "Missing company or customer.", data = list };
+
+            try
+            {
+                using (var con = new SqlConnection(connstr))
+                {
+                    con.Open();
+                    var cmd = new SqlCommand(
+                        @"SELECT inv.Number, inv.Type,
+                                 CONVERT(VARCHAR(10), COALESCE(inv.InvoiceDate, inv.CreatedDate, inv.ExpirationDate), 101) AS InvoiceDate,
+                                 inv.Total,
+                                 (inv.Total - ISNULL(inv.AmountCollect, 0)) AS Due,
+                                 inv.AppointmentId
+                          FROM [msSchedulerV3].[dbo].[tbl_Invoice] inv
+                          WHERE inv.CompnyID = @CompanyID AND inv.CustomerID = @CustomerID
+                          ORDER BY COALESCE(inv.InvoiceDate, inv.CreatedDate, inv.ExpirationDate) DESC", con);
+                    cmd.Parameters.AddWithValue("@CompanyID", companyId);
+                    cmd.Parameters.AddWithValue("@CustomerID", customerId);
+                    using (var r = cmd.ExecuteReader())
+                    {
+                        while (r.Read())
+                        {
+                            list.Add(new
+                            {
+                                number = r["Number"]?.ToString() ?? "",
+                                type = r["Type"]?.ToString() ?? "",
+                                date = r["InvoiceDate"]?.ToString() ?? "",
+                                total = string.Format("{0:N2}", Convert.ToDecimal(r["Total"] ?? 0)),
+                                due = string.Format("{0:N2}", Convert.ToDecimal(r["Due"] ?? 0)),
+                                appointmentId = r["AppointmentId"]?.ToString() ?? ""
+                            });
+                        }
+                    }
+                }
+                return new { success = true, data = list };
+            }
+            catch (Exception ex)
+            {
+                return new { success = false, message = ex.Message, data = list };
+            }
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object GetBusinessFilesAndCommunications(string customerId)
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            var list = new List<object>();
+            if (string.IsNullOrEmpty(companyId) || string.IsNullOrEmpty(customerId))
+                return new { success = false, message = "Missing company or customer.", data = list };
+
+            try
+            {
+                using (var con = new SqlConnection(connstr))
+                {
+                    con.Open();
+
+                    var fileCmd = new SqlCommand(
+                        @"SELECT FileName, FileType, UploadDate, UploadedBy, Reference
+                          FROM [msSchedulerV3].[dbo].[tbl_Files]
+                          WHERE CompanyID = @CompanyID AND CAST(CustomerID AS NVARCHAR(50)) = @CustomerID
+                          ORDER BY UploadDate DESC", con);
+                    fileCmd.Parameters.AddWithValue("@CompanyID", companyId);
+                    fileCmd.Parameters.AddWithValue("@CustomerID", customerId);
+                    using (var r = fileCmd.ExecuteReader())
+                    {
+                        while (r.Read())
+                        {
+                            list.Add(new
+                            {
+                                kind = "File",
+                                title = r["FileName"]?.ToString() ?? "",
+                                detail = r["Reference"]?.ToString() ?? r["FileType"]?.ToString() ?? "",
+                                eventDate = r["UploadDate"] != DBNull.Value ? Convert.ToDateTime(r["UploadDate"]).ToString("g") : "",
+                                status = r["UploadedBy"]?.ToString() ?? ""
+                            });
+                        }
+                    }
+
+                    var commCmd = new SqlCommand(
+                        @"SELECT c.CommunicationType, c.Direction, c.Subject, c.Message, c.SentDate, c.Status, c.RecipientEmail
+                          FROM [msSchedulerV3].[dbo].[tbl_TPMCommunications] c
+                          LEFT JOIN [msSchedulerV3].[dbo].[tbl_WorkOrders] wo
+                            ON wo.Id = c.WorkOrderId AND wo.CompanyID = c.CompanyID
+                          LEFT JOIN [msSchedulerV3].[dbo].[tbl_Appointment] a
+                            ON a.ApptID = wo.AppointmentId AND a.CompanyID = wo.CompanyID
+                          WHERE c.CompanyID = @CompanyID
+                            AND CAST(a.CustomerID AS NVARCHAR(50)) = @CustomerID
+                          ORDER BY c.SentDate DESC", con);
+                    commCmd.Parameters.AddWithValue("@CompanyID", companyId);
+                    commCmd.Parameters.AddWithValue("@CustomerID", customerId);
+                    using (var r = commCmd.ExecuteReader())
+                    {
+                        while (r.Read())
+                        {
+                            string message = r["Message"]?.ToString() ?? "";
+                            if (message.Length > 120) message = message.Substring(0, 120) + "...";
+                            list.Add(new
+                            {
+                                kind = "Communication",
+                                title = r["CommunicationType"]?.ToString() ?? "",
+                                detail = !string.IsNullOrEmpty(r["Subject"]?.ToString())
+                                    ? r["Subject"].ToString()
+                                    : message,
+                                eventDate = r["SentDate"] != DBNull.Value ? Convert.ToDateTime(r["SentDate"]).ToString("g") : "",
+                                status = (r["Direction"]?.ToString() ?? "") + " / " + (r["Status"]?.ToString() ?? "")
+                            });
+                        }
+                    }
+                }
+
+                list = list.OrderByDescending(x =>
+                {
+                    var prop = x.GetType().GetProperty("eventDate");
+                    DateTime dt;
+                    return prop != null && DateTime.TryParse(prop.GetValue(x)?.ToString(), out dt) ? dt : DateTime.MinValue;
+                }).ToList();
+
+                return new { success = true, data = list };
+            }
+            catch (Exception ex)
+            {
+                return new { success = false, message = ex.Message, data = list };
+            }
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object GetCecRedirectUrl(string redirectPath)
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            string userId = HttpContext.Current.Session["LoginUser"]?.ToString();
+            if (string.IsNullOrEmpty(companyId) || string.IsNullOrEmpty(userId))
+                return new { success = false, message = "Session expired." };
+
+            if (string.IsNullOrWhiteSpace(redirectPath))
+                return new { success = false, message = "Redirect path is required." };
+
+            try
+            {
+                string newGuid = Guid.NewGuid().ToString();
+                string sql = $"INSERT INTO XinatorCentral.dbo.tbl_Login (SessionGuid, SessionString) VALUES ('{newGuid}', '{userId}|{companyId}')";
+                Database db = new Database();
+                db.UpdateSql(sql);
+
+                string cecBaseUrl = ConfigurationManager.AppSettings["cecBaseUrl"];
+                if (string.IsNullOrEmpty(cecBaseUrl))
+                    return new { success = false, message = "CEC URL is not configured in Web.config." };
+
+                if (!redirectPath.StartsWith("/"))
+                    redirectPath = "/" + redirectPath.TrimStart('/');
+
+                string redirectUrl = HttpUtility.UrlEncode(redirectPath);
+                string url = $"{cecBaseUrl}AuthVerify.aspx?id={newGuid}&redirect={redirectUrl}";
+                return new { success = true, url = url };
+            }
+            catch (Exception ex)
+            {
+                return new { success = false, message = ex.Message };
+            }
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object GetEmailHistoryUrl(string customerId)
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            string userId = HttpContext.Current.Session["LoginUser"]?.ToString();
+            if (string.IsNullOrEmpty(companyId) || string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(customerId))
+                return new { success = false, message = "Session expired or customer not found." };
+
+            try
+            {
+                string newGuid = Guid.NewGuid().ToString();
+                string sql = $"INSERT INTO XinatorCentral.dbo.tbl_Login (SessionGuid, SessionString) VALUES ('{newGuid}', '{userId}|{companyId}')";
+                Database db = new Database();
+                db.UpdateSql(sql);
+
+                string cecBaseUrl = ConfigurationManager.AppSettings["cecBaseUrl"];
+                if (string.IsNullOrEmpty(cecBaseUrl))
+                    return new { success = false, message = "CEC URL is not configured in Web.config." };
+
+                string redirectUrl = HttpUtility.UrlEncode($"EmailHistory_List.aspx?Id={customerId}");
+                string url = $"{cecBaseUrl}AuthVerify.aspx?id={newGuid}&redirect={redirectUrl}";
+                return new { success = true, url = url };
+            }
+            catch (Exception ex)
+            {
+                return new { success = false, message = ex.Message };
+            }
         }
 
         private void LoadTags()

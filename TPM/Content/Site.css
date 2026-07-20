@@ -174,12 +174,12 @@ sidebar-logo-img {
 }
 
 .sidebar-nav-item {
-    padding: 12px;
+    padding: 6px 10px;
     display: flex;
-    align-items: center;
+    align-items: stretch;
     cursor: pointer;
     border-radius: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     transition: background-color 0.2s ease, justify-content 0.3s ease;
 }
 
@@ -195,9 +195,13 @@ sidebar-logo-img {
     display: flex;
     align-items: center;
     width: 100%;
+    min-height: 40px;
+    padding: 8px 10px;
+    border-radius: 6px;
     color: var(--text-gray-700);
     text-decoration: none;
     outline: none !important;
+    gap: 0;
 }
 
     .sidebar-nav-link:hover,
@@ -251,15 +255,34 @@ sidebar-logo-img {
 }
 
 .sidebar-icon {
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    min-height: 22px;
     margin-right: 12px;
     color: var(--text-gray-700);
     stroke: var(--text-gray-700);
-    display: inline !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
     visibility: visible !important;
     transition: transform 0.2s ease, color 0.2s ease, stroke 0.2s ease;
 }
+
+    .sidebar-icon svg {
+        width: 20px;
+        height: 20px;
+        display: block;
+        flex-shrink: 0;
+    }
+
+    .sidebar-icon i {
+        font-size: 17px;
+        width: 20px;
+        text-align: center;
+        line-height: 1;
+    }
 
 [data-theme="dark"] .sidebar-icon {
     color: var(--text-gray-700);
@@ -268,10 +291,16 @@ sidebar-logo-img {
 
 .sidebar-collapsed .sidebar-nav-item {
     justify-content: center;
+    padding: 6px 0;
+}
+
+.sidebar-collapsed .sidebar-nav-link {
+    justify-content: center;
+    padding: 8px 0;
 }
 
 .sidebar-collapsed .sidebar-icon {
-    margin-left: 10px !important;
+    margin-left: 0 !important;
     margin-right: 0 !important;
 }
 
@@ -284,6 +313,8 @@ sidebar-logo-img {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-size: 0.9375rem;
+    line-height: 1.25;
 }
 
 .sidebar-footer {
@@ -385,8 +416,9 @@ sidebar-logo-img {
 .theme-toggle {
     display: flex;
     align-items: center;
-    padding: 12px;
-    margin: 5px;
+    padding: 8px 20px;
+    margin: 4px 10px 8px;
+    min-height: 40px;
     border-radius: 8px;
     transition: background-color 0.2s ease;
 }
@@ -486,6 +518,8 @@ input:checked + .slider {
 
 .sidebar-collapsed .theme-toggle {
     justify-content: center;
+    padding: 8px 0;
+    margin: 4px 0 8px;
 }
 
 .sidebar-collapsed .theme-toggle-text {

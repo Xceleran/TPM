@@ -229,16 +229,22 @@
     <Content Include="Content\customer.css" />
     <Content Include="Content\customerdetails.css" />
     <Content Include="Content\invoice.css" />
+    <Content Include="Content\inquiry-portal.css" />
     <Content Include="Content\Site.css" />
     <Content Include="Content\forms.css" />
     <Content Include="Customer.aspx" />
     <Content Include="Forms.aspx" />
+    <Content Include="PolicyHolderInquiry.aspx" />
+    <Content Include="TPInquiry.aspx" />
+    <Content Include="TwilioInbound.ashx" />
+    <Content Include="Database\TPM_Efficiency_Migration.sql" />
     <Content Include="AuthVerify.aspx" />
     <Content Include="Dashboard.aspx" />
     <Content Include="Dispatch.aspx" />
     <Content Include="favicon.ico" />
     <Content Include="Global.asax" />
     <Content Include="InvoiceCreate.aspx" />
+    <Content Include="Home.aspx" />
     <Content Include="Scripts\AppointmentList - Copy.js" />
     <Content Include="Scripts\appointments.js" />
     <Content Include="Invoice.aspx" />
@@ -338,7 +344,21 @@
       <DependentUpon>logout.aspx</DependentUpon>
     </Compile>
     <Compile Include="Processors\AppointmentStatusCommunicationProcessor.cs" />
+    <Compile Include="Processors\AhsStatusQueueProcessor.cs" />
+    <Compile Include="Processors\CommunicationOrchestrator.cs" />
+    <Compile Include="Processors\CoverageItemProcessor.cs" />
+    <Compile Include="Processors\CSLDataScopeProvider.cs" />
     <Compile Include="Processors\EmailProcessor.cs" />
+    <Compile Include="Processors\InboundEmailProcessor.cs" />
+    <Compile Include="Processors\InquiryChatService.cs" />
+    <Compile Include="Processors\PortalAdapters\ApiPortalAdapter.cs" />
+    <Compile Include="Processors\PortalAdapters\GuidedManualAdapter.cs" />
+    <Compile Include="Processors\PortalAdapters\IPortalAdapter.cs" />
+    <Compile Include="Processors\PortalAdapters\RpaPortalAdapter.cs" />
+    <Compile Include="Processors\PortalIntegrationHub.cs" />
+    <Compile Include="Processors\StatusTransitionEngine.cs" />
+    <Compile Include="Processors\TPMInvoiceService.cs" />
+    <Compile Include="Processors\WorkOrderProcessor.cs" />
     <Compile Include="QboConnection.aspx.cs">
       <DependentUpon>QboConnection.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
@@ -366,6 +386,23 @@
     </Compile>
     <Compile Include="FormResponse.aspx.designer.cs">
       <DependentUpon>FormResponse.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="PolicyHolderInquiry.aspx.cs">
+      <DependentUpon>PolicyHolderInquiry.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="PolicyHolderInquiry.aspx.designer.cs">
+      <DependentUpon>PolicyHolderInquiry.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="TPInquiry.aspx.cs">
+      <DependentUpon>TPInquiry.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="TPInquiry.aspx.designer.cs">
+      <DependentUpon>TPInquiry.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="TwilioInbound.ashx.cs">
+      <DependentUpon>TwilioInbound.ashx</DependentUpon>
     </Compile>
     <Compile Include="AuthVerify.aspx.cs">
       <DependentUpon>AuthVerify.aspx</DependentUpon>
@@ -409,10 +446,18 @@
     <Compile Include="InvoiceCreate.aspx.designer.cs">
       <DependentUpon>InvoiceCreate.aspx</DependentUpon>
     </Compile>
+    <Compile Include="Home.aspx.cs">
+      <DependentUpon>Home.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="Home.aspx.designer.cs">
+      <DependentUpon>Home.aspx</DependentUpon>
+    </Compile>
     <Compile Include="Entity\Appointments\Resource.cs" />
     <Compile Include="Entity\Appointments\TimeSlot.cs" />
     <Compile Include="Entity\Customer\CustomerEntity.cs" />
     <Compile Include="Entity\Customer\CustomerSite.cs" />
+    <Compile Include="Entity\Enums\TpmWorkOrderStatus.cs" />
     <Compile Include="Entity\Enums\WorkOrderStatus.cs" />
     <Compile Include="Entity\Forms\FormTemplate.cs" />
     <Compile Include="Models\AppointmentModel\AppointmentModel.cs" />
@@ -426,6 +471,7 @@
     <Compile Include="Processors\QBOManager.cs" />
     <Compile Include="Processors\UserLogProcessor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Models\TPM\TpmModels.cs" />
     <Compile Include="Models\FormResponseModel\FormResponseModel.cs" />
     <Compile Include="ThirdPartyProviders.aspx.cs">
       <DependentUpon>ThirdPartyProviders.aspx</DependentUpon>

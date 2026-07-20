@@ -73,7 +73,7 @@ namespace TPM
                 }
                 else
                 {
-                    string exception = " Swal.fire('Invalid Customer data.', '', 'Successfully');window.location.href='Home.aspx';";
+                    string exception = " Swal.fire('Invalid Customer data.', '', 'Successfully');window.location.href='Dashboard.aspx';";
                     ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", exception, true);
                     return;
                 }

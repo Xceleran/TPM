@@ -5,14 +5,12 @@ using Intuit.Ipp.DataService;
 using Intuit.Ipp.OAuth2PlatformClient;
 using Intuit.Ipp.QueryFilter;
 using Intuit.Ipp.Security;
-using Microsoft.Ajax.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
 using System.Globalization;
 using System.Linq;
-using System.Net.NetworkInformation;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
@@ -522,6 +520,123 @@ namespace FSM.Processors
             catch
             {
             }
+        }
+
+        public string CreateInvoiceQbo(ServiceContext serviceContext, string companyId, string customerQboId, string invoiceNumber, decimal total, string memo)
+        {
+            try
+            {
+                QBOSettins settings = new QBOSettins();
+                if (!VerifyCompanySetting(companyId, ref settings)) return "0";
+                serviceContext = GetServiceContext(settings, companyId);
+                if (serviceContext == null) return "0";
+
+                var invoice = new Intuit.Ipp.Data.Invoice
+                {
+                    DocNumber = invoiceNumber,
+                    CustomerRef = new Intuit.Ipp.Data.ReferenceType { Value = customerQboId },
+                    TotalAmt = total,
+                    TotalAmtSpecified = true,
+                    PrivateNote = memo ?? "TPM Invoice"
+                };
+
+                var line = new Line
+                {
+                    Amount = total,
+                    AmountSpecified = true,
+                    DetailType = LineDetailTypeEnum.SalesItemLineDetail,
+                    DetailTypeSpecified = true,
+                    Description = memo ?? "Service",
+                    AnyIntuitObject = new SalesItemLineDetail
+                    {
+                        Qty = 1,
+                        QtySpecified = true
+                    }
+                };
+                invoice.Line = new[] { line };
+
+                var dataService = new DataService(serviceContext);
+                var added = dataService.Add(invoice);
+                return added?.Id ?? "0";
+            }
+            catch
+            {
+                return "0";
+            }
+        }
+
+        public bool SyncPaymentToQBO(ServiceContext serviceContext, QBOSettins qboSettings, string companyId, string invoiceQboId, decimal amount, string paymentRef)
+        {
+            try
+            {
+                serviceContext = GetServiceContext(qboSettings, companyId);
+                if (serviceContext == null) return false;
+
+                var payment = new Payment
+                {
+                    TotalAmt = amount,
+                    TotalAmtSpecified = true,
+                    PaymentRefNum = paymentRef ?? "",
+                    CustomerRef = new Intuit.Ipp.Data.ReferenceType { Value = "0" },
+                    Line = new[]
+                    {
+                        new Line
+                        {
+                            Amount = amount,
+                            AmountSpecified = true,
+                            LinkedTxn = new[] { new LinkedTxn { TxnId = invoiceQboId, TxnType = "Invoice" } }
+                        }
+                    }
+                };
+
+                var dataService = new DataService(serviceContext);
+                dataService.Add(payment);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public string CustomerSyncToQBO(ServiceContext serviceContext, QBOSettins qboSettings, string companyId, string customerId)
+        {
+            try
+            {
+                serviceContext = GetServiceContext(qboSettings, companyId);
+                if (serviceContext == null) return "0";
+
+                Database db = new Database();
+                DataTable dt;
+                db.Execute("SELECT FirstName, LastName, Email, Phone, Address1, City, State, ZipCode FROM [msSchedulerV3].[dbo].[tbl_Customer] WHERE CompanyID='" + companyId + "' AND CustomerID='" + customerId + "'", out dt);
+                if (dt.Rows.Count == 0) return "0";
+
+                var row = dt.Rows[0];
+                var customer = new Intuit.Ipp.Data.Customer
+                {
+                    GivenName = row["FirstName"]?.ToString(),
+                    FamilyName = row["LastName"]?.ToString(),
+                    PrimaryEmailAddr = new EmailAddress { Address = row["Email"]?.ToString() },
+                    PrimaryPhone = new TelephoneNumber { FreeFormNumber = row["Phone"]?.ToString() },
+                    BillAddr = new Intuit.Ipp.Data.PhysicalAddress
+                    {
+                        Line1 = row["Address1"]?.ToString(),
+                        City = row["City"]?.ToString(),
+                        CountrySubDivisionCode = row["State"]?.ToString(),
+                        PostalCode = row["ZipCode"]?.ToString()
+                    }
+                };
+
+                var dataService = new DataService(serviceContext);
+                var added = dataService.Add(customer);
+                if (added?.Id != null)
+                {
+                    db.Execute("UPDATE [msSchedulerV3].[dbo].[tbl_Customer] SET QboId='" + added.Id + "' WHERE CompanyID='" + companyId + "' AND CustomerID='" + customerId + "'");
+                    return added.Id;
+                }
+            }
+            catch { }
+            return "0";
         }
 
     }

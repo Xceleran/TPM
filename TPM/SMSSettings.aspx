@@ -1,4 +1,4 @@
-﻿<%@ Page Title="Settings" Language="C#" MasterPageFile="~/FSM.Master" AutoEventWireup="true" CodeBehind="SMSSettings.aspx.cs" Inherits="FSM.SMSSettings" %>
+﻿<%@ Page Title="Settings" Language="C#" MasterPageFile="~/TPM.Master" AutoEventWireup="true" CodeBehind="SMSSettings.aspx.cs" Inherits="FSM.SMSSettings" %>
 
 
 

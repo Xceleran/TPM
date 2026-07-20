@@ -1,4 +1,4 @@
-﻿<%@ Page Title="Invoices" Language="C#" MasterPageFile="~/FSM.Master" AutoEventWireup="true" CodeBehind="InvoiceCreate.aspx.cs" Inherits="FSM.InvoiceCreate" %>
+﻿<%@ Page Title="Invoices" Language="C#" MasterPageFile="~/TPM.Master" AutoEventWireup="true" CodeBehind="InvoiceCreate.aspx.cs" Inherits="FSM.InvoiceCreate" %>
 
 <asp:Content ID="BodyContent" ContentPlaceHolderID="MainContent" runat="server">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />

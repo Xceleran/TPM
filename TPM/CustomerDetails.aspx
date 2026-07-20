@@ -1736,5 +1736,49 @@
                 });
             });
         </script>
+        <script>
+            // Deep-link tab / action support from Supported TP Providers actions menu
+            (function () {
+                var params = new URLSearchParams(window.location.search);
+                var tab = params.get('tab');
+                var openAction = params.get('openAction');
+                var mobileParam = params.get('mobile');
+                if (!tab && !openAction) return;
+
+                document.addEventListener('DOMContentLoaded', function () {
+                    if (tab) {
+                        var tabBtn = document.getElementById(tab + '-tab');
+                        if (tabBtn && window.bootstrap && bootstrap.Tab) {
+                            bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+                        }
+                    }
+                    if (openAction === 'sendEmail') {
+                        var emailBtn = document.getElementById('btnSendEmail');
+                        if (emailBtn) emailBtn.click();
+                    } else if (openAction === 'sendSms') {
+                        var mobile = mobileParam || '';
+                        if (!mobile) {
+                            var mobileLink = document.getElementById('<%= hlMobile.ClientID %>');
+                            mobile = mobileLink ? (mobileLink.textContent || mobileLink.innerText || '').trim() : '';
+                            if (!mobile && mobileLink && mobileLink.getAttribute('href')) {
+                                mobile = mobileLink.getAttribute('href').replace('tel:', '').trim();
+                            }
+                        }
+                        if (!mobile) {
+                            var phoneLink = document.getElementById('<%= hlPhone.ClientID %>');
+                            mobile = phoneLink ? (phoneLink.textContent || phoneLink.innerText || '').trim() : '';
+                            if (!mobile && phoneLink && phoneLink.getAttribute('href')) {
+                                mobile = phoneLink.getAttribute('href').replace('tel:', '').trim();
+                            }
+                        }
+                        var custIdEl = document.getElementById('<%= lblCustomerId.ClientID %>');
+                        var custId = custIdEl ? (custIdEl.textContent || custIdEl.innerText || '').trim() : '';
+                        if (typeof OpenSMSPopUp === 'function') {
+                            OpenSMSPopUp(mobile, custId);
+                        }
+                    }
+                });
+            })();
+        </script>
                <script src="Scripts/customerdetails.js?v=10"></script>
     </asp:Content>

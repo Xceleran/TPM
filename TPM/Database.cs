@@ -1019,7 +1019,9 @@ public class Database
             this.Connection = new SqlConnection(this.ConnectionString);
             this.Connection.Open();
             this.Command.Connection = this.Connection;
-            result = (Int32)this.Command.ExecuteScalar();
+            var scalar = this.Command.ExecuteScalar();
+            if (scalar != null && scalar != DBNull.Value)
+                result = Convert.ToInt32(scalar);
             this.Close();
         }
         catch (Exception ex)

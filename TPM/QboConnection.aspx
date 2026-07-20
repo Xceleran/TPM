@@ -1,4 +1,4 @@
-﻿<%@ Page Title="Qbo Connection" Language="C#" AutoEventWireup="true" MasterPageFile="~/FSM.Master" CodeBehind="QboConnection.aspx.cs" Inherits="FSM.QboConnection" %>
+﻿<%@ Page Title="Qbo Connection" Language="C#" AutoEventWireup="true" MasterPageFile="~/TPM.Master" CodeBehind="QboConnection.aspx.cs" Inherits="FSM.QboConnection" %>
 
 <asp:Content ID="Content1" ContentPlaceHolderID="MainContent" runat="server">
 

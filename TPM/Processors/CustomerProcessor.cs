@@ -17,33 +17,24 @@ namespace FSM.Processors
 
         public Boolean CheckIfValidCustomer(CustomerEntity customers)
         {
+            if (customers == null || string.IsNullOrEmpty(customers.CompanyID) || string.IsNullOrEmpty(customers.CustomerGuid))
+                return false;
 
             Database db = new Database(connStr);
-            DataTable dt = new DataTable();
-            string Sql = @"Select CustomerID From  [msSchedulerV3].[dbo].[tbl_Customer]
-                                    where CompanyID =@CompanyID and CustomerGuid=@CustomerGuid";
+            string Sql = @"SELECT COUNT(1) FROM [msSchedulerV3].[dbo].[tbl_Customer]
+                           WHERE CompanyID = @CompanyID AND CustomerGuid = @CustomerGuid";
 
             db.Command.CommandText = Sql;
             db.Command.Parameters.Clear();
-
-
             db.Command.Parameters.AddWithValue("@CompanyID", customers.CompanyID);
             db.Command.Parameters.AddWithValue("@CustomerGuid", customers.CustomerGuid);
 
-
-            if (db.ExecuteExecuteScalar() == 0)
-            {
-                return false;
-            }
-            else
-            {
-                return true;
-            }
+            return db.ExecuteExecuteScalar() > 0;
         }
         public CustomerEntity GetCustomerDetails(string customerId, string companyId)
         {
             var customer = new CustomerEntity();
-            string connectionString = System.Configuration.ConfigurationManager.AppSettings["ConnStrJobs"].ToString();
+            string connectionString = ConfigurationManager.AppSettings["ConnString"].ToString();
             Database db = new Database(connectionString);
             try
             {

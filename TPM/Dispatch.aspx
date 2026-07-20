@@ -1,4 +1,4 @@
-﻿<%@ Page Title="Dispatch" Language="C#" MasterPageFile="~/FSM.Master" AutoEventWireup="true" CodeBehind="Dispatch.aspx.cs" Inherits="FSM.Dispatch" %>
+﻿<%@ Page Title="Dispatch" Language="C#" MasterPageFile="~/TPM.Master" AutoEventWireup="true" CodeBehind="Dispatch.aspx.cs" Inherits="FSM.Dispatch" %>
 
 <asp:Content ID="BodyContent" ContentPlaceHolderID="MainContent" runat="server">
     <style>

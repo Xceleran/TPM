@@ -17,6 +17,7 @@ using System.Configuration;
 using System.Data.SqlClient;
 using FSM;
 using FSM.SMSService;
+using FSM.Processors;
 using System.IO;
 using FSM.Models.AppoinmentModel;
 
@@ -299,8 +300,15 @@ namespace TPM
                 db.Command.CommandText = strSQL;
                 db.ExecuteCommand();
                 db.Close();
-                DataSet dataSet =  null;
-                if (myStatus == AppointmentStatus.Accept)
+
+                int apptIdInt;
+                int.TryParse(ApptID, out apptIdInt);
+                var statusEngine = new StatusTransitionEngine();
+                statusEngine.ProcessAppointmentStatusChange(companyid, apptIdInt, CustomerID, SiteID, ApptStatus,
+                    HttpContext.Current.Session["LoginUser"]?.ToString() ?? "System");
+
+                DataSet dataSet = null;
+                if (false && myStatus == AppointmentStatus.Accept)
                 {
 
                     var _CommunicationSettings = new CommunicationSettings();

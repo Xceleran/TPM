@@ -33,12 +33,12 @@ namespace FSM
             {
                 if (!Convert.ToBoolean(Session["CanAccessQuickBooks"]))
                 {
-                    Response.Redirect("Home.aspx", false);
+                    Response.Redirect("Dashboard.aspx", false);
                 }
             }
             else
             {
-                Response.Redirect("Home.aspx", false);
+                Response.Redirect("Dashboard.aspx", false);
             }
             QBOSettins qBoStng = new QBOSettins();
             QBOManager qBOManager = new QBOManager();

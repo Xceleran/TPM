@@ -221,6 +221,13 @@
                                                 <label for="messageTypeDropdown" class="form-label fw-bold">Select Message Type</label>
                                                 <select id="messageTypeDropdown" class="form-select">
                                                     <option value="AcceptTPWorkOrder">Accept TP Work Order</option>
+                                                    <option value="AppointmentConfirmation">Appointment Confirmation</option>
+                                                    <option value="PreAuthorizationRequest">Pre-Authorization Request</option>
+                                                    <option value="StatusUpdate">Status Update</option>
+                                                    <option value="RequestAdditionalInfo">Request Additional Info</option>
+                                                    <option value="InvoiceNotification">Invoice Notification</option>
+                                                    <option value="EscalationNotice">Escalation Notice</option>
+                                                    <option value="ClosureConfirmation">Closure Confirmation</option>
                                                     <option value="Incomplete">Incomplete</option>
                                                     <option value="Cancelled">Cancelled</option>
                                                    <%-- <option value="Confirmation">Appointment Confirmation</option>
@@ -778,18 +785,26 @@
             }
 
             saveBtn.addEventListener('click', () => {
-                const optionalSettings = [];
-                const switches = tableBody.querySelectorAll('input[type="checkbox"]:not(:disabled)');
+                const canonicalStatuses = [
+                    'New', 'Acknowledged', 'PendingAuthorization', 'Scheduled', 'InProgress',
+                    'AwaitingParts', 'PendingInfo', 'Approved', 'Denied', 'InvoiceSubmitted',
+                    'PaymentPending', 'Reconciled', 'Closed', 'Escalated'
+                ];
+                const mappings = canonicalStatuses.map(s => ({
+                    thirdPartyId: null,
+                    canonicalStatus: s,
+                    portalStatusCode: s.toUpperCase(),
+                    portalStatusLabel: s
+                }));
 
-                switches.forEach(sw => {
-                    optionalSettings.push({
-                        statusId: sw.dataset.statusId,
-                        isEnabled: sw.checked
-                    });
+                $.ajax({
+                    type: 'POST', url: 'Settings.aspx/SaveStatusMappings', contentType: 'application/json',
+                    data: JSON.stringify({ mappings: mappings }),
+                    success: function (r) {
+                        alert(r.d && r.d.success ? 'Status mappings saved.' : 'Failed to save status mappings.');
+                    },
+                    error: function () { alert('Failed to save status mappings.'); }
                 });
-
-                console.log("Saving optional status settings:", optionalSettings);
-                alert("Optional status settings saved to console. Implement server-side saving next.");
             });
 
             const statusTab = document.getElementById('optional-status-tab');
@@ -1106,7 +1121,14 @@
 
          const messageTypeConfig = {
                 "Confirmation": { status: "Confirmed", faIdSwitch: false, ynAllowed: true },
-                "AcceptTPWorkOrder": { status: "Accept", faIdSwitch: false, ynAllowed: true },
+                "AcceptTPWorkOrder": { status: "Acknowledged", faIdSwitch: false, ynAllowed: true },
+                "AppointmentConfirmation": { status: "Scheduled", faIdSwitch: false, ynAllowed: true },
+                "PreAuthorizationRequest": { status: "PendingAuthorization", faIdSwitch: false, ynAllowed: false },
+                "StatusUpdate": { status: "InProgress", faIdSwitch: false, ynAllowed: false },
+                "RequestAdditionalInfo": { status: "PendingInfo", faIdSwitch: false, ynAllowed: false },
+                "InvoiceNotification": { status: "InvoiceSubmitted", faIdSwitch: false, ynAllowed: false },
+                "EscalationNotice": { status: "Escalated", faIdSwitch: false, ynAllowed: false },
+                "ClosureConfirmation": { status: "Closed", faIdSwitch: false, ynAllowed: true },
                 "Dispatch": { status: "Dispatched", faIdSwitch: true, ynAllowed: true },
                 "FA-ID": { status: "Dispatched", faIdSwitch: false, ynAllowed: false },
                 "In-Route": { status: "In-Route", faIdSwitch: false, ynAllowed: false },

@@ -92,6 +92,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initializeEventListeners() {
+        $('#invFilterType').on('change', function () {
+            applyFiltersInv();
+        });
+
         // Handle clicks on CSL links in the appointments table to switch tabs
         $(document).on('click', '#apptTableBody .csl-link', function (e) {
             e.preventDefault();
@@ -1015,11 +1019,21 @@ document.addEventListener('DOMContentLoaded', () => {
     function initializeTabFromURL() {
         const params = new URLSearchParams(location.search);
         const tab = params.get('tab');
+        const invoiceType = params.get('invoiceType');
         if (tab) {
             const btn = document.querySelector(`#custdetTabs .nav-link[data-bs-target="#${tab}"]`);
             if (btn && window.bootstrap && bootstrap.Tab) {
                 new bootstrap.Tab(btn).show();
             }
+        }
+        if (invoiceType) {
+            setTimeout(function () {
+                const typeFilter = document.getElementById('invFilterType');
+                if (!typeFilter) return;
+                if (invoiceType === 'Invoice') typeFilter.value = 'invoice';
+                else if (invoiceType === 'Proposal') typeFilter.value = 'estimate';
+                applyFiltersInv();
+            }, 600);
         }
     }
 
@@ -1374,6 +1388,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getFilteredInvoices() {
         let filtered = [...invoiceData];
+
+        const typeFilter = ($('#invFilterType').val() || 'all').toLowerCase();
+        if (typeFilter === 'invoice') {
+            filtered = filtered.filter(inv => (inv.InvoiceType || '').toLowerCase() === 'invoice');
+        } else if (typeFilter === 'estimate') {
+            filtered = filtered.filter(inv => (inv.InvoiceType || '').toLowerCase() === 'proposal');
+        }
 
         // Apply date filter if set
         if (invStartDate && invEndDate) {

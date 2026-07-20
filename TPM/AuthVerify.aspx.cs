@@ -39,14 +39,14 @@ namespace FSM
                 ////userID = "locationa@lhg.com";
 
                 // To test mXP user, uncomment the following lines:
-                companyID = "msProDemo1"; // mXP Company ID
-                userID = "admin.prodemo@myserviceforce.com";
+                //companyID = "msProDemo1"; // mXP Company ID
+                //userID = "admin.prodemo@myserviceforce.com";
 
-                userID = "xxacrescue@myserviceforce.com";
-                companyID = "13202";
+                //userID = "xxacrescue@myserviceforce.com";
+                //companyID = "13202";
 
-                //userID = "admin@mxptest.com";
-                //companyID = "14590";
+                userID = "admin@mxptest.com";
+                companyID = "14590";
 
             }
             if (!string.IsNullOrEmpty(companyID) && !string.IsNullOrEmpty(userID))

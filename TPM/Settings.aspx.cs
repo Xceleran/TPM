@@ -8,6 +8,7 @@ using System.Web.Script.Services;
 using System.Web.Services;
 using System.Web.UI;
 using FSM.Helper;
+using FSM.Processors;
 
 namespace FSM
 {
@@ -248,8 +249,9 @@ namespace FSM
                     
                         cmd = new SqlCommand(
                             @"Delete From [msSchedulerV3].[dbo].[tbl_TPMCommunicationSettings] where CompanyID=@CompanyID and messageType =@messageType;
-                            INSERT INTO [msSchedulerV3].[dbo].[tbl_TPMCommunicationSettings] ([CompanyID], StatusName,messageType, SendEmail, [SendSMS], [EmailTemplate],emailSubject, [SMSTemplate]) 
-                              VALUES (@CompanyID, @StatusName,@messageType, @SendEmail, @SendSMS, @EmailTemplate,@emailSubject, @SMSTemplate)", con);
+                            INSERT INTO [msSchedulerV3].[dbo].[tbl_TPMCommunicationSettings] 
+                              ([CompanyID], StatusName, messageType, SendEmail, [SendSMS], [EmailTemplate], EmailSubject, [SMSTemplate], AutoSend, SendToCustomer, SendToResource, IsActive, CreatedDateTime) 
+                              VALUES (@CompanyID, @StatusName, @messageType, @SendEmail, @SendSMS, @EmailTemplate, @EmailSubject, @SMSTemplate, 1, 1, 0, 1, GETDATE())", con);
                    
                     cmd.Parameters.AddWithValue("@CompanyID", companyId.Trim());
                     cmd.Parameters.AddWithValue("@StatusName", communicationSettings.triggerStatus);
@@ -666,6 +668,110 @@ namespace FSM
         }
 
 
+        [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object SaveStatusMappings(List<StatusMappingItem> mappings)
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            if (string.IsNullOrEmpty(companyId)) return new { success = false, message = "Not authenticated" };
+            try
+            {
+                var engine = new StatusTransitionEngine();
+                if (mappings != null)
+                {
+                    foreach (var m in mappings)
+                        engine.SaveStatusMapping(companyId, m.thirdPartyId, m.canonicalStatus, m.portalStatusCode, m.portalStatusLabel);
+                }
+                return new { success = true };
+            }
+            catch (Exception ex)
+            {
+                return new { success = false, message = ex.Message };
+            }
+        }
+
+        [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object GetStatusMappings()
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            var engine = new StatusTransitionEngine();
+            return new { success = true, data = engine.GetStatusMappings(companyId, null) };
+        }
+
+        [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object SaveTpmSettings(bool portalEnabled, bool portalAutoAccess, bool autoProcessEmails, bool aiChatEnabled, bool aiAutoReply)
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            try
+            {
+                string connStr = ConfigurationManager.AppSettings["ConnString"];
+                using (var con = new SqlConnection(connStr))
+                {
+                    con.Open();
+                    var del = new SqlCommand("DELETE FROM [msSchedulerV3].[dbo].[tbl_TPMSettings] WHERE CompanyID = @CompanyID", con);
+                    del.Parameters.AddWithValue("@CompanyID", companyId);
+                    del.ExecuteNonQuery();
+                    var ins = new SqlCommand(
+                        @"INSERT INTO [msSchedulerV3].[dbo].[tbl_TPMSettings]
+                          (CompanyID, AutoInvoice, EmailNotifications, PortalEnabled, PortalAutoAccess, AutoProcessEmails, UpdatedDate, AiChatEnabled, AiAutoReply)
+                          VALUES (@CompanyID, 0, 1, @PortalEnabled, @PortalAutoAccess, @AutoProcessEmails, GETDATE(), @AiChatEnabled, @AiAutoReply)", con);
+                    ins.Parameters.AddWithValue("@CompanyID", companyId);
+                    ins.Parameters.AddWithValue("@PortalEnabled", portalEnabled);
+                    ins.Parameters.AddWithValue("@PortalAutoAccess", portalAutoAccess);
+                    ins.Parameters.AddWithValue("@AutoProcessEmails", autoProcessEmails);
+                    ins.Parameters.AddWithValue("@AiChatEnabled", aiChatEnabled);
+                    ins.Parameters.AddWithValue("@AiAutoReply", aiAutoReply);
+                    ins.ExecuteNonQuery();
+                }
+                return new { success = true };
+            }
+            catch (Exception ex) { return new { success = false, message = ex.Message }; }
+        }
+
+        [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object GetTpmSettings()
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            try
+            {
+                string connStr = ConfigurationManager.AppSettings["ConnString"];
+                using (var con = new SqlConnection(connStr))
+                {
+                    con.Open();
+                    var cmd = new SqlCommand("SELECT TOP 1 * FROM [msSchedulerV3].[dbo].[tbl_TPMSettings] WHERE CompanyID = @CompanyID", con);
+                    cmd.Parameters.AddWithValue("@CompanyID", companyId);
+                    using (var r = cmd.ExecuteReader())
+                    {
+                        if (r.Read())
+                        {
+                            return new
+                            {
+                                success = true,
+                                portalEnabled = r["PortalEnabled"] != DBNull.Value && Convert.ToBoolean(r["PortalEnabled"]),
+                                portalAutoAccess = r["PortalAutoAccess"] != DBNull.Value && Convert.ToBoolean(r["PortalAutoAccess"]),
+                                autoProcessEmails = r["AutoProcessEmails"] != DBNull.Value && Convert.ToBoolean(r["AutoProcessEmails"]),
+                                aiChatEnabled = r["AiChatEnabled"] != DBNull.Value && Convert.ToBoolean(r["AiChatEnabled"]),
+                                aiAutoReply = r["AiAutoReply"] != DBNull.Value && Convert.ToBoolean(r["AiAutoReply"])
+                            };
+                        }
+                    }
+                }
+                return new { success = true, portalEnabled = false, portalAutoAccess = false, autoProcessEmails = false, aiChatEnabled = false, aiAutoReply = false };
+            }
+            catch (Exception ex) { return new { success = false, message = ex.Message }; }
+        }
+
+
+    }
+    public class StatusMappingItem
+    {
+        public int? thirdPartyId { get; set; }
+        public string canonicalStatus { get; set; }
+        public string portalStatusCode { get; set; }
+        public string portalStatusLabel { get; set; }
     }
     public class CommunicationSettings
     {

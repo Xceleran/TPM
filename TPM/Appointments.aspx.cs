@@ -1492,6 +1492,19 @@ namespace TPM
                                 int resourceId = appointment.ResourceID;
                                 ConsoleLog($"[Appointments.UpdateAppointment] Status changed from {oldStatus} to {appointment.Status}. Processing communication...");
                                 ProcessStatusCommunication(apptId, oldStatus, appointment.Status, resourceId, CompanyID);
+
+                                try
+                                {
+                                    var statusEngine = new StatusTransitionEngine();
+                                    statusEngine.ProcessAppointmentStatusChange(CompanyID, apptId,
+                                        appointment.CustomerID, appointment.SiteId.ToString(),
+                                        appointment.Status,
+                                        HttpContext.Current.Session["LoginUser"]?.ToString() ?? "System");
+                                }
+                                catch (Exception tpmEx)
+                                {
+                                    ConsoleLog($"[Appointments.UpdateAppointment] TPM status engine: {tpmEx.Message}");
+                                }
                             }
                             catch (Exception commEx)
                             {
@@ -2318,6 +2331,14 @@ namespace TPM
                                     // For now, we'll process with newStatusId and let processor handle it
                                     ConsoleLog($"[BatchUpdateAppointmentStatus] Processing communication for ApptID={apptId}, NewStatus={newStatusName}({payload.newStatusId})");
                                     processor.ProcessStatusChange(apptId, 0, payload.newStatusId, "", newStatusName, null);
+
+                                    try
+                                    {
+                                        var statusEngine = new StatusTransitionEngine();
+                                        statusEngine.ProcessAppointmentStatusChange(payload.companyId, apptId, "", "0", newStatusName,
+                                            HttpContext.Current.Session["LoginUser"]?.ToString() ?? "System");
+                                    }
+                                    catch { }
                                 }
                             }
                             catch (Exception commEx)

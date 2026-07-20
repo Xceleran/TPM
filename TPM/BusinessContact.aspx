@@ -292,16 +292,16 @@
                                                 More
                                             </button>
                                             <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                                                <a class="dropdown-item" href="customerDetail.aspx?BusinessGuID=<%=BusinessGuID.Value%>&Mode=Add">Add Link Contact</a>
-                                                <a class="dropdown-item" href="#" onclick="CreateProposal('Invoice');">Create Invoice</a>
-                                                <a class="dropdown-item" href="#" onclick="ViewInvoiceList('Invoice');">View Invoice</a>
-                                                <a class="dropdown-item" href="#" onclick="CreateProposal( 'Proposal');">Create Estimate</a>
-                                                <a class="dropdown-item" href="#" onclick="ViewInvoiceList( 'Proposal');">View Estimate</a>
-                                                <a class="dropdown-item" href="#" onclick="CreateAppt();">Create Appointment</a>
-                                                <a class="dropdown-item" href="#" onclick="ViewAppointment();">View Appointment</a>
-                                                <a class="dropdown-item" href="#" onclick="ViewFiles();">View Files</a>
-                                                <a class="dropdown-item" href="#" onclick="ViewEmailHistoryList();">View Email History</a>
-                                                <a class="dropdown-item" href="#" onclick="addProject();">Add Project</a>
+                                                <a class="dropdown-item" href="#" onclick="return AddLinkedContact();">Add Link Contact</a>
+                                                <a class="dropdown-item" href="#" onclick="return CreateProposal('Invoice');">Create Invoice</a>
+                                                <a class="dropdown-item" href="#" onclick="return ViewInvoiceList('Invoice');">View Invoice</a>
+                                                <a class="dropdown-item" href="#" onclick="return CreateProposal('Proposal');">Create Estimate</a>
+                                                <a class="dropdown-item" href="#" onclick="return ViewInvoiceList('Proposal');">View Estimate</a>
+                                                <a class="dropdown-item" href="#" onclick="return CreateAppt();">Create Appointment</a>
+                                                <a class="dropdown-item" href="#" onclick="return ViewAppointment();">View Appointment</a>
+                                                <a class="dropdown-item" href="#" onclick="return ViewFiles();">View Files</a>
+                                                <a class="dropdown-item" href="#" onclick="return ViewEmailHistoryList();">View Email History</a>
+                                                <a class="dropdown-item" href="#" onclick="return addProject();">Add Project</a>
                                             </div>
                                         </div>
                                         &nbsp;
@@ -451,6 +451,13 @@
                                         <div class="table-responsive">
                                             <table id="currentProjectTable" class="table table-striped table-bordered" style="width: 100%;">
                                                 <thead class="thead-light">
+                                                    <tr>
+                                                        <th>Kind</th>
+                                                        <th>Title</th>
+                                                        <th>Detail</th>
+                                                        <th>Date</th>
+                                                        <th>Status</th>
+                                                    </tr>
                                                 </thead>
                                                 <tbody>
                                                 </tbody>
@@ -482,17 +489,18 @@
                         <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionExample">
                             <div class="card-body">
                                 <div class="row">
-                                    <div class="spinner-border m-5" id="spinner_ProjectList" role="status">
+                                    <div class="spinner-border m-5" id="spinner_ProjectList" role="status" style="display: none;">
                                         <span class="sr-only">Loading...</span>
                                     </div>
                                     <div class="col-12 table-responsive">
                                         <table id="table_ProjectList" class="table table-striped table-bordered" style="width: 100%">
                                             <thead>
                                                 <tr>
-                                                    <th>Name</th>
-                                                    <th>Address</th>
+                                                    <th>Number</th>
+                                                    <th>Type</th>
+                                                    <th>Date</th>
                                                     <th>Total</th>
-                                                   
+                                                    <th>Due</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -591,6 +599,6 @@
             initializeSelectPicker();
         });
     </script>
-    <script src="Scripts/BusinessContact.js?v=8" type="text/javascript"></script>
+    <script src="Scripts/BusinessContact.js?v=10" type="text/javascript"></script>
    
 </asp:Content>

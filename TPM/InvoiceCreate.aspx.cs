@@ -36,7 +36,8 @@ namespace FSM
         {
             if (Session["CompanyID"] == null)
             {
-                //Response.Redirect("Logout.aspx");
+                Response.Redirect("Dashboard.aspx");
+                return;
             }
             if (!IsPostBack)
             {
@@ -46,28 +47,39 @@ namespace FSM
                 IsQuickBookEnabled = qBOManager.VerifyCompanySetting(Session["CompanyID"].ToString(), ref qBoStng);
                 hd_IsQuickBookEnabled.Value = IsQuickBookEnabled.ToString();
 
-                if (Session["CompanyID"] != null) CompanyID = Session["CompanyID"].ToString();
                 if (Session["CompanyName"] != null) CompanyName = Session["CompanyName"].ToString();
                 if (Session["CompanyGUID"] != null) CompanyGUID = Session["CompanyGUID"].ToString();
 
                 hdCompanyID.Value = CompanyID;
                 hdCompanyName.Value = CompanyName;
                 hdCompanyGUID.Value = CompanyGUID;
-                string _CustomerId = Request.Params["cId"];
 
-                _CustomerId = Common.CleanInput(_CustomerId);
+                string _CustomerId = Common.CleanInput(Request.Params["cId"]);
+                string woIdParam = Common.CleanInput(Request.Params["woId"]);
+
+                if (string.IsNullOrEmpty(_CustomerId) && !string.IsNullOrEmpty(woIdParam))
+                {
+                    _CustomerId = ResolveCustomerGuidFromWorkOrder(CompanyID, woIdParam);
+                }
+
+                if (string.IsNullOrEmpty(_CustomerId))
+                {
+                    string script = "alert('Customer is required. Assign the warranty company or open invoice from a customer/work order.');window.location.href='ThirdPartyProviders.aspx';";
+                    ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", script, true);
+                    return;
+                }
 
                 CustomerProcessor customerProcessor = new CustomerProcessor();
                 if (!customerProcessor.CheckIfValidCustomer(new CustomerEntity { CompanyID = CompanyID, CustomerGuid = _CustomerId }))
                 {
-                    string exception = "alert('Invalid Customer data.', '', 'Successfully');window.location.href='Home.aspx';";
+                    string exception = "alert('Invalid Customer data.');window.location.href='Dashboard.aspx';";
                     ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", exception, true);
                     return;
                 }
 
                 SV_CustomeID.Value = _CustomerId;
                 Indicator.Value = Common.CleanInput(Request.Params["InType"]);
-                AppointmentID.Value = Common.CleanInput(Request.Params["AppID"]);
+                AppointmentID.Value = Common.CleanInput(Request.Params["AppID"] ?? Request.Params["woId"]);
                 //btn_ConvertToInvocie.Visible = false;
                 if (Request.Params["InType"] == "Proposal" && Request.Params["InvNum"] != null)
                 {
@@ -720,8 +732,24 @@ namespace FSM
                 db.Execute(sql);
                 db.Close();
 
-                // The rest of your method for Jobs DB and QuickBooks insertion remains the same...
-                // ...
+                try
+                {
+                    var invSvc = new FSM.Processors.TPMInvoiceService();
+                    int woId = 0;
+                    if (!string.IsNullOrEmpty(_AppointmentID))
+                    {
+                        var woProc = new FSM.Processors.WorkOrderProcessor();
+                        var wo = woProc.GetByAppointmentId(_CompanyId, int.Parse(_AppointmentID));
+                        woId = wo.Id;
+                    }
+                    if (woId > 0)
+                    {
+                        invSvc.CreateTpmInvoiceRecord(_CompanyId, woId, InvoiceID, qNum, decimal.Parse(subTotal), decimal.Parse(taxAmt), Convert.ToDecimal(tL),
+                            HttpContext.Current.Session["LoginUser"]?.ToString());
+                        invSvc.SyncToQbo(_CompanyId, InvoiceID, "0", Convert.ToDecimal(tL), qNum);
+                    }
+                }
+                catch { }
 
                 return "Data saved successfully.";
             }
@@ -822,6 +850,28 @@ namespace FSM
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
             return new string(Enumerable.Repeat(chars, length)
                 .Select(s => s[random.Next(s.Length)]).ToArray());
+        }
+
+        private string ResolveCustomerGuidFromWorkOrder(string companyId, string workOrderId)
+        {
+            int woId;
+            if (!int.TryParse(workOrderId, out woId) || woId <= 0)
+                return "";
+
+            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            using (var con = new SqlConnection(connStr))
+            {
+                con.Open();
+                var cmd = new SqlCommand(
+                    @"SELECT TOP 1 c.CustomerGuid
+                      FROM [msSchedulerV3].[dbo].[tbl_WorkOrders] wo
+                      LEFT JOIN [msSchedulerV3].[dbo].[tbl_Appointment] a ON a.ApptID = wo.AppointmentId AND a.CompanyID = wo.CompanyID
+                      LEFT JOIN [msSchedulerV3].[dbo].[tbl_Customer] c ON c.CustomerID = a.CustomerID AND c.CompanyID = a.CompanyID
+                      WHERE wo.CompanyID = @CompanyID AND wo.Id = @WorkOrderId", con);
+                cmd.Parameters.AddWithValue("@CompanyID", companyId);
+                cmd.Parameters.AddWithValue("@WorkOrderId", woId);
+                return cmd.ExecuteScalar()?.ToString() ?? "";
+            }
         }
     }
 

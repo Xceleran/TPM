@@ -1690,5 +1690,43 @@ namespace TPM
 
             public int? TagId { get; set; }
         }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object GetAccessLogList(string customerId)
+        {
+            string companyId = HttpContext.Current.Session["CompanyID"]?.ToString();
+            var list = new List<object>();
+            try
+            {
+                using (var con = new SqlConnection(ConfigurationManager.AppSettings["ConnString"]))
+                {
+                    con.Open();
+                    var cmd = new SqlCommand(
+                        @"SELECT CommunicationType, Direction, Subject, Message, SentDate, Status, RecipientEmail
+                          FROM [msSchedulerV3].[dbo].[tbl_TPMCommunications]
+                          WHERE CompanyID = @CompanyID
+                          ORDER BY SentDate DESC", con);
+                    cmd.Parameters.AddWithValue("@CompanyID", companyId);
+                    using (var r = cmd.ExecuteReader())
+                    {
+                        while (r.Read())
+                        {
+                            list.Add(new
+                            {
+                                type = r["CommunicationType"]?.ToString(),
+                                direction = r["Direction"]?.ToString(),
+                                subject = r["Subject"]?.ToString(),
+                                message = r["Message"]?.ToString(),
+                                date = r["SentDate"] != DBNull.Value ? Convert.ToDateTime(r["SentDate"]).ToString("g") : "",
+                                status = r["Status"]?.ToString()
+                            });
+                        }
+                    }
+                }
+            }
+            catch { }
+            return new { success = true, data = list };
+        }
     }
 }
