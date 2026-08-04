@@ -68,6 +68,7 @@ namespace FSM.Entity.Customer
         
               public string ApptDateTime { get; set; } // Added line
         public string StatusName { get; set; } // Added line
+        public string StatusColor { get; set; } // tbl_Status.CalenderColor - drives the SL grid status badge
         public string SchedulingCal { get; set; } // Added line
         public int? CSLTagId { get; set; } = null;
         public string CSLTagString { get; set; }

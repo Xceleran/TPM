@@ -6,9 +6,39 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/select/3.0.0/css/select.dataTables.min.css">
 
     <!-- Local Styles and Scripts -->
-    <link rel="stylesheet" href="Content/customer.css?v=1">
+    <link rel="stylesheet" href="Content/customer.css?v=4">
 
+    <%-- The custom-fields chip tooltip styles moved to Content/customer.css so CustomerDetails.aspx,
+         which renders the same chips in its appointment modal, picks them up too. --%>
     <style>
+        .cust-action-btns {
+            display: flex;
+            gap: 10px;
+        }
+
+        .cust-action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #444;
+            font-size: 22px;
+            padding: 6px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+            .cust-action-btn:hover {
+                background: #f0f0f0;
+                color: #007bff;
+            }
+
+        .sms-btn {
+            color: green;
+            font-size: 22px;
+        }
+
         .loading-overlay {
                 position: relative;
                 top: 0;
@@ -81,24 +111,31 @@
             <!-- Customer List -->
             <div class="cust-list-container">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div class="pt-2 ps-2 d-flex align-items-center gap-3 d-none ">
+                    <div class="pt-2 ps-2 d-flex align-items-center gap-3">
                         <div>
                             <label for="statusFilter" class="form-label">Filter by Status:</label>
                             <asp:DropDownList ID="statusFilter" runat="server" CssClass="form-select w-auto">
-                                <asp:ListItem Text="All Statuses" Value=""></asp:ListItem>
+                                <asp:ListItem Text="Active appointments" Value=""></asp:ListItem>
+                                <asp:ListItem Text="All (incl. Closed/Canceled)" Value="all_inclusive"></asp:ListItem>
                             </asp:DropDownList>
                         </div>
                     </div>
                     <div class="toggle-switch">
                         <label for="hideNA" class="form-label" style="font-size: 0.8rem;">Hide Customer with No Appointments:</label>
-                        <input type="checkbox" id="hideNA"  />
+                        <input type="checkbox" id="hideNA" checked />
                     </div>
                 </div>
 
+                <%-- Header cells must stay in step with the `columns` array in Scripts/customer.js
+                     (fullname / Email / StatusName / actions). DataTables aborts the whole grid on a
+                     column-count mismatch, so adding a JS column without a <th> silently kills the page. --%>
                 <table id="customerTable" class="display" style="width: 100%">
                     <thead>
                         <tr>
                             <th>Tp Name</th>
+                            <th>Email</th>
+                            <th>Status</th>
+                            <th></th>
                         </tr>
                     </thead>
                 </table>
@@ -124,7 +161,14 @@
                     <div class="ci-row">
                         <div class="ci-item" id="customerAddress-container">
                             <i class="ci-icon fas fa-map-marker-alt"></i>
-                            <span class="ci-value" id="customerAddress">-</span>
+                            <span class="ci-value">
+                                <span id="customerAddress1"></span>
+                                <br />
+                                <span id="customerAddress2"></span>
+                                <span id="customerCityStateZip"></span>
+                                <br />
+                                <span id="customerCountry"></span>
+                            </span>
                         </div>
                     </div>
                     <!-- Row 2: Phone and Mobile -->
@@ -308,15 +352,14 @@
                     <div class="d-flex flex-wrap align-items-center gap-3 pt-3 px-3 bg-gray-50 rounded-lg w-100">
                         <ul class="nav nav-tabs-modal flex gap-3 mb-0" id="editAppointmentTabs" role="tablist">
                             <li class="nav-item" role="presentation">
-                                <h4> Appointment Details</h4>
                                 <button
-                                    class="nav-link-modal active d-none px-4 py-2 text-sm font-semibold text-gray-700 bg-white rounded-md shadow-sm transition-all duration-200 hover:bg-blue-100 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                    class="nav-link-modal active px-4 py-2 text-sm font-semibold text-gray-700 bg-white rounded-md shadow-sm transition-all duration-200 hover:bg-blue-100 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
                                     id="appointment-tab" data-bs-toggle="tab" data-bs-target="#appointment-details"
                                     type="button" role="tab" aria-controls="appointment-details"
                                     aria-selected="true">
-                                    </button>
+                                    Appointment Details</button>
                             </li>
-                            <li class="nav-item d-none" role="presentation">
+                            <li class="nav-item" role="presentation">
                                 <button
                                     class="nav-link-modal px-4 py-2 text-sm font-semibold text-gray-700 bg-white rounded-md shadow-sm transition-all duration-200 hover:bg-blue-100 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
                                     id="forms-tab" data-bs-toggle="tab" data-bs-target="#forms-section"
@@ -325,6 +368,28 @@
                                     Forms</button>
                             </li>
                         </ul>
+                        <%-- CSL nav buttons - open CustomerDetails.aspx in a new tab. Not real tabs
+                             (no panes to switch to), so data-bs-toggle is intentionally omitted to
+                             stop Bootstrap from hiding the current pane on click. customer.js binds
+                             a delegated click handler on these by id-prefix. --%>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-sm btn-outline-secondary" id="csl-basic-tab" type="button">
+                                Basic Info</button>
+                            <button class="btn btn-sm btn-outline-secondary" id="csl-appointments-tab" type="button">
+                                Appointments</button>
+                            <button class="btn btn-sm btn-outline-secondary" id="csl-invoices-tab" type="button">
+                                Invoices/Estimates</button>
+                            <button class="btn btn-sm btn-outline-secondary" id="csl-notes-tab" type="button">
+                                Notes</button>
+                            <button class="btn btn-sm btn-outline-secondary" id="csl-equipment-tab" type="button">
+                                Equipment</button>
+                            <button class="btn btn-sm btn-outline-secondary" id="csl-pictures-tab" type="button">
+                                Pictures</button>
+                            <button class="btn btn-sm btn-outline-secondary" id="csl-files-tab" type="button">
+                                Files</button>
+                            <button class="btn btn-sm btn-outline-secondary" id="csl-agreements-tab" type="button">
+                                Maintenance Agreements</button>
+                        </div>
                         <div class="ms-auto">
                             <button type="button"
                                 class="btn-close text-gray-500 opacity-80 hover:opacity-100 transition-opacity duration-200"
@@ -346,23 +411,28 @@
                             <!-- Appointment Details Tab -->
                             <div class="tab-pane fade show active" id="appointment-details" role="tabpanel"
                                 aria-labelledby="appointment-tab">
+                                <div class="mb-3">
+                                    <span class="fw-bold text-muted" style="font-size: 0.95rem;">
+                                        Appointment ID: <span id="bodyAppointmentIdDisplay" class="badge bg-primary text-white font-monospace" style="font-size: 0.9rem;"></span>
+                                    </span>
+                                </div>
                                 <div class="row g-4">
                                     <!-- Column 1: Customer / Site Info (Read Only) -->
                                     <div class="col-md-4">
                                         <h5 class="mb-3">Customer / Site Info</h5>
                                         <div class="row">
-                                            <div class="col-md-12">
-                                                <label class="form-label">Customer Name</label>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Site Contact</label>
                                                 <input type="text" id="custModal_CustomerName" class="form-control"
                                                     readonly>
                                             </div>
-                                            <div class="col-md-6 d-none">
+                                            <div class="col-md-6">
                                                 <label class="form-label">Email</label>
                                                 <input type="text" id="custModal_Email" class="form-control"
                                                     readonly>
                                             </div>
                                         </div>
-                                       
+
                                         <div class="row mt-2">
                                             <div class="col-12">
                                                 <label class="form-label">Service Location</label>
@@ -386,8 +456,14 @@
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label">Mobile</label>
-                                                <input type="text" id="custModal_Mobile" class="form-control"
-                                                    readonly>
+                                                <div class="input-group">
+                                                    <input type="text" id="custModal_Mobile" class="form-control"
+                                                        readonly>
+                                                    <button type="button" id="custModal_smsMobile"
+                                                        class="btn btn-outline-success" title="Send Text">
+                                                        <i class="fas fa-sms"></i>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                         <div class="row mt-2">
@@ -536,7 +612,7 @@
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary d-none" onclick="saveAppointmentChanges()">Update</button>
+                    <button type="button" class="btn btn-primary" onclick="saveAppointmentChanges()">Update</button>
                 </div>
             </div>
         </div>
@@ -806,5 +882,97 @@
        
     }
           </script>
-      <script src="Scripts/customer.js?v=17"></script>
+
+    <%-- Forms modals for the SL appointment modal. NOTE: the copies on Appointments.aspx still
+         use Bootstrap 4's data-dismiss, which is inert under the Bootstrap 5 bundle TPM.Master
+         loads - these use data-bs-dismiss so the close buttons actually work. --%>
+    <div class="modal fade" id="formsSelectionModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Select Forms for Appointment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Available Forms</h6>
+                            <hr />
+                            <div id="availableFormsList" class="available-forms-list">
+                                <!-- Available forms will be loaded here -->
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Selected Forms</h6>
+                            <div id="selectedFormsList" class="selected-forms-list">
+                                <!-- Selected forms will appear here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="applyFormsSelection()">Apply Selection</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Appointment Forms Management Modal -->
+    <div class="modal fade" id="appointmentFormsModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Appointment Forms</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h6>Forms List</h6>
+                            <div id="appointmentFormsList" class="appointment-forms-list">
+                                <!-- Appointment forms will be loaded here -->
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 id="formName" class="mb-0"></h5>
+                                <div class="form-actions mt-2" id="formActionsContainer" style="display: none;">
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-sm btn-primary"
+                                            onclick="openCustomerResponseModal()" title="View the customer's response">
+                                            <i class="fa fa-eye"></i> Response
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-info"
+                                            onclick="sendFormsViaEmail()" title="Send forms to customer email">
+                                            <i class="fa fa-envelope"></i> Email
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-warning"
+                                            onclick="sendFormsViaSMS()" title="Send forms to customer phone">
+                                            <i class="fa fa-mobile"></i> SMS
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="loader" style="display:none;">
+                                <img src="content/GearLoder.gif" alt="Loading..." />
+                            </div>
+
+                            <div id="formViewerContainer">
+                                <div class="form-viewer-placeholder text-center p-5 text-muted">
+                                    Select a form on the left to view the customer's response.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+      <script src="Scripts/customer.js?v=22"></script>
 </asp:Content>

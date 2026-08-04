@@ -528,9 +528,12 @@ namespace TPM
             public List<CustomFieldData> CustomFields { get; set; }
         }
 
-        [WebMethod]
+        // EnableSession is required: this method reads Session["CompanyID"] and
+        // WebMethodAttribute.EnableSession defaults to false, so without it Session is null and
+        // every save returned false with only a Debug.WriteLine to show for it.
+        [WebMethod(EnableSession = true)]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
-        public static bool UpdateAppointmentWithViewModel(AppointmentUpdateViewModel viewModel)
+        public static bool UpdateAppointmentWithViewModel(AppointmentUpdateViewModel viewModel, bool sendNotification = true)
         {
             if (viewModel == null || viewModel.AppointmentData == null)
             {
@@ -697,14 +700,24 @@ namespace TPM
             // Process status communication AFTER successful transaction commit
             if (success && viewModel.AppointmentData.StatusID > 0 && !string.IsNullOrEmpty(oldStatus) && oldStatus != viewModel.AppointmentData.StatusID.ToString())
             {
-                try
+                // Email/SMS confirmation to the customer is gated by the caller's "Send notification?"
+                // choice (the edit-modal dialog). When the user picks "No, just save", sendNotification
+                // is false and we skip the customer comms - status history is still logged above.
+                if (sendNotification)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[Appointments] Status changed from {oldStatus} to {viewModel.AppointmentData.StatusID}. Processing communication...");
-                    ProcessStatusCommunication(appointmentId, oldStatus, viewModel.AppointmentData.StatusID.ToString(), resourceId, CompanyID);
+                    try
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[Appointments] Status changed from {oldStatus} to {viewModel.AppointmentData.StatusID}. Processing communication...");
+                        ProcessStatusCommunication(appointmentId, oldStatus, viewModel.AppointmentData.StatusID.ToString(), resourceId, CompanyID);
+                    }
+                    catch (Exception commEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[Appointments] ERROR processing status communication: {commEx.Message}");
+                    }
                 }
-                catch (Exception commEx)
+                else
                 {
-                    System.Diagnostics.Debug.WriteLine($"[Appointments] ERROR processing status communication: {commEx.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[Appointments] Status changed from {oldStatus} to {viewModel.AppointmentData.StatusID}, but sendNotification=false. Skipping customer email/SMS.");
                 }
             }
 

@@ -11,7 +11,7 @@
             href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
 
         <link rel="stylesheet" href="Content/customerdetails.css">
-        <link rel="stylesheet" href="Content/customer.css">
+        <link rel="stylesheet" href="Content/customer.css?v=4">
         <style>
             #siteAppointmentDetailsModal_PopUP .modal-dialog {
                 max-width: 95vw;
@@ -938,7 +938,7 @@
         <!-- Site Appointment Details Modal (Refactored to Bootstrap) -->
         <div class="modal fade" id="siteAppointmentDetailsModal_PopUP" tabindex="-1"
             aria-labelledby="siteAppointmentDetailsModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable" style="max-width: 98%; width: 98%;">
                 <div class="modal-content">
                     <div
                         class="modal-header d-flex justify-content-between align-items-center bg-white shadow-sm rounded-top">
@@ -955,10 +955,38 @@
                                             class="ms-2 badge bg-light text-dark font-monospace"
                                             style="font-size: 0.8rem; border: 1px solid #dee2e6;"></span></button>
                                 </li>
-                              
+                                <%-- id is deliberately NOT "forms-tab": the page-level Forms tab already owns
+                                     that id (see the customer tab strip above), and a duplicate would make
+                                     document.querySelector('#forms-tab') resolve to the wrong element. --%>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link-modal px-4 py-2" id="modal-forms-tab"
+                                        data-bs-toggle="tab" data-bs-target="#forms-section" type="button"
+                                        role="tab" aria-controls="forms-section" aria-selected="false"
+                                        style="font-weight: 600; color: #4b5563; background-color: white; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); transition: all 0.2s;"
+                                        onmouseover="this.style.backgroundColor='#dbeafe'; this.style.color='#1e40af';"
+                                        onmouseout="if(!this.classList.contains('active')){this.style.backgroundColor='white'; this.style.color='#4b5563';}">Forms</button>
+                                </li>
                             </ul>
+                            <%-- CSL nav buttons - jump straight to one of this page's own tabs. They are pure
+                                 navigation, NOT Bootstrap tabs (no data-bs-toggle), so clicking must not swap
+                                 an inline pane; customerdetails.js binds a delegated handler by id-prefix. --%>
                             <div class="d-flex flex-wrap gap-2">
-                                
+                                <button class="btn btn-sm btn-outline-secondary" id="csl-basic-tab" type="button">
+                                    Basic Info</button>
+                                <button class="btn btn-sm btn-outline-secondary" id="csl-appointments-tab" type="button">
+                                    Appointments</button>
+                                <button class="btn btn-sm btn-outline-secondary" id="csl-invoices-tab" type="button">
+                                    Invoices/Estimates</button>
+                                <button class="btn btn-sm btn-outline-secondary" id="csl-notes-tab" type="button">
+                                    Notes</button>
+                                <button class="btn btn-sm btn-outline-secondary" id="csl-equipment-tab" type="button">
+                                    Equipment</button>
+                                <button class="btn btn-sm btn-outline-secondary" id="csl-pictures-tab" type="button">
+                                    Pictures</button>
+                                <button class="btn btn-sm btn-outline-secondary" id="csl-files-tab" type="button">
+                                    Files</button>
+                                <button class="btn btn-sm btn-outline-secondary" id="csl-agreements-tab" type="button">
+                                    Maintenance Agreements</button>
                             </div>
                             <div class="ms-auto">
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"
@@ -976,6 +1004,13 @@
                                 <!-- Appointment Details Tab -->
                                 <div class="tab-pane fade show active" id="appointment-details" role="tabpanel"
                                     aria-labelledby="appointment-tab">
+                                    <div class="mb-3">
+                                        <span class="fw-bold text-muted" style="font-size: 0.95rem;">
+                                            Appointment ID: <span id="bodyAppointmentIdDisplay"
+                                                class="badge bg-primary text-white font-monospace"
+                                                style="font-size: 0.9rem;"></span>
+                                        </span>
+                                    </div>
                                     <div class="row g-4">
                                         <!-- Column 1: Customer / Site Info (Read Only) -->
                                         <div class="col-md-4">
@@ -1128,10 +1163,24 @@
                                             <!-- Appointment-Specific Links -->
                                             <div class="mb-3">
                                                 <h6 class="mb-2">Appointment-Specific Items</h6>
+                                                <%-- Read-only: TPM has no invoice link/unlink endpoints
+                                                     (GetCustomerInvoicesForLinking / LinkInvoiceToAppointment
+                                                     exist only in FSM). Forms are attached from the Forms tab. --%>
                                                 <div id="appointmentSpecificLinks" class="border rounded p-2"
                                                     style="min-height: 60px;">
-                                                    <small class="text-muted">No items attached to this
-                                                        appointment</small>
+                                                    <div class="mb-2">
+                                                        <label class="form-label mb-1 small text-muted">Forms</label>
+                                                        <div id="apptFormsAttachedList">
+                                                            <small class="text-muted">No forms attached</small>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label class="form-label mb-1 small text-muted">Inv/Est</label>
+                                                        <div id="apptInvoicesAttachedList">
+                                                            <small class="text-muted">No invoices or estimates
+                                                                attached</small>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1365,8 +1414,9 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
-                            onclick="openAppointmentModal()">Close</button>
+                        <%-- data-bs-dismiss already closes this; the old onclick called
+                             openAppointmentModal(), which is defined nowhere and threw. --%>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>
@@ -1780,5 +1830,5 @@
                 });
             })();
         </script>
-               <script src="Scripts/customerdetails.js?v=10"></script>
+               <script src="Scripts/customerdetails.js?v=13"></script>
     </asp:Content>

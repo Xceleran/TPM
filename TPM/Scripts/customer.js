@@ -1,8 +1,47 @@
-﻿
+
 let table = null;
 var sites = [];
 var siteAppointmentsCache = {};
 var IsSiteDataLoading = true;
+
+// --- Filter state persistence (ported from the FSM CSL board) ---
+
+// The status dropdown is an <asp:DropDownList> inside ContentPlaceHolderID="MainContent",
+// so it actually renders as #MainContent_statusFilter. Always resolve it through this
+// helper: a bare $('#statusFilter') matches nothing and silently turns the filter into a
+// no-op, which is exactly how it behaved before.
+function $statusFilterEl() {
+    return $('#statusFilter').length ? $('#statusFilter') : $('#MainContent_statusFilter');
+}
+
+// Key is TPM-specific on purpose: TPM and FSM both run on http://localhost:62934 during
+// development, so a shared key would let one app read the other's saved filters.
+var TPM_FILTER_STATE_KEY = 'tpmCustomerFilterState';
+
+function getFilterState() {
+    try {
+        var saved = sessionStorage.getItem(TPM_FILTER_STATE_KEY);
+        return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function saveFilterState() {
+    var dt = $.fn.DataTable.isDataTable('#customerTable') ? $('#customerTable').DataTable() : null;
+    var state = {
+        search: dt ? dt.search() : '',
+        page: dt ? dt.page() : 0,
+        pageLength: dt ? dt.page.len() : 10,
+        statusFilter: $statusFilterEl().val() || '',
+        hideNA: $('#hideNA').is(':checked')
+    };
+    sessionStorage.setItem(TPM_FILTER_STATE_KEY, JSON.stringify(state));
+}
+
+function clearFilterState() {
+    sessionStorage.removeItem(TPM_FILTER_STATE_KEY);
+}
 
 function escapeHTML(str) {
     return String(str ?? '').replace(/[&<>"']/g, s => (
@@ -108,6 +147,25 @@ function clearSiteFiltersFromSession() {
 
 $(document).ready(function () {
 
+    // Restore the dropdown/toggle from the previous visit BEFORE loadCustomers(), so the
+    // very first ajax call already carries the saved status filter instead of firing once
+    // with the default and again after restore.
+    var savedFilterState = getFilterState();
+    if (savedFilterState) {
+        if (savedFilterState.statusFilter) {
+            $statusFilterEl().val(savedFilterState.statusFilter);
+        }
+        if (typeof savedFilterState.hideNA === 'boolean') {
+            $('#hideNA').prop('checked', savedFilterState.hideNA);
+        }
+    }
+
+    // Persist filters when leaving for the details page, so coming back lands on the same
+    // search term, page and status.
+    $(document).on('click', 'a[href*="CustomerDetails.aspx"]', function () {
+        saveFilterState();
+    });
+
     loadCustomers();
     loadSiteApptStatuses();
 
@@ -140,6 +198,17 @@ $(document).ready(function () {
     $('#customerTable tbody').on('click', 'tr', function () {
         $('#contact, #sites').slideDown();
         $('#contactBtn, #sitesBtn').addClass('active');
+    });
+
+    // SMS from the appointment modal. FSM opens its own apptSmsModal backed by
+    // Customer.aspx/SendCustomerSMS; TPM has neither, but it does have CustomerChatHistory.aspx,
+    // which is the same affordance on TPM's own plumbing (and matches the grid's SMS button).
+    $(document).on('click', '#custModal_smsMobile', function (e) {
+        e.preventDefault();
+        const mobile = ($('#custModal_Mobile').val() || '').trim();
+        const name = ($('#custModal_CustomerName').val() || '').trim();
+        const customerId = ($('#editCustomerId').val() || $('#CustomerID').val() || '').toString().trim();
+        OpenCustomerChatHistory(mobile, name, customerId);
     });
 
     $('#addCustomerBtn').on('click', function () {
@@ -466,8 +535,11 @@ $(document).ready(function () {
         }
     });
 
-    $('#statusFilter').on('change', function () {
-        if (table) table.draw(false);
+    // Delegated + both IDs, because the ASP.NET control renders as #MainContent_statusFilter.
+    // This must re-query the server (not table.draw) now that the status filter is applied in
+    // SQL - a client-side redraw would only re-filter the 10 rows already on screen.
+    $(document).on('change', '#statusFilter, #MainContent_statusFilter', function () {
+        if (table) table.ajax.reload();
     });
 
     $('#cslViewFilter').on('change', function () {
@@ -554,10 +626,21 @@ function loadCustomers() {
     sitesListContainer.empty();
 
     sitesHeaderContainer.append('<h4 class="cust-details-title" >Select a Customer to view sites.</h4>');
-    $('#customerTable').DataTable({
+
+    // Restore search text / page from the previous visit (e.g. returning from CustomerDetails).
+    var savedState = getFilterState();
+    var initSearch = (savedState && savedState.search) ? savedState.search : '';
+    var initPage = (savedState && savedState.page) ? savedState.page : 0;
+
+    // Assign to the module-level `table`. Without this it stayed null forever, so every
+    // `if (table) table.ajax.reload()` guard (status filter, hideNA toggle, view filter)
+    // silently did nothing and the filters looked wired but were inert.
+    table = $('#customerTable').DataTable({
         processing: true,
         serverSide: true,
         filter: true,
+        search: { search: initSearch },
+        displayStart: initPage * 10,
         ajax: {
             url: "Customer.aspx/LoadCustomers",
             type: "POST",
@@ -572,7 +655,8 @@ function loadCustomers() {
                     sortColumn: d.columns[d.order[0].column].data,
                     sortDirection: d.order[0].dir,
                     cslViewFilter: 'all', // No longer using $('#cslViewFilter').val()
-                    hideNoAppointments: $('#hideNA').is(':checked')
+                    hideNoAppointments: $('#hideNA').is(':checked'),
+                    statusFilter: $statusFilterEl().val() || ''
                 });
             },
             dataSrc: function (json) {
@@ -588,31 +672,28 @@ function loadCustomers() {
         select: { style: 'single' },
         columns: [
             { data: "fullname", name: "TP Name", autoWidth: true },
-            { data: "Email", name: "Email", autoWidth: true },
+            {
+                data: "Email",
+                name: "Email",
+                autoWidth: true,
+                render: function (data) {
+                    if (!data) { return ''; }
+                    return `<a href="mailto:${escapeHTML(data)}" class="email-link">${escapeHTML(data)}</a>`;
+                }
+            },
             {
                 data: "StatusName",
                 name: "Status",
                 autoWidth: true,
-                render: function (data) {
-                    let statusText = data || 'N/A'; // Changed from const status to let statusText
-                    let statusClass = 'status-na';
-                    switch (statusText.toLowerCase()) { // Used statusText.toLowerCase()
-                        case 'pending': statusClass = 'status-pending'; break;
-                        case 'confirmed': statusClass = 'status-confirmed'; break;
-                        case 'dispatched': statusClass = 'status-dispatched'; break;
-                        case 'in-route': statusClass = 'status-in-route'; break;
-                        case 'fa-id sent': statusClass = 'status-fa-id-sent'; break;
-                        case 'arrived': statusClass = 'status-arrived'; break;
-                        case 'completed': statusClass = 'status-completed'; break;
-                        case 'closed': statusClass = 'status-closed'; break;
-                        case 'on-hold': statusClass = 'status-on-hold'; break;
-                        case '0':
-                            statusClass = 'status-default';
-                            statusText = 'Multiple'; // Changed displayed text
-                            break;
-                        case 'cancelled': statusClass = 'status-cancelled'; break;
-                    }
-                    return `<span class="badge ${statusClass}">${statusText}</span>`; // Used statusText
+                render: function (data, type, row) {
+                    // Colour comes from tbl_Status.CalenderColor via LoadCustomers, same as FSM CSL,
+                    // so a company's configured status colours carry over instead of a hardcoded
+                    // class list that silently falls through on spelling drift (In-Route vs InRoute,
+                    // Cancelled vs Canceled).
+                    let statusText = data || 'N/A';
+                    if (statusText === '0') { statusText = 'Multiple'; }
+                    const bgColor = row.StatusColor || '#3b82f6';
+                    return `<span class="badge" style="background-color: ${bgColor}; color: #fff; padding: 5px 10px; font-weight: 500; font-size: 0.75rem; border-radius: 4px;">${escapeHTML(statusText)}</span>`;
                 }
             },
             {
@@ -643,6 +724,25 @@ function loadCustomers() {
                     IsSiteDataLoading = false;
                 }
             }
+        },
+        initComplete: function () {
+            // State has been consumed by search/displayStart above; drop it so a plain
+            // reload of the page starts clean instead of resurrecting an old search.
+            clearFilterState();
+
+            // Debounce the search box: DataTables fires a server round-trip on every
+            // keystroke by default, which on a server-side grid means a query per letter.
+            var api = this.api();
+            var searchInput = $('div.dataTables_filter input');
+            searchInput.off('keyup search input').on('keyup', function () {
+                var self = this;
+                clearTimeout(self._searchTimer);
+                self._searchTimer = setTimeout(function () {
+                    if (api.search() !== self.value) {
+                        api.search(self.value).draw();
+                    }
+                }, 400);
+            });
         }
     });
 
@@ -662,7 +762,9 @@ function generateCustomerDetails(data) {
         $('#customerName').text('Select a Customer');
 
         $('.ci-item').addClass('is-empty');
-        $('#customerPhone, #customerMobile, #customerEmail, #customerAddress, #customerJobTitle').text('-');
+        $('#customerPhone, #customerMobile, #customerEmail, #customerJobTitle').text('-');
+        // The address is a set of spans, not one #customerAddress node - clear each of them.
+        $('#customerAddress1, #customerAddress2, #customerCityStateZip, #customerCountry').text('');
 
         $('#sites .sites-header').empty();
         $('#sites .sites-list').empty().html('<p class="text-muted">Select a customer to see their sites.</p>');
@@ -695,8 +797,20 @@ function generateCustomerDetails(data) {
     updateItem('customerMobile', data.Mobile, `sms:${normPhone(data.Mobile)}`);
     updateItem('customerEmail', data.Email, `mailto:${data.Email}`);
 
-    const fullAddress = [safe(data.Address1), safe(data.City), safe(data.State), safe(data.ZipCode)].filter(Boolean).join(', ');
-    updateItem('customerAddress', fullAddress);
+    // Structured address block, mirroring FSM CSL: street on its own line, then
+    // "City, State, Zip", then country. The old single-line join lost Address2 entirely.
+    $('#customerAddress1').text(safe(data.Address1));
+    $('#customerAddress2').text(safe(data.Address2));
+    const cityStateZip = [safe(data.City), safe(data.State), safe(data.ZipCode)].filter(Boolean).join(', ');
+    $('#customerCityStateZip').text(cityStateZip);
+    $('#customerCountry').text(safe(data.Country));
+
+    const customerAddressContainer = $('#customerAddress-container');
+    if (safe(data.Address1) || safe(data.Address2) || safe(data.City) || safe(data.State) || safe(data.ZipCode) || safe(data.Country)) {
+        customerAddressContainer.removeClass('is-empty');
+    } else {
+        customerAddressContainer.addClass('is-empty');
+    }
 
     updateItem('customerJobTitle', data.JobTitle);
 
@@ -1196,7 +1310,10 @@ function populateAndOpenEditCustomerModal(customerData) {
 
 function applyRowFiltersOnCurrentPage() {
     if (!table) return;
-    const wantedStatus = ($('#statusFilter').val() || 'all').toLowerCase();
+    // '' (Active appointments) and 'all_inclusive' are not real row statuses - the server
+    // already applied them - so treat both as "no client-side status filter".
+    const rawStatus = $statusFilterEl().val();
+    const wantedStatus = (!rawStatus || rawStatus === 'all_inclusive') ? 'all' : rawStatus.toLowerCase();
     const hideNA = $('#hideNA').is(':checked');
 
     table.rows({ page: 'current' }).every(function () {
@@ -1264,12 +1381,16 @@ function showAppointmentDetailsModal(appointment, siteId) {
     // Ensure dropdowns are populated
     populateDropdown("MainContent_ServiceTypeFilter_Edit", cslServiceTypes, "ServiceTypeID", "ServiceName", "Select Service Type");
     populateDropdown("resource_list", cslResources, "Id", "Name", "Unassigned");
+    // populateDropdown adds its placeholder with an EMPTY value, and the line below wants an
+    // explicit "0" for Unassigned - without this drop we end up with two "Unassigned" entries
+    // and a selected value of "" rather than "0".
+    $('#resource_list option').filter(function () { return this.value === ''; }).remove();
     if (!$('#resource_list option[value="0"]').length) {
         $('#resource_list').prepend(new Option("Unassigned", "0"));
     }
     populateDropdown("MainContent_StatusTypeFilter_Edit", cslApptStatuses, "StatusID", "StatusName", "Select Status");
     populateDropdown("MainContent_TicketStatusFilter_Edit", cslTicketStatuses, "StatusID", "StatusName", "Select Ticket Status");
-    populateTimeSlots();
+    populateTimeSlotDropdown(allTimeSlots);
 
     // Extract raw ID if it's formatted (e.g. APPT-103-5432 -> 5432)
     let apptId = appointment.AppoinmentId;
@@ -1288,76 +1409,127 @@ function showAppointmentDetailsModal(appointment, siteId) {
             const details = response.d;
             if (details) {
                 $('#editApptId').val(details.ApptID);
+                // Display-only: stash the CEC-facing UId so any shown.bs.modal listener shows it, not the PK.
+                $('#editApptId').attr('data-uid', details.AppoinmentUId || '');
                 $('#editCustomerId').val(details.CustomerID);
                 $('#editAppointmentForm').data('site-id', siteId);
 
+                // Appointment ID badge - prefer the CEC-facing AppoinmentUId, fall back to the numeric PK.
+                var bodyApptIdDisplay = document.getElementById('bodyAppointmentIdDisplay');
+                var displayApptId = details.AppoinmentUId || details.ApptID;
+                if (bodyApptIdDisplay && displayApptId) {
+                    bodyApptIdDisplay.textContent = '#' + displayApptId;
+                }
+
                 // Populate Customer/Site Info (Left Column)
 
-                $('#custModal_CustomerName').val(details.CustomerName);
+                // GetAppointmentDetails returns ContactName/Phone/Mobile - the old code read
+                // details.PhoneNumber / details.MobileNumber, which do not exist on this payload,
+                // so both boxes were permanently blank.
+                $('#custModal_CustomerName').val(details.ContactName || details.CustomerName || '');
                 $('#custModal_SiteName').val(details.SiteName || '');
-                // For email, phone, mobile, country - ensure we use the correct property names from site object
                 $('#custModal_Address').val(details.Address || '');
                 $('#custModal_City').val(details.City || '');
                 $('#custModal_State').val(details.State || '');
                 $('#custModal_Zip').val(details.Zip || '');
                 $('#custModal_Country').val(details.Country || '');
                 $('#custModal_Email').val(details.Email || '');
-                $('#custModal_Phone').val(details.PhoneNumber || '');
-                $('#custModal_Mobile').val(details.MobileNumber || '');
-
+                $('#custModal_Phone').val(details.Phone || '');
+                $('#custModal_Mobile').val(details.Mobile || '');
 
                 $('#MainContent_ServiceTypeFilter_Edit').val(details.ServiceTypeID || "");
+
+                // Stash the stored resource before selecting it. The dropdown only lists CURRENT
+                // resources, so an appointment assigned to a since-removed technician selects
+                // nothing - and a save would then write ResourceID = NULL and silently drop the
+                // assignment. saveAppointmentChanges falls back to this value when the dropdown
+                // has no selection at all (an explicit "0"/Unassigned pick is still honoured).
+                $('#resource_list').attr('data-orig-resource', details.ResourceID || 0);
                 $('#resource_list').val(details.ResourceID || "0");
 
                 setDropdownByTextOrValue('MainContent_StatusTypeFilter_Edit', details.Status);
+                // Remember the status the modal opened with, so the save can tell whether it actually
+                // changed and only then offer "Send notification?".
+                $('#MainContent_StatusTypeFilter_Edit').attr('data-orig-status', $('#MainContent_StatusTypeFilter_Edit').val());
                 setDropdownByTextOrValue('MainContent_TicketStatusFilter_Edit', details.TicketStatus);
-                setDropdownByTextOrValue('time_slot', details.TimeSlot);
 
+                // Match the saved TimeSlot text against a configured block, falling back to matching
+                // the appointment's start time when the stored label doesn't line up.
+                var timeSlotValue = (details.TimeSlot || '').trim();
+                var matchingSlot = allTimeSlots.find(function (s) {
+                    return (s.TimeBlockSchedule || '').trim() === timeSlotValue || (s.TimeBlock || '').trim() === timeSlotValue;
+                });
+                if (!matchingSlot && details.StartDateTime) {
+                    var extractedStart = moment(details.StartDateTime, 'MM/DD/YYYY hh:mm A').format('hh:mm A');
+                    matchingSlot = allTimeSlots.find(function (s) { return s.StartTime === extractedStart; });
+                }
+                $('#time_slot').val(matchingSlot ? matchingSlot.StartTime : '');
 
-                $('#dateInput').val(details.Date);
+                // Prefer the stored Start/End datetimes over recomputing them from Hour/Minute.
+                $('#txt_StartDate').val(details.StartDateTime || '');
+                $('#txt_EndDate').val(details.EndDateTime || '');
+                $('#duration').val(details.Duration || '');
 
-                let startMoment = null;
-                if (details.Date) {
-                    startMoment = moment(`${details.Date} ${details.Hour}:${details.Minute}`, "YYYY-MM-DD H:m");
-                    $('#txt_StartDate').val(startMoment.format("MM/DD/YYYY hh:mm A"));
+                if (details.StartDateTime) {
+                    var startMom = moment(details.StartDateTime, 'MM/DD/YYYY hh:mm A');
+                    if (startMom.isValid()) $('#dateInput').val(startMom.format('YYYY-MM-DD'));
+                    else $('#dateInput').val(details.Date || '');
                 } else {
-                    $('#txt_StartDate').val('');
+                    $('#dateInput').val(details.Date || '');
                 }
 
-                $('#duration').val(details.Duration || "");
-
-                if (startMoment && startMoment.isValid() && details.Duration) {
-                    const totalMinutes = parseDuration(details.Duration);
-                    if (totalMinutes > 0) {
-                        const newEndDateTime = startMoment.clone().add(totalMinutes, 'minutes');
-                        $('#txt_EndDate').val(newEndDateTime.format('MM/DD/YYYY hh:mm A'));
-                    } else {
-                        $('#txt_EndDate').val('');
-                    }
-                } else if (details.EndDateTime) {
-                    $('#txt_EndDate').val(moment(details.EndDateTime).format('MM/DD/YYYY hh:mm A'));
+                // Pull the service type's configured default duration and re-derive the end time.
+                var serviceTypeId = parseInt(details.ServiceTypeID) || 0;
+                if (serviceTypeId > 0) {
+                    $.ajax({
+                        url: "Customer.aspx/GetDuration",
+                        type: "POST",
+                        contentType: "application/json; charset=utf-8",
+                        dataType: "json",
+                        data: JSON.stringify({ serviceTypeID: serviceTypeId }),
+                        success: function (resp) {
+                            var dur = resp.d || "0";
+                            if (dur && dur !== "0") {
+                                $('#duration').val(dur);
+                                updateEndDateFromDuration();
+                            }
+                        }
+                    });
                 }
-                else {
-                    $('#txt_EndDate').val('');
-                }
-
 
                 $('#editApptNote').val(details.Note);
+
+                // Keep date / slot / duration / start / end in step as the user edits them.
+                $('#dateInput').off('change').on('change', syncModalTimes);
+                $('#time_slot').off('change').on('change', syncModalTimes);
+                $('#duration').off('change').on('change', updateEndDateFromDuration);
+                $('#txt_StartDate').off('change').on('change', calculateTimeRequired);
+                $('#txt_EndDate').off('change').on('change', calculateTimeRequired);
+                $('#MainContent_ServiceTypeFilter_Edit').off('change').on('change', function () {
+                    var stId = parseInt($(this).val()) || 0;
+                    if (stId <= 0) return;
+                    $.ajax({
+                        url: "Customer.aspx/GetDuration",
+                        type: "POST",
+                        contentType: "application/json; charset=utf-8",
+                        dataType: "json",
+                        data: JSON.stringify({ serviceTypeID: stId }),
+                        success: function (resp) {
+                            var dur = resp.d || "0";
+                            if (dur && dur !== "0") {
+                                $('#duration').val(dur);
+                                updateEndDateFromDuration();
+                            }
+                        }
+                    });
+                });
 
                 // Reset Tabs
                 const tabTrigger = new bootstrap.Tab(document.querySelector('#editAppointmentTabs button[data-bs-target="#appointment-details"]'));
                 tabTrigger.show();
 
-                // Load Forms for this appointment (in Forms tab)
-                // Use the shared function which calls Appointments.aspx/Method
-                // We need to ensure attached forms are loaded. 
-                // Since we don't have 'AttachedForms' in 'details' from Customer.aspx (presumably),
-                // we might need to fetch them or assume they load when tab is clicked?
-                // Actually loadAppointmentSpecificLinks loads them for the side panel. 
-                // But for the Forms TAB, we need to populate #selectedFormsEdit
-                // We will call a helper function here.
-                // loadFormsForModal(details.ApptID);
-                // loadCustomFields(null, details.ApptID);
+                loadCustomFields(null, details.ApptID);
+                loadFormsForModal(details.ApptID);
 
                 // Use Bootstrap modal syntax
                 $('#siteAppointmentDetailsModal').modal('show');
@@ -1399,6 +1571,9 @@ function loadDropdownDataForModal() {
             }
         });
     });
+
+    // Fetch the company's configured time blocks for the Time Slot dropdown.
+    getTimeSlots();
 }
 
 function populateDropdown(elementId, data, valueField, textField, defaultText) {
@@ -1416,29 +1591,338 @@ function populateDropdown(elementId, data, valueField, textField, defaultText) {
     }
 }
 
-function populateTimeSlots() {
-    const $timeSlot = $('#time_slot');
-    if (!$timeSlot.length) return;
-    $timeSlot.empty();
-    $timeSlot.append('<option value="">Select Time Slot</option>');
+// Time blocks configured for the company (tbl_TimeBlocks), fetched once per page load.
+let allTimeSlots = [];
 
+// Replaces the old populateTimeSlots(), which invented fixed 30-minute 8AM-8PM slots on the
+// client. Those matched no configured block, so every save wrote a TimeSlot string the rest of
+// the system didn't recognise and a TimeSlotId of 0.
+function getTimeSlots() {
+    return $.ajax({
+        url: "Customer.aspx/GetTimeSlots",
+        type: "POST",
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        data: {}
+    }).then(function (response) {
+        var slots = response.d || [];
+        slots.sort(function (a, b) {
+            var parseTime = function (timeStr) {
+                var match = (timeStr || '').match(/(\d+):(\d+)\s*(AM|PM)/i);
+                if (!match) return 0;
+                var hours = parseInt(match[1], 10);
+                var mins = parseInt(match[2], 10);
+                if (match[3].toUpperCase() === 'PM' && hours !== 12) hours += 12;
+                if (match[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
+                return hours * 60 + mins;
+            };
+            return parseTime(a.StartTime) - parseTime(b.StartTime);
+        });
+        allTimeSlots = slots;
+        populateTimeSlotDropdown(slots);
+        return slots;
+    });
+}
 
+function populateTimeSlotDropdown(slots) {
+    var $dropdown = $('#time_slot');
+    if (!$dropdown.length) return;
+    var currentValue = $dropdown.val();
+    $dropdown.empty();
+    $dropdown.append('<option value="">Select Time Slot</option>');
+    (slots || []).forEach(function (slot) {
+        var value = slot.StartTime;
+        var displayText = slot.TimeBlockSchedule || slot.TimeBlock || slot.StartTime;
+        var optionHtml = '<option value="' + value + '" data-id="' + slot.ID + '" data-start="' + slot.StartTime + '" data-end="' + slot.EndTime + '">' + displayText + '</option>';
+        $dropdown.append(optionHtml);
+    });
+    if (currentValue) $dropdown.val(currentValue);
+}
 
-    // Add 30-min increments from 8 AM to 8 PM
-    for (let h = 8; h < 20; h++) {
-        for (let m = 0; m < 60; m += 30) {
-            let hh = h % 12 || 12;
-            let ampm = h >= 12 ? "PM" : "AM";
-            let h_next = m === 30 ? h + 1 : h;
-            let m_next = m === 30 ? 0 : 30;
-            let hh_next = h_next % 12 || 12;
-            let ampm_next = h_next >= 12 ? "PM" : "AM";
+// Date + Time Slot -> Start/End datetime, honouring the Time Required box when it has a value
+// and falling back to the block's own EndTime otherwise.
+function syncModalTimes() {
+    var dateValue = $('#dateInput').val();
+    var timeSlotValue = $('#time_slot').val();
 
-            let slotText = `${hh.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')} ${ampm} - ${hh_next.toString().padStart(2, '0')}:${m_next.toString().padStart(2, '0')} ${ampm_next}`;
-            $timeSlot.append(new Option(slotText, slotText.toLowerCase()));
+    if (!dateValue || !timeSlotValue) return;
+
+    var selectedSlot = allTimeSlots.find(function (slot) { return slot.StartTime === timeSlotValue; }) ||
+                       allTimeSlots.find(function (slot) { return slot.TimeBlock === timeSlotValue; });
+    if (!selectedSlot) return;
+
+    var startTimeStr = selectedSlot.StartTime;
+    if (!startTimeStr) {
+        var timeMatch = (selectedSlot.TimeBlockSchedule || '').match(/(\d{1,2}:\d{2}\s*[AP]M)/);
+        if (!timeMatch) return;
+        startTimeStr = timeMatch[0];
+    }
+
+    var newStartDateTime = moment(dateValue + ' ' + startTimeStr, 'YYYY-MM-DD hh:mm A');
+    if (!newStartDateTime.isValid()) return;
+
+    $('#txt_StartDate').val(newStartDateTime.format('MM/DD/YYYY hh:mm A'));
+
+    var totalDur = parseDuration($('#duration').val() || '');
+    if (totalDur > 0) {
+        $('#txt_EndDate').val(newStartDateTime.clone().add(totalDur, 'minutes').format('MM/DD/YYYY hh:mm A'));
+    } else if (selectedSlot.EndTime) {
+        var endMom = moment(dateValue + ' ' + selectedSlot.EndTime, 'YYYY-MM-DD hh:mm A');
+        if (endMom.isValid()) {
+            $('#txt_EndDate').val(endMom.format('MM/DD/YYYY hh:mm A'));
         }
     }
 }
+
+function updateEndDateFromDuration() {
+    var start = moment($('#txt_StartDate').val(), 'MM/DD/YYYY hh:mm A');
+    if (!start.isValid()) return;
+
+    var totalMinutes = parseDuration($('#duration').val() || '');
+    if (totalMinutes <= 0) return;
+
+    $('#txt_EndDate').val(start.clone().add(totalMinutes, 'minutes').format('MM/DD/YYYY hh:mm A'));
+    calculateTimeRequired();
+}
+
+// Start/End -> "N Hr : N Min", with the inline warning when End precedes Start.
+function calculateTimeRequired() {
+    const $start = $('#txt_StartDate');
+    const $end = $('#txt_EndDate');
+    const $duration = $('#duration');
+    const $error = $('#customer_EndDate');
+
+    const start = moment($start.val(), 'MM/DD/YYYY hh:mm A');
+    const end = moment($end.val(), 'MM/DD/YYYY hh:mm A');
+
+    if (!start.isValid() || !end.isValid()) {
+        if ($duration.length) $duration.val('');
+        return;
+    }
+
+    if (end.isBefore(start)) {
+        if ($error.length) $error.show();
+        $end.css('border-color', 'red');
+        if ($duration.length) $duration.val('Invalid');
+        return;
+    }
+
+    if ($error.length) $error.hide();
+    $end.css('border-color', '');
+
+    const diff = moment.duration(end.diff(start));
+    const hours = Math.floor(diff.asHours());
+    const minutes = diff.minutes();
+
+    if ($duration.length) $duration.val(`${hours} Hr : ${minutes} Min`);
+}
+
+// Moving the Date picker shifts the day of Start/End while keeping their times.
+function updateDate(event) {
+    const newDate = event.target.value; // YYYY-MM-DD
+    if (!newDate) return;
+
+    const $start = $('#txt_StartDate');
+    const $end = $('#txt_EndDate');
+    const mNewDate = moment(newDate, "YYYY-MM-DD");
+
+    [$start, $end].forEach($el => {
+        if ($el.val()) {
+            let curMoment = moment($el.val(), "MM/DD/YYYY hh:mm A");
+            if (curMoment.isValid()) {
+                curMoment.year(mNewDate.year()).month(mNewDate.month()).date(mNewDate.date());
+                $el.val(curMoment.format("MM/DD/YYYY hh:mm A"));
+            }
+        } else {
+            let timeStr = $el.attr('id') === 'txt_StartDate' ? "08:00 AM" : "09:00 AM";
+            $el.val(mNewDate.format("MM/DD/YYYY") + " " + timeStr);
+        }
+    });
+
+    calculateTimeRequired();
+}
+
+// ---------------------------------------------------------------------------
+// Appointment save (ported from FSM CSL)
+// ---------------------------------------------------------------------------
+
+// showAlert lives in forms.js, which isn't loaded on this page - so define the same wrapper
+// here (SweetAlert when available, native alert fallback). Guarded so forms.js's copy wins if
+// it is ever present. Must RETURN a thenable: callers chain .then(r => r.isConfirmed).
+window.showAlert = window.showAlert || function (options) {
+    if (typeof Swal !== 'undefined') { return Swal.fire(options); }
+    if (options && options.showCancelButton) {
+        return Promise.resolve({ isConfirmed: window.confirm(options.text || options.title || '') });
+    }
+    window.alert((options && (options.text || options.title)) || 'Alert');
+    return Promise.resolve({ isConfirmed: true });
+};
+
+// Blocking overlay over the edit modal while the save round-trips, so the Update button can't
+// be double-submitted.
+window.showApptUpdateLoading = window.showApptUpdateLoading || function (modalId) {
+    var $modal = $('#' + modalId);
+    if (!$modal.length || $modal.find('.appt-update-loading').length) return;
+    $modal.find('.modal-content').first().append(
+        '<div class="appt-update-loading" style="position:absolute;inset:0;background:rgba(255,255,255,.65);' +
+        'display:flex;align-items:center;justify-content:center;z-index:1080;">' +
+        '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Saving...</span></div></div>'
+    );
+};
+window.hideApptUpdateLoading = window.hideApptUpdateLoading || function (modalId) {
+    $('#' + modalId).find('.appt-update-loading').remove();
+};
+
+// "Send notification?" confirmation shown before saving a status change. Uses Swal directly so it
+// returns a promise; resolves true ("Yes, send") or false ("No, just save") - both proceed with the save.
+window.confirmSendNotificationDialog = window.confirmSendNotificationDialog || function () {
+    if (typeof Swal === 'undefined') {
+        return Promise.resolve(confirm('Send the confirmation email / text message to the customer?'));
+    }
+    return Swal.fire({
+        icon: 'question',
+        title: 'Send notification?',
+        text: 'Do you want to send the confirmation email / text message to the customer?',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, send',
+        cancelButtonText: 'No, just save',
+        reverseButtons: true,
+        allowEscapeKey: false,
+        allowOutsideClick: false
+    }).then(result => !!(result && result.isConfirmed));
+};
+
+// FSM narrows the prompt to statuses that actually have a configured template, via
+// Appointments.aspx/GetNotificationEnabledStatuses. TPM has no such endpoint (its
+// AppointmentStatusCommunicationProcessor has no WillSendNotificationOnStatus), so we take FSM's
+// own conservative fallback: prompt on any real status change rather than risk sending silently.
+window.statusChangeNeedsNotifyPrompt = window.statusChangeNeedsNotifyPrompt || function (statusId) {
+    return true;
+};
+
+function saveAppointmentChanges() {
+    const apptId = $('#editApptId').val();
+    const siteId = $('#editAppointmentForm').data('site-id');
+
+    if (!apptId) return;
+
+    // .val() gives the numeric StatusID (dropdowns carry StatusID as value / StatusName as text);
+    // reading .text() would send the visible name and corrupt the column.
+    const statusId = parseInt($('#MainContent_StatusTypeFilter_Edit').val(), 10) || 0;
+    const ticketStatusId = parseInt($('#MainContent_TicketStatusFilter_Edit').val(), 10) || 0;
+    const customerId = $('#editCustomerId').val();
+
+    const startMom = moment($('#txt_StartDate').val(), "MM/DD/YYYY hh:mm A");
+    const totalMinutes = parseDuration($('#duration').val() || '');
+    const durHours = Math.floor(totalMinutes / 60);
+    const durMinutes = totalMinutes % 60;
+
+    // Custom fields, scoped to the modal container so we don't sweep up stray custom_* inputs
+    // elsewhere on the page.
+    const customFieldValues = [];
+    $('#customFieldsContainer [name^="custom_"]').each(function () {
+        const fieldId = parseInt($(this).attr('name').split('_')[1]);
+        if ($(this).is(':checkbox')) {
+            if ($(this).is(':checked')) {
+                let entry = customFieldValues.find(f => f.FieldId === fieldId);
+                if (!entry) {
+                    entry = { FieldId: fieldId, Value: [] };
+                    customFieldValues.push(entry);
+                }
+                const currentVals = typeof entry.Value === 'string' ? JSON.parse(entry.Value) : entry.Value;
+                currentVals.push($(this).val());
+                entry.Value = JSON.stringify(currentVals);
+            }
+        } else {
+            customFieldValues.push({ FieldId: fieldId, Value: $(this).val() });
+        }
+    });
+
+    // Only send a time slot when one is genuinely selected. The placeholder option has an
+    // empty value but the label "Select Time Slot", and blindly sending option:selected.text()
+    // writes that literal string into tbl_Appointment.TimeSlot - Live already has rows
+    // polluted exactly that way. Empty string makes the server skip the column entirely.
+    const slotValue = $('#time_slot').val() || '';
+    const $slotOption = $('#time_slot option:selected');
+
+    // '' means the dropdown never matched the appointment's stored resource (it is not in the
+    // current resource list) - keep what is on the row rather than clearing it. An explicit
+    // '0' is the user genuinely choosing Unassigned and is passed through.
+    const resourceRaw = $('#resource_list').val();
+    const resourceId = (resourceRaw === '' || resourceRaw === null || resourceRaw === undefined)
+        ? (parseInt($('#resource_list').attr('data-orig-resource'), 10) || 0)
+        : (parseInt(resourceRaw, 10) || 0);
+
+    const viewModel = {
+        AppointmentData: {
+            AppoinmentId: apptId,
+            CustomerID: customerId,
+            SiteId: parseInt(siteId) || 0,
+            ServiceType: $('#MainContent_ServiceTypeFilter_Edit').val(),
+            StatusID: statusId,
+            TicketStatusID: ticketStatusId,
+            ResourceID: resourceId,
+            // Send the full datetime, not just the date. A "YYYY-MM-DD" string makes the
+            // server's Convert.ToDateTime write ApptDateTime at midnight, silently discarding
+            // the appointment's time of day on every save - which is why status/tech emails
+            // that read ApptDateTime ended up announcing "12:00 AM".
+            RequestDate: startMom.isValid() ? startMom.format("YYYY-MM-DD HH:mm:ss") : $('#dateInput').val(),
+            TimeSlot: slotValue ? ($slotOption.text() || '').trim() : '',
+            TimeSlotId: slotValue ? ($slotOption.data('id') || 0) : 0,
+            Note: $('#editApptNote').val(),
+            StartDateTime: $('#txt_StartDate').val(),
+            EndDateTime: $('#txt_EndDate').val(),
+            Hour: durHours,
+            Minute: durMinutes
+        },
+        SiteData: null,   // this modal doesn't edit the site address; leave it untouched
+        CustomFields: customFieldValues
+    };
+
+    const origStatusId = parseInt($('#MainContent_StatusTypeFilter_Edit').attr('data-orig-status'), 10) || 0;
+    const statusChanged = statusId > 0 && statusId !== origStatusId;
+
+    const performSave = (sendNotification) => {
+        showApptUpdateLoading('siteAppointmentDetailsModal');
+        $.ajax({
+            type: "POST",
+            url: "Appointments.aspx/UpdateAppointmentWithViewModel",
+            data: JSON.stringify({ viewModel: viewModel, sendNotification: sendNotification }),
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function (response) {
+                if (response.d) {
+                    showAlert({ icon: 'success', title: 'Success!', text: 'Appointment updated successfully.' });
+                    $('#siteAppointmentDetailsModal').modal('hide');
+                    const $container = $(`#site-appts-${siteId}`);
+                    if (siteAppointmentsCache[siteId]) delete siteAppointmentsCache[siteId];
+                    if ($container.length) {
+                        $container.data('loaded', false);
+                        loadSiteAppointments(siteId, $container);
+                        loadAppointmentCount(customerId, siteId);
+                    }
+                } else {
+                    // Server returns false when a status that requires a resource is set without one.
+                    showAlert({ icon: 'error', title: 'Error', text: 'Failed to update appointment. If you changed the status, make sure a resource is assigned.' });
+                }
+            },
+            error: function (xhr) {
+                console.error("Update failed", xhr.responseText);
+                showAlert({ icon: 'error', title: 'Error', text: 'Failed to update appointment due to a server error.' });
+            },
+            complete: function () {
+                hideApptUpdateLoading('siteAppointmentDetailsModal');
+            }
+        });
+    };
+
+    if (statusChanged && window.statusChangeNeedsNotifyPrompt(statusId)) {
+        window.confirmSendNotificationDialog().then(performSave);
+    } else {
+        performSave(false);
+    }
+}
+
 function setDropdownByTextOrValue(elementId, textOrVal) {
     if (!textOrVal) return;
     const $el = $(`#${elementId}`);
@@ -1527,4 +2011,782 @@ function OpenCustomerChatHistory(mobile, name, customerId) {
 }
 function Open_TPStatusPopup() {
     $("#m_Staus").modal("show");
+}
+
+// ---------------------------------------------------------------------------
+// Custom Fields - chip UI (ported from FSM CSL / appointments.js)
+// ---------------------------------------------------------------------------
+// Chip-only by design: the panel never renders option lists or editable values
+// inline. Values are captured on the mobile app; the office side only links or
+// unlinks a field to the appointment and inspects it via the hover tooltip.
+// The save serializer expects the `name="custom_{fieldId}"` hidden-input shape.
+
+function escapeHtmlAttr(s) {
+    return String(s === null || s === undefined ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function loadCustomFields(form, appointmentId) {
+    const container = document.getElementById("customFieldsContainer");
+    if (!container) return;
+
+    container.innerHTML = '<div class="text-center p-3">Loading custom fields...</div>';
+
+    $.ajax({
+        type: "POST",
+        url: "Customer.aspx/GetActiveCustomFields",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify({ apptId: appointmentId }),
+        dataType: "json",
+        success: function (response) {
+            container.innerHTML = '';
+            if (response.d && response.d.length > 0) {
+                renderCustomFields(response.d, container);
+            } else {
+                container.innerHTML = '<div class="alert alert-info py-1 px-2 small">No active custom fields.</div>';
+            }
+        },
+        error: function () {
+            container.innerHTML = '<div class="text-danger small">Failed to load custom fields.</div>';
+        }
+    });
+}
+
+function renderCustomFields(fields, container) {
+    container.innerHTML = `
+        <label class="form-label">Custom Fields</label>
+        <select id="addCustomFieldDropdown" class="form-select form-select-sm mb-2">
+            <option value="">Select an option</option>
+        </select>
+        <div id="addedCustomFields"></div>
+    `;
+
+    const allFields = fields.slice();
+    const $dropdown = $('#addCustomFieldDropdown', container);
+    const $list = $('#addedCustomFields', container);
+
+    const GROUPS = [
+        { key: 'checklist', label: 'Checklist',        types: ['checklist'] },
+        { key: 'dropdown',  label: 'Dropdown',         types: ['dropdown'] },
+        { key: 'simple',    label: 'Text/Number/Date', types: ['text', 'number', 'date'] }
+    ];
+    const groupForType = (t) => GROUPS.find(g => g.types.indexOf(t) !== -1);
+
+    GROUPS.forEach(g => {
+        const wrap = document.createElement('div');
+        wrap.className = 'cf-group mb-2';
+        wrap.dataset.groupKey = g.key;
+        wrap.style.display = 'none';
+        wrap.innerHTML = `
+            <small class="text-muted d-block mb-1">${g.label}</small>
+            <div class="cf-group-chips d-flex flex-wrap gap-1"></div>
+        `;
+        $list.append(wrap);
+    });
+
+    const refreshDropdown = () => {
+        const addedIds = new Set(
+            Array.from($list[0].querySelectorAll('[data-field-id]')).map(el => parseInt(el.dataset.fieldId, 10))
+        );
+        $dropdown.empty().append('<option value="">Select an option</option>');
+        allFields.forEach(f => {
+            const group = groupForType(f.FieldType);
+            if (!addedIds.has(f.FieldId) && group) {
+                $dropdown.append(`<option value="${f.FieldId}">${escapeHTML(f.FieldName)} - ${group.label}</option>`);
+            }
+        });
+    };
+
+    const buildHiddenInputs = (field) => {
+        const frag = document.createDocumentFragment();
+        const v = field.Value;
+        if (field.FieldType === 'checklist') {
+            let arr = [];
+            if (v !== null && v !== undefined && v !== '') {
+                try { arr = JSON.parse(v) || []; } catch (e) { arr = []; }
+            }
+            if (arr.length > 0) {
+                arr.forEach(opt => {
+                    const inp = document.createElement('input');
+                    inp.type = 'checkbox';
+                    inp.checked = true;
+                    inp.name = `custom_${field.FieldId}`;
+                    inp.value = opt;
+                    inp.style.display = 'none';
+                    frag.appendChild(inp);
+                });
+            } else {
+                const inp = document.createElement('input');
+                inp.type = 'hidden';
+                inp.name = `custom_${field.FieldId}`;
+                inp.value = '[]';
+                frag.appendChild(inp);
+            }
+        } else {
+            const inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = `custom_${field.FieldId}`;
+            inp.value = (v === null || v === undefined) ? '' : v;
+            frag.appendChild(inp);
+        }
+        return frag;
+    };
+
+    const renderChip = (field) => {
+        const group = groupForType(field.FieldType);
+        if (!group) return;
+        const groupWrap = $list[0].querySelector(`[data-group-key="${group.key}"]`);
+        const chipsRow = groupWrap.querySelector('.cf-group-chips');
+
+        const chip = document.createElement('span');
+        chip.className = 'badge border bg-light text-dark d-inline-flex align-items-center cf-chip';
+        chip.dataset.fieldId = field.FieldId;
+        chip.dataset.fieldName = field.FieldName || '';
+        chip.dataset.fieldType = field.FieldType || '';
+        chip.dataset.fieldOptions = field.Options || '[]';
+        chip.dataset.fieldValue = (field.Value === null || field.Value === undefined) ? '' : field.Value;
+        chip.innerHTML = `${escapeHTML(field.FieldName)}
+            <button type="button" class="btn-close btn-close-sm ms-2 cf-chip-remove" aria-label="Remove" style="font-size:.55em;"></button>`;
+        chip.appendChild(buildHiddenInputs(field));
+        chip.querySelector('.cf-chip-remove').addEventListener('click', () => {
+            chip.remove();
+            if (!chipsRow.querySelector('[data-field-id]')) groupWrap.style.display = 'none';
+            refreshDropdown();
+        });
+        chipsRow.appendChild(chip);
+        groupWrap.style.display = '';
+    };
+
+    fields.forEach(f => {
+        if (customFieldHasValue(f)) renderChip(f);
+    });
+    refreshDropdown();
+
+    $dropdown.on('change', function () {
+        const fid = parseInt($(this).val(), 10);
+        if (!fid) return;
+        const field = allFields.find(f => f.FieldId === fid);
+        if (!field) return;
+        renderChip(field);
+        refreshDropdown();
+        $(this).val('');
+    });
+}
+
+function customFieldHasValue(field) {
+    // Linked = server returned a (possibly empty) FieldValue row. Unlinked = null.
+    const v = field.Value;
+    return v !== null && v !== undefined;
+}
+
+// --- Custom-fields chip hover tooltip -------------------------------------
+function ensureCfChipTooltip() {
+    let tip = document.getElementById('cfChipTooltip');
+    if (!tip) {
+        tip = document.createElement('div');
+        tip.id = 'cfChipTooltip';
+        tip.className = 'cf-chip-tooltip';
+        document.body.appendChild(tip);
+    }
+    return tip;
+}
+
+function buildCfChipTooltipHtml(chip) {
+    const name = chip.dataset.fieldName || 'Custom Field';
+    const ftype = chip.dataset.fieldType || '';
+    let opts = [];
+    try { opts = JSON.parse(chip.dataset.fieldOptions || '[]') || []; } catch (e) { opts = []; }
+    if (!Array.isArray(opts)) opts = [];
+    const rawValue = chip.dataset.fieldValue || '';
+
+    let body;
+    if (ftype === 'text' || ftype === 'number' || ftype === 'date') {
+        body = rawValue
+            ? `<div class="cf-tt-value">${escapeHTML(rawValue)}</div>`
+            : `<div class="cf-tt-empty">No value set</div>`;
+    } else {
+        let selected = [];
+        if (ftype === 'checklist') {
+            try { selected = JSON.parse(rawValue) || []; } catch (e) { selected = []; }
+            if (!Array.isArray(selected)) selected = [];
+        } else if (rawValue) {
+            selected = [rawValue];
+        }
+        if (opts.length === 0) {
+            body = `<div class="cf-tt-empty">No options defined</div>`;
+        } else {
+            body = opts.map(opt => {
+                const isSel = selected.indexOf(opt) !== -1;
+                const icon = ftype === 'checklist'
+                    ? (isSel ? '☑' : '☐')
+                    : (isSel ? '●' : '○');
+                return `<div class="cf-tt-opt${isSel ? ' cf-tt-opt-sel' : ''}">${icon} ${escapeHTML(opt)}</div>`;
+            }).join('');
+        }
+    }
+
+    const typeLabel = {
+        checklist: 'Checklist', dropdown: 'Dropdown',
+        text: 'Text', number: 'Number', date: 'Date'
+    }[ftype] || 'Custom Field';
+
+    return `<div class="cf-tt-title">${escapeHTML(name)} <span class="cf-tt-type">${typeLabel}</span></div>
+            <div class="cf-tt-body">${body}</div>`;
+}
+
+function positionCfChipTooltip(tip, chip) {
+    const rect = chip.getBoundingClientRect();
+    tip.style.top = '0px';
+    tip.style.left = '0px';
+    tip.style.display = 'block';
+    const tipRect = tip.getBoundingClientRect();
+    let top = window.scrollY + rect.top - tipRect.height - 8;
+    if (top < window.scrollY + 8) top = window.scrollY + rect.bottom + 8;
+    let left = window.scrollX + rect.left + (rect.width / 2) - (tipRect.width / 2);
+    left = Math.max(window.scrollX + 8,
+        Math.min(left, window.scrollX + window.innerWidth - tipRect.width - 8));
+    tip.style.top = top + 'px';
+    tip.style.left = left + 'px';
+}
+
+function showCfChipTooltip(chip) {
+    const tip = ensureCfChipTooltip();
+    tip.innerHTML = buildCfChipTooltipHtml(chip);
+    positionCfChipTooltip(tip, chip);
+}
+
+function hideCfChipTooltip() {
+    const tip = document.getElementById('cfChipTooltip');
+    if (tip) tip.style.display = 'none';
+}
+
+$(document)
+    .off('mouseenter.cfchip', '#customFieldsContainer .cf-chip')
+    .on('mouseenter.cfchip', '#customFieldsContainer .cf-chip', function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains('cf-chip-remove')) return;
+        showCfChipTooltip(this);
+    })
+    .off('mouseleave.cfchip', '#customFieldsContainer .cf-chip')
+    .on('mouseleave.cfchip', '#customFieldsContainer .cf-chip', function () {
+        hideCfChipTooltip();
+    });
+
+// ---------------------------------------------------------------------------
+// CSL nav buttons in the appointment modal
+// ---------------------------------------------------------------------------
+// These open CustomerDetails.aspx in a new tab on the requested tab. They are pure
+// navigation, NOT Bootstrap tabs - clicking must not switch an inline pane, which is
+// why the markup omits data-bs-toggle and this handler stops propagation.
+$(document).off('click.cslmodal', '#siteAppointmentDetailsModal button[id^="csl-"]')
+    .on('click.cslmodal', '#siteAppointmentDetailsModal button[id^="csl-"]', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const tabId = $(this).attr('id');
+        const customerId = $('#editCustomerId').val() || $('#CustomerID').val() || '';
+        const siteId = parseInt($('#editAppointmentForm').data('site-id'), 10) || 0;
+        if (!customerId) {
+            console.warn('CSL tab clicked but customerId missing');
+            return;
+        }
+        const tabMapping = {
+            'csl-basic-tab': 'basic',
+            'csl-appointments-tab': 'appointments',
+            'csl-invoices-tab': 'invoices',
+            'csl-notes-tab': 'notes',
+            'csl-equipment-tab': 'equipment',
+            'csl-pictures-tab': 'pictures',
+            'csl-files-tab': 'files',
+            'csl-agreements-tab': 'agreements'
+        };
+        const targetTab = tabMapping[tabId];
+        if (targetTab) {
+            const url = `CustomerDetails.aspx?custId=${encodeURIComponent(customerId)}&siteId=${siteId}&tab=${targetTab}`;
+            window.open(url, '_blank');
+        }
+    });
+
+// ---------------------------------------------------------------------------
+// Forms lane for the SL appointment modal
+// ---------------------------------------------------------------------------
+// Wired to TPM's OWN forms endpoints, not FSM's. The two products diverged here:
+// FSM attaches/detaches per form instance (AttachFormsToAppointment /
+// DetachFormFromAppointment / UpdateFormInstanceStatus), whereas TPM replaces the whole
+// attached set in one call (Appointments.aspx/UpdateAttachedForms). Rather than port FSM's
+// server model into TPM, this reuses the endpoints TPM's own Appointments page already
+// drives, so behaviour stays consistent across the two TPM screens.
+//
+// Deliberately NOT duplicated here: the inline editable form renderer + signature pad from
+// appointments.js (~1500 lines). Filling a form stays on the Appointments page; from the SL
+// modal you attach forms, see their status, email/SMS them, and read the customer's response.
+
+let cslSelectedForms = [];
+let cslCurrentAppointmentForms = [];
+
+// The SL modal keys off #editApptId / #editCustomerId; the Appointments page uses
+// #AppoinmentId / #CustomerID. Fall back so these helpers work on either surface.
+function _cslFormsApptId() {
+    return $('#editApptId').val() || $('#AppoinmentId').val() || '';
+}
+function _cslFormsCustomerId() {
+    return $('#editCustomerId').val() || $('#CustomerID').val() || '';
+}
+function _cslFormsAlert(opts) {
+    if (typeof showAlert === 'function') { return showAlert(opts); }
+    alert((opts && (opts.text || opts.title)) || 'Error');
+    return Promise.resolve({ isConfirmed: true });
+}
+
+function getFormStatusClass(status) {
+    switch ((status || '').toLowerCase()) {
+        case 'completed': return 'text-success';
+        case 'inprogress': return 'text-info';
+        case 'submitted': return 'text-primary';
+        default: return 'text-warning';
+    }
+}
+
+// --- Attach / detach ------------------------------------------------------
+
+function openFormsSelectionModal(mode) {
+    if (!_cslFormsApptId()) {
+        _cslFormsAlert({ icon: 'warning', title: 'No Appointment', text: 'Please open an appointment first.' });
+        return;
+    }
+    $('#formsSelectionModal').modal('show');
+    loadAvailableForms();
+    // Tick the boxes for what's already attached once the list has rendered.
+    setTimeout(loadCurrentlySelectedForms, 250);
+}
+
+function loadAvailableForms() {
+    $.ajax({
+        type: "POST",
+        url: "Forms.aspx/GetAllTemplates",
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            if (response.d) populateAvailableFormsList(response.d);
+        },
+        error: function (xhr, status, error) {
+            console.error('Error loading available forms:', error);
+            $('#availableFormsList').html('<p class="text-danger">Failed to load forms.</p>');
+        }
+    });
+}
+
+function populateAvailableFormsList(forms) {
+    const container = $('#availableFormsList');
+    container.empty();
+
+    const active = (forms || []).filter(f => f.IsActive);
+    if (active.length === 0) {
+        container.append('<p class="text-muted">No active form templates.</p>');
+        return;
+    }
+
+    active.forEach(form => {
+        const name = escapeHTML(form.TemplateName || '');
+        const formItem = $(`
+            <div class="form-check mb-2">
+                <input class="form-check-input csl-form-cb" type="checkbox" id="form_${form.Id}"
+                       value="${form.Id}" data-form-name="${escapeHtmlAttr(form.TemplateName || '')}">
+                <label class="form-check-label" for="form_${form.Id}">
+                    <strong>${name}</strong>
+                    ${form.Description ? '<br><small class="text-muted">' + escapeHTML(form.Description) + '</small>' : ''}
+                    ${form.RequireSignature ? '<br><small class="text-info"><i class="fa fa-pencil"></i> Signature Required</small>' : ''}
+                </label>
+            </div>
+        `);
+        container.append(formItem);
+    });
+}
+
+// Delegated so it survives the list being re-rendered; appointments.js uses an inline
+// onchange with the template name interpolated straight into the attribute, which breaks
+// on any name containing a quote.
+$(document).off('change.cslforms', '#availableFormsList .csl-form-cb')
+    .on('change.cslforms', '#availableFormsList .csl-form-cb', function () {
+        const formId = parseInt($(this).val(), 10);
+        const formName = $(this).data('form-name') || '';
+        toggleFormSelection(formId, formName, this.checked);
+    });
+
+function toggleFormSelection(formId, formName, isSelected) {
+    if (isSelected) {
+        if (!cslSelectedForms.some(f => f.id === formId)) {
+            cslSelectedForms.push({ id: formId, name: formName });
+        }
+    } else {
+        cslSelectedForms = cslSelectedForms.filter(form => form.id !== formId);
+    }
+    updateSelectedFormsList();
+}
+
+function updateSelectedFormsList() {
+    const container = $('#selectedFormsList');
+    container.empty();
+
+    if (cslSelectedForms.length === 0) {
+        container.append('<p class="text-muted">No forms selected</p>');
+        return;
+    }
+
+    cslSelectedForms.forEach(form => {
+        const item = $(`
+            <div class="selected-form-item p-2 mb-2 border rounded">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>${escapeHTML(form.name)}</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger csl-remove-selected"
+                            data-form-id="${form.id}">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `);
+        container.append(item);
+    });
+}
+
+$(document).off('click.cslforms', '.csl-remove-selected')
+    .on('click.cslforms', '.csl-remove-selected', function () {
+        removeSelectedForm(parseInt($(this).data('form-id'), 10));
+    });
+
+function removeSelectedForm(formId) {
+    cslSelectedForms = cslSelectedForms.filter(form => form.id !== formId);
+    $(`#form_${formId}`).prop('checked', false);
+    updateSelectedFormsList();
+}
+
+// Reads what's currently attached and mirrors it into both the checkbox list and the
+// modal's own chip strip.
+function loadCurrentlySelectedForms(appointmentId) {
+    if (!appointmentId) appointmentId = _cslFormsApptId();
+    if (!appointmentId) return;
+
+    $.ajax({
+        type: "POST",
+        url: "Forms.aspx/GetAppointmentForms",
+        data: JSON.stringify({ appointmentId: appointmentId }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            const forms = response.d || [];
+            cslSelectedForms = forms.map(f => ({ id: f.TemplateId || f.Id, name: f.TemplateName }));
+            cslSelectedForms.forEach(f => { $(`#form_${f.id}`).prop('checked', true); });
+            updateSelectedFormsList();
+            populateAttachedFormsTab(forms);
+        },
+        error: function (xhr, status, error) {
+            console.error('Error loading attached forms:', error);
+        }
+    });
+}
+
+// The chip strip inside the modal's Forms tab (#selectedFormsEdit).
+function populateAttachedFormsTab(forms) {
+    const container = $('#selectedFormsEdit');
+    container.empty();
+
+    if (!forms || forms.length === 0) {
+        container.html('<small class="text-muted">No forms attached to this appointment</small>');
+        return;
+    }
+
+    forms.forEach(form => {
+        const statusClass = getFormStatusClass(form.Status);
+        const badge = $(`
+            <div class="form-badge p-2 mb-2 border rounded d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>${escapeHTML(form.TemplateName || '')}</strong>
+                    <br><small class="${statusClass}">Status: ${escapeHTML(form.Status || 'Pending')}</small>
+                </div>
+                <div>
+                    ${form.RequireSignature ? '<i class="fa fa-pencil text-info" title="Signature Required"></i>' : ''}
+                    ${form.RequireTip ? '<i class="fa fa-dollar text-success ms-1" title="Tip Enabled"></i>' : ''}
+                </div>
+            </div>
+        `);
+        container.append(badge);
+    });
+}
+
+// Persists the selection. TPM's UpdateAttachedForms replaces the whole set, so sending the
+// full id list is the detach path too.
+function applyFormsSelection() {
+    const appointmentId = _cslFormsApptId();
+    const customerId = _cslFormsCustomerId();
+
+    if (!appointmentId) {
+        _cslFormsAlert({ icon: 'error', title: 'Error', text: 'No appointment selected' });
+        return;
+    }
+    if (!customerId) {
+        _cslFormsAlert({ icon: 'error', title: 'Error', text: 'No customer selected' });
+        return;
+    }
+
+    const formIds = cslSelectedForms.map(f => f.id);
+
+    $.ajax({
+        type: "POST",
+        url: "Appointments.aspx/UpdateAttachedForms",
+        data: JSON.stringify({ appointmentId: appointmentId, customerId: customerId, formIds: formIds }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            if (response.d === true) {
+                $('#formsSelectionModal').modal('hide');
+                _cslFormsAlert({ icon: 'success', title: 'Saved', text: 'Attached forms updated.', timer: 2000 });
+                loadFormsForModal(appointmentId);
+            } else {
+                _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to update attached forms.' });
+            }
+        },
+        error: function (xhr, status, error) {
+            _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to update attached forms: ' + error });
+        }
+    });
+}
+
+// --- View attached forms --------------------------------------------------
+
+function loadFormsForModal(appointmentId) {
+    if (!appointmentId) appointmentId = _cslFormsApptId();
+    if (!appointmentId) return;
+
+    $.ajax({
+        type: "POST",
+        url: "Forms.aspx/GetAppointmentForms",
+        data: JSON.stringify({ appointmentId: appointmentId }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            const forms = response.d || [];
+            cslCurrentAppointmentForms = forms;
+            cslSelectedForms = forms.map(f => ({ id: f.TemplateId || f.Id, name: f.TemplateName }));
+            populateAttachedFormsTab(forms);
+        },
+        error: function () {
+            $('#selectedFormsEdit').html('<small class="text-danger">Failed to load forms.</small>');
+        }
+    });
+}
+
+function openAppointmentFormsModal() {
+    const appointmentId = _cslFormsApptId();
+    if (!appointmentId) {
+        _cslFormsAlert({ icon: 'warning', title: 'No Appointment Selected', text: 'Please select an appointment first.' });
+        return;
+    }
+
+    $('#formName').empty();
+    $('#formViewerContainer').empty();
+    $('#formActionsContainer').hide();
+    $('#appointmentFormsModal').modal('show');
+    loadAppointmentForms(appointmentId);
+}
+
+function loadAppointmentForms(appointmentId) {
+    $("#loader").show();
+    $.ajax({
+        type: "POST",
+        url: "Forms.aspx/GetAppointmentForms",
+        data: JSON.stringify({ appointmentId: appointmentId }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            $("#loader").hide();
+            cslCurrentAppointmentForms = response.d || [];
+            populateAppointmentFormsList(cslCurrentAppointmentForms);
+        },
+        error: function () {
+            $("#loader").hide();
+            _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to load appointment forms' });
+        }
+    });
+}
+
+function populateAppointmentFormsList(forms) {
+    const container = $('#appointmentFormsList');
+    container.empty();
+
+    if (!forms || forms.length === 0) {
+        container.append('<p class="text-muted">No forms attached to this appointment</p>');
+        return;
+    }
+
+    forms.forEach(form => {
+        const statusClass = getFormStatusClass(form.Status);
+        const item = $(`
+            <div class="form-item p-3 mb-2 border rounded csl-form-item" style="cursor:pointer;"
+                 data-template-id="${form.TemplateId || form.Id}"
+                 data-template-name="${escapeHtmlAttr(form.TemplateName || '')}">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <strong>${escapeHTML(form.TemplateName || '')}</strong>
+                        <br><small class="text-muted">Status: <span class="${statusClass}">${escapeHTML(form.Status || 'Pending')}</span></small>
+                    </div>
+                    <div class="form-actions">
+                        ${form.RequireSignature ? '<i class="fa fa-pencil text-info" title="Signature Required"></i>' : ''}
+                        ${form.RequireTip ? '<i class="fa fa-dollar text-success ms-1" title="Tip Enabled"></i>' : ''}
+                    </div>
+                </div>
+            </div>
+        `);
+        container.append(item);
+    });
+}
+
+$(document).off('click.cslforms', '#appointmentFormsList .csl-form-item')
+    .on('click.cslforms', '#appointmentFormsList .csl-form-item', function () {
+        const templateId = parseInt($(this).data('template-id'), 10);
+        $('#formName').text($(this).data('template-name') || '');
+        $('#formActionsContainer').show().data('template-id', templateId);
+        openCustomerResponseModal(templateId);
+    });
+
+// Read-only render of what the customer actually submitted. The editable renderer +
+// signature pad stay on the Appointments page - see the note at the top of this section.
+function openCustomerResponseModal(templateId) {
+    if (!templateId) templateId = parseInt($('#formActionsContainer').data('template-id'), 10);
+    const appointmentId = parseInt(_cslFormsApptId(), 10) || 0;
+    const customerId = parseInt(_cslFormsCustomerId(), 10) || 0;
+
+    if (!templateId) {
+        _cslFormsAlert({ icon: 'warning', title: 'No Form Selected', text: 'Pick a form from the list first.' });
+        return;
+    }
+
+    $("#loader").show();
+    $.ajax({
+        type: "POST",
+        url: "Appointments.aspx/GetCustomerResponseOnForms",
+        data: JSON.stringify({ templateId: templateId, appointmentId: appointmentId, customerId: customerId }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            $("#loader").hide();
+            let structure = null;
+            try { structure = response.d ? JSON.parse(response.d) : null; } catch (e) { structure = null; }
+            renderCslFormResponse(structure);
+        },
+        error: function () {
+            $("#loader").hide();
+            $('#formViewerContainer').html('<div class="alert alert-danger">Failed to load the customer response.</div>');
+        }
+    });
+}
+
+function renderCslFormResponse(structure) {
+    const container = $('#formViewerContainer');
+    container.empty();
+
+    const fields = (structure && (structure.fields || structure.Fields)) || [];
+    if (!structure || !fields.length) {
+        container.html('<div class="alert alert-info">No response has been submitted for this form yet.</div>');
+        return;
+    }
+
+    const rows = fields.map(f => {
+        const label = f.label || f.Label || f.name || f.Name || '';
+        let value = f.value !== undefined ? f.value : (f.Value !== undefined ? f.Value : '');
+        if (Array.isArray(value)) value = value.join(', ');
+        if (value === null || value === undefined || value === '') value = '<em class="text-muted">- not answered -</em>';
+        else value = escapeHTML(String(value));
+        return `<tr><th class="w-35 align-top">${escapeHTML(String(label))}</th><td>${value}</td></tr>`;
+    }).join('');
+
+    container.html(`
+        <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0">
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `);
+}
+
+// --- Send to customer -----------------------------------------------------
+
+function sendFormsViaEmail() {
+    const appointmentId = _cslFormsApptId();
+    if (!appointmentId) {
+        _cslFormsAlert({ icon: 'error', title: 'Error', text: 'No appointment selected' });
+        return;
+    }
+    if (cslCurrentAppointmentForms.length === 0) {
+        _cslFormsAlert({ icon: 'warning', title: 'Warning', text: 'No forms attached to send' });
+        return;
+    }
+
+    // The modal already shows the resolved site/customer email; fall back to a prompt.
+    let customerEmail = ($('#custModal_Email').val() || '').trim();
+    if (!customerEmail) {
+        customerEmail = prompt('Enter customer email address:');
+        if (!customerEmail) return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(customerEmail)) {
+        _cslFormsAlert({ icon: 'error', title: 'Invalid Email', text: 'Please enter a valid email address' });
+        return;
+    }
+
+    $.ajax({
+        type: "POST",
+        url: "Appointments.aspx/SendFormsViaEmail",
+        data: JSON.stringify({ appointmentId: appointmentId, customerEmail: customerEmail }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            if (response.d === true) {
+                _cslFormsAlert({ icon: 'success', title: 'Email Sent', text: `Forms have been sent to ${customerEmail} successfully!`, timer: 3000 });
+            } else {
+                _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to send email' });
+            }
+        },
+        error: function (xhr, status, error) {
+            _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to send email: ' + error });
+        }
+    });
+}
+
+function sendFormsViaSMS() {
+    const appointmentId = _cslFormsApptId();
+    if (!appointmentId) {
+        _cslFormsAlert({ icon: 'error', title: 'Error', text: 'No appointment selected' });
+        return;
+    }
+    if (cslCurrentAppointmentForms.length === 0) {
+        _cslFormsAlert({ icon: 'warning', title: 'Warning', text: 'No forms attached to send' });
+        return;
+    }
+
+    let customerPhone = ($('#custModal_Mobile').val() || $('#custModal_Phone').val() || '').trim();
+    if (!customerPhone) {
+        customerPhone = prompt('Enter customer mobile number:');
+        if (!customerPhone) return;
+    }
+
+    $.ajax({
+        type: "POST",
+        url: "Appointments.aspx/SendFormsViaSMS",
+        data: JSON.stringify({ appointmentId: appointmentId, customerPhone: customerPhone }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            if (response.d === true) {
+                _cslFormsAlert({ icon: 'success', title: 'SMS Sent', text: `Forms have been sent to ${customerPhone} successfully!`, timer: 3000 });
+            } else {
+                _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to send SMS' });
+            }
+        },
+        error: function (xhr, status, error) {
+            _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to send SMS: ' + error });
+        }
+    });
 }

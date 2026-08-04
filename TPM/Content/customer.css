@@ -593,12 +593,10 @@ span.dt-column-order {
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Hiding Email from customer Table */
-#customerTable th:nth-child(3),
-#customerTable td:nth-child(3),
-#customerTable col:nth-child(3) {
-    display: none;
-}
+/* Removed: a positional rule that hid #customerTable column 3. It was written to hide Email
+   back when the grid was laid out differently; column 3 is now Status, so the rule silently
+   collapsed the status badges to zero width. Hide columns via the DataTables `columns`
+   definition, not nth-child - positional CSS breaks the moment a column is added. */
 
 /* Toggle Switch Styles */
 .toggle-switch {
@@ -1370,3 +1368,51 @@ div#contact {
     max-height: 300px;
     overflow-y: auto;
 }
+
+/* ==========================================================================
+   Custom-fields chip hover tooltip
+   Shared by Customer.aspx (Service Locations) and CustomerDetails.aspx - both
+   render the same chip UI in their appointment modal. Kept in sync with FSM
+   Content/appointments.css.
+   ========================================================================== */
+#cfChipTooltip.cf-chip-tooltip {
+    display: none;
+    position: absolute;
+    z-index: 9999;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .12);
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.45;
+    max-width: 300px;
+    color: #212529;
+    pointer-events: none;
+}
+
+#cfChipTooltip .cf-tt-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+#cfChipTooltip .cf-tt-type {
+    font-size: 11px;
+    font-weight: 500;
+    color: #6c757d;
+    background: #f1f3f5;
+    padding: 1px 8px;
+    border-radius: 10px;
+}
+
+#cfChipTooltip .cf-tt-body { max-height: 220px; overflow-y: auto; }
+#cfChipTooltip .cf-tt-opt { padding: 2px 0; color: #6c757d; }
+#cfChipTooltip .cf-tt-opt-sel { color: #198754; font-weight: 500; }
+#cfChipTooltip .cf-tt-empty { font-style: italic; color: #adb5bd; }
+#cfChipTooltip .cf-tt-value { color: #212529; word-break: break-word; }

@@ -1,4 +1,4 @@
-﻿using FSM.Entity.Customer;
+using FSM.Entity.Customer;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -123,7 +123,11 @@ namespace FSM
                     statusFilter.DataTextField = "StatusName";
                     statusFilter.DataValueField = "StatusName";
                     statusFilter.DataBind();
-                    statusFilter.Items.Insert(0, new ListItem("All Statuses", ""));
+                    // Default to "Active appointments" (hides Closed/Cancelled) with an opt-in to
+                    // show everything - mirrors the FSM CSL board so the list isn't cluttered with
+                    // inactive appointments.
+                    statusFilter.Items.Insert(0, new ListItem("Active appointments", ""));
+                    statusFilter.Items.Insert(1, new ListItem("All (incl. Closed/Canceled)", "all_inclusive"));
                 }
             }
             catch (Exception ex)
@@ -133,7 +137,7 @@ namespace FSM
         }
         [WebMethod]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
-        public static string LoadCustomers(int draw, int start, int length, string searchValue, string sortColumn, string sortDirection, string cslViewFilter = "all", bool hideNoAppointments = false)
+        public static string LoadCustomers(int draw, int start, int length, string searchValue, string sortColumn, string sortDirection, string cslViewFilter = "all", bool hideNoAppointments = false, string statusFilter = "")
         {
             string companyid = HttpContext.Current.Session["CompanyID"].ToString();
             int totalRecords = 0;
@@ -156,6 +160,7 @@ namespace FSM
                                     WHEN s.StatusName IS NOT NULL THEN s.StatusName
                                     ELSE a.Status
                                 END AS StatusName,
+                                s.CalenderColor AS StatusColor,
                                 a.ApptID AS LatestAppointmentID -- Select the Appointment ID
                             FROM [msSchedulerV3].[dbo].[tbl_Appointment] a
                             LEFT JOIN [msSchedulerV3].[dbo].[tbl_Status] s ON TRY_CAST(a.Status AS INT) = s.StatusID AND a.CompanyID = s.CompanyID
@@ -168,7 +173,14 @@ namespace FSM
                 // Apply searchValue filter
                 if (!string.IsNullOrEmpty(searchValue))
                 {
-                    fromAndWhere += $" AND (cst.FirstName LIKE '%{searchValue}%' OR cst.LastName LIKE '%{searchValue}%' OR cst.Email LIKE '%{searchValue}%')";
+                    // Search only what the grid actually renders: the "Tp Name" column
+                    // (FirstName + ' ' + LastName, i.e. the "fullname" field) plus Email.
+                    // The previous clause referenced a "cst" alias that only exists in
+                    // LoadCustomers_OLD, so every search threw "The multi-part identifier
+                    // 'cst.FirstName' could not be bound" and the grid came back empty.
+                    string safeSearch = searchValue.Replace("'", "''");
+                    fromAndWhere += $@" AND ((ISNULL(c.FirstName,'') + ' ' + ISNULL(c.LastName,'')) LIKE '%{safeSearch}%'
+                                             OR ISNULL(c.Email,'') LIKE '%{safeSearch}%')";
                 }
 
                 // Apply additional filters
@@ -187,11 +199,32 @@ namespace FSM
                     fromAndWhere += " and apptData.LatestAppointmentID  > 0 ";
                 }
 
+                // Status filter (mirrors the FSM CSL board):
+                //   "all_inclusive" -> no status restriction
+                //   ""              -> "Active appointments": hide Closed/Cancelled. Rows with no
+                //                      appointment at all are excluded too, since their status is
+                //                      NULL and they are not an active appointment.
+                //   <status name>   -> filter to that exact status
+                if (statusFilter == "all_inclusive")
+                {
+                    // no status restriction
+                }
+                else if (string.IsNullOrEmpty(statusFilter))
+                {
+                    fromAndWhere += " AND apptData.StatusName IS NOT NULL AND apptData.StatusName NOT IN ('Closed','Cancelled','Canceled') ";
+                }
+                else
+                {
+                    string safeStatus = statusFilter.Replace("'", "''");
+                    fromAndWhere += $" AND apptData.StatusName = '{safeStatus}' ";
+                }
+
                 // Whitelist sort column -> real DB column. Anything unrecognized falls back to FirstName.
                 string safeSortColumn;
                 switch (sortColumn)
                 {
                     case "fullname":   safeSortColumn = "FirstName"; break;
+                    case "Email":      safeSortColumn = "c.Email"; break;
                     case "StatusName": safeSortColumn = "apptData.StatusName"; break;
                     default:           safeSortColumn = "FirstName"; break;
                 }
@@ -210,6 +243,7 @@ namespace FSM
                         SELECT
                             c.*,
                             apptData.StatusName,
+                            apptData.StatusColor,
                             apptData.LatestAppointmentID AS LatestAppointmentID
                     " + fromAndWhere
                     + $" ORDER BY {safeSortColumn} {safeSortDirection} OFFSET {start} ROWS FETCH NEXT {length} ROWS ONLY;";
@@ -245,6 +279,9 @@ namespace FSM
                             City = dr["City"].ToString(),
                             State = dr["State"].ToString(),
                             ZipCode = dr["ZipCode"].ToString(),
+                            // tbl_Customer.Country exists and the entity declares it, but it was never
+                            // mapped here, so the details panel's country line could never populate.
+                            Country = dr.Table.Columns.Contains("Country") ? dr["Country"].ToString() : "",
                             Phone = Phone,
                             Mobile = Mobile,
                             Email = dr["Email"].ToString(),
@@ -260,7 +297,11 @@ namespace FSM
                             CallPopAppId = dr["CallPopAppId"].ToString(),
                             QboId = dr["QboId"].ToString(),
                             CreatedCompanyID = dr["CreatedCompanyID"].ToString(),
-                            StatusName = dr["StatusName"].ToString()
+                            StatusName = dr["StatusName"].ToString(),
+                            // Same fallback FSM uses so an unconfigured status still renders a readable badge.
+                            StatusColor = dr["StatusColor"] != DBNull.Value && !string.IsNullOrEmpty(dr["StatusColor"].ToString())
+                                            ? dr["StatusColor"].ToString()
+                                            : "#3b82f6"
                         });
                     }
                 }
@@ -621,11 +662,119 @@ namespace FSM
             }
             return list;
         }
-        [WebMethod]
+
+        // Real time blocks for the appointment modal's Time Slot dropdown, from the company's
+        // configured tbl_TimeBlocks - the same source Jobs-Scheduler and FSM CSL use. The client
+        // previously generated fixed 30-minute 8AM-8PM slots locally, which meant the saved
+        // TimeSlot string matched no configured block and TimeSlotId was always 0.
+        // Fully qualified: TPM has two TimeSlot types (this entity and a nested
+        // Appointments.TimeSlot), and this file imports neither.
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static List<FSM.Entity.Appoinments.TimeSlot> GetTimeSlots()
+        {
+            var timeSlots = new List<FSM.Entity.Appoinments.TimeSlot>();
+
+            if (HttpContext.Current.Session == null || HttpContext.Current.Session["CompanyID"] == null)
+            {
+                System.Diagnostics.Debug.WriteLine("GetTimeSlots: CompanyID is missing from session");
+                return timeSlots;
+            }
+
+            string companyId = HttpContext.Current.Session["CompanyID"].ToString();
+            Database db = new Database();
+
+            try
+            {
+                db.Open();
+                DataTable dt = new DataTable();
+                string sql = @"SELECT ID,
+                                      TimeBlock,
+                                      TimeBlock + ' ( ' + CONVERT(varchar(30), StartTime, 100) + ' - ' + CONVERT(varchar(30), EndTime, 100) + ' )' AS TimeBlockSchedule,
+                                      FORMAT(CAST(StartTime AS DATETIME), 'hh:mm tt') AS StartTime,
+                                      FORMAT(CAST(EndTime AS DATETIME), 'hh:mm tt') AS EndTime
+                               FROM [msSchedulerV3].[dbo].[tbl_TimeBlocks]
+                               WHERE [IsDeleted] = 0 AND [IsFromCalender] = 0 AND CompanyID = @CompanyID
+                               ORDER BY StartTime";
+                db.AddParameter("@CompanyID", companyId, SqlDbType.NVarChar);
+                db.ExecuteParam(sql, out dt);
+                db.Close();
+
+                foreach (DataRow row in dt.Rows)
+                {
+                    timeSlots.Add(new FSM.Entity.Appoinments.TimeSlot
+                    {
+                        ID = Convert.ToInt32(row["ID"]),
+                        TimeBlock = row["TimeBlock"] == DBNull.Value ? "" : row["TimeBlock"].ToString(),
+                        TimeBlockSchedule = row["TimeBlockSchedule"] == DBNull.Value ? "" : row["TimeBlockSchedule"].ToString(),
+                        StartTime = row["StartTime"] == DBNull.Value ? "" : row["StartTime"].ToString(),
+                        EndTime = row["EndTime"] == DBNull.Value ? "" : row["EndTime"].ToString(),
+                        CompanyID = companyId
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error in GetTimeSlots (Customer): " + ex.Message);
+                if (db.Connection != null && db.Connection.State == ConnectionState.Open) db.Close();
+            }
+
+            return timeSlots;
+        }
+
+        // Default appointment length for a service type, formatted as the "N Hr : N Min" string
+        // the modal's Time Required box expects.
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static string GetDuration(int serviceTypeID)
+        {
+            var duration = "0";
+            if (serviceTypeID <= 0) return duration;
+
+            if (HttpContext.Current.Session == null || HttpContext.Current.Session["CompanyID"] == null)
+            {
+                System.Diagnostics.Debug.WriteLine("GetDuration: CompanyID is missing from session");
+                return duration;
+            }
+
+            string companyId = HttpContext.Current.Session["CompanyID"].ToString();
+            Database db = new Database();
+
+            try
+            {
+                db.Open();
+                DataTable dt = new DataTable();
+                string sql = @"SELECT Hour, Minute FROM [msSchedulerV3].[dbo].[tbl_ServiceType]
+                               WHERE CompanyID = @CompanyID AND ServiceTypeID = @ServiceTypeID";
+                db.AddParameter("@CompanyID", companyId, SqlDbType.NVarChar);
+                db.AddParameter("@ServiceTypeID", serviceTypeID, SqlDbType.Int);
+                db.ExecuteParam(sql, out dt);
+                db.Close();
+
+                if (dt.Rows.Count > 0)
+                {
+                    DataRow row = dt.Rows[0];
+                    int hr = row["Hour"] == DBNull.Value ? 0 : Convert.ToInt32(row["Hour"]);
+                    int min = row["Minute"] == DBNull.Value ? 0 : Convert.ToInt32(row["Minute"]);
+                    duration = $"{hr} Hr : {min} Min";
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error in GetDuration (Customer): " + ex.Message);
+                if (db.Connection != null && db.Connection.State == ConnectionState.Open) db.Close();
+            }
+
+            return duration;
+        }
+
+        // EnableSession required - reads Session["CompanyID"]; without it the guard below
+        // short-circuits and the modal always shows "No active custom fields".
+        [WebMethod(EnableSession = true)]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public static object GetActiveCustomFields(int apptId)
         {
-            if (HttpContext.Current.Session["CompanyID"] == null)
+            if (HttpContext.Current.Session == null || HttpContext.Current.Session["CompanyID"] == null)
             {
                 return new List<object>();
             }
@@ -696,8 +845,9 @@ namespace FSM
                 //db.Open();
                 DataTable dt = new DataTable();
                 string sql = @"
-                            SELECT 
-                                appt.ApptID, 
+                            SELECT
+                                appt.ApptID,
+                                appt.AppoinmentUId,
                                 appt.CustomerID,
                                 appt.SiteID,
                                 appt.Note, 
@@ -770,6 +920,8 @@ namespace FSM
                     result = new
                     {
                         ApptID = row["ApptID"],
+                        // CEC-facing appointment number shown to users; ApptID stays the write key.
+                        AppoinmentUId = row["AppoinmentUId"] != DBNull.Value ? row["AppoinmentUId"].ToString() : "",
                         CustomerID = row["CustomerID"],
                         SiteID = row["SiteID"] != DBNull.Value ? row["SiteID"] : 0,
                         Note = row["Note"],

@@ -136,7 +136,7 @@ namespace TPM
                 System.Diagnostics.Debug.WriteLine($"Error loading status data: {ex.Message}");
             }
         }
-        [WebMethod]
+        [WebMethod(EnableSession = true)]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public static string LoadAppointments(string SearchBy = "",
           string SearchFor = "",
@@ -148,7 +148,12 @@ namespace TPM
         {
             List<CustomerEntity> _List = new List<CustomerEntity>();
 
-            string companyid = HttpContext.Current.Session["CompanyID"].ToString();
+            string companyid = HttpContext.Current.Session?["CompanyID"]?.ToString();
+            if (string.IsNullOrEmpty(companyid))
+            {
+                System.Diagnostics.Debug.WriteLine("LoadAppointments: CompanyID is missing from session");
+                return JsonConvert.SerializeObject(new { data = _List });
+            }
             try
             {
 
