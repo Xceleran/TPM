@@ -1115,6 +1115,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Everything above lives inside the DOMContentLoaded closure, but the appointment modal code
+    // further down is top-level, so it cannot see loadAppointments and used to fall back to a full
+    // location.reload() after every save. Expose it for a targeted refresh instead.
+    window.reloadCustomerAppointments = loadAppointments;
+
     function loadInvoices() {
         if (!customerId) {
             console.error('Cannot load invoices: customerId is missing');
@@ -2840,9 +2845,14 @@ window.loadDropdownDataForModal = function () {
 };
 
 function getTimeSlotsForCustomerDetails() {
+    // Customer.aspx/GetTimeSlots, NOT Appointments.aspx/GetTimeSlots. TPM has two TimeSlot types
+    // and the Appointments one (TPM.Appointments+TimeSlot) returns StartTime/EndTime as null -
+    // only TimeBlockSchedule is filled. populateTimeSlots uses StartTime as the option VALUE, so
+    // every option came back with value "", identical to the placeholder: no slot could ever be
+    // preselected and saving wrote the literal string "Select Time Slot" into tbl_Appointment.
     return $.ajax({
         type: "POST",
-        url: "Appointments.aspx/GetTimeSlots",
+        url: "Customer.aspx/GetTimeSlots",
         data: '{}',
         contentType: "application/json; charset=utf-8",
         dataType: "json"
@@ -2894,14 +2904,16 @@ function populateTimeSlots(slots) {
     }
 
     slots.forEach(function (slot) {
-        var value = slot.StartTime;
-        var displayText = slot.TimeBlockSchedule || slot.TimeBlock || slot.StartTime;
+        var value = slot.StartTime || '';
+        var displayText = slot.TimeBlockSchedule || slot.TimeBlock || slot.StartTime || '';
+        // .attr(name, null) REMOVES the attribute in jQuery, so pass '' rather than a null
+        // StartTime/EndTime - calculateTimeRequired reads data-start/data-end back off these.
         var option = $('<option></option>')
             .val(value)
             .text(displayText)
-            .attr('data-id', slot.ID)
-            .attr('data-start', slot.StartTime)
-            .attr('data-end', slot.EndTime);
+            .attr('data-id', slot.ID || '')
+            .attr('data-start', slot.StartTime || '')
+            .attr('data-end', slot.EndTime || '');
         $timeSlot.append(option);
     });
 }
@@ -2980,9 +2992,16 @@ window.showAppointmentDetailsModal = async function (appointmentId) {
 
                 $('#MainContent_ServiceTypeFilter_Edit').val(details.ServiceTypeID || "");
                 $('#resource_list').val(details.ResourceID || "0");
+                // The Resource dropdown only lists CURRENT resources, so an appointment assigned to
+                // a departed tech selects nothing and .val() is ''. Remember the row's real value so
+                // the save can put it back instead of writing NULL over it.
+                $('#resource_list').attr('data-orig-resource', details.ResourceID || 0);
 
                 setDropdownByTextOrValue('MainContent_StatusTypeFilter_Edit', details.Status);
                 setDropdownByTextOrValue('MainContent_TicketStatusFilter_Edit', details.TicketStatus);
+                // Baseline for "did the status actually change?" - drives the notification prompt.
+                $('#MainContent_StatusTypeFilter_Edit').attr('data-orig-status',
+                    $('#MainContent_StatusTypeFilter_Edit').val() || 0);
                 // Match time slot using TimeBlockSchedule, TimeBlock, or StartTime fallback
                 var timeSlotValue = (details.TimeSlot || '').trim();
                 var matchingSlot = allTimeSlotsCD.find(function (slot) {
@@ -3086,6 +3105,14 @@ window.showAppointmentDetailsModal = async function (appointmentId) {
 
                 loadFormsForModal(details.ApptID);
                 loadCustomFields(null, details.ApptID);
+                loadAppointmentSpecificLinks(details.ApptID);
+
+                // AppoinmentUId is the CEC-facing "Appointment ID" users quote (e.g. "Pro 1527-12");
+                // ApptID is the internal PK. Stashed on the modal and re-applied on shown.bs.modal so
+                // a later listener re-rendering the header can't blank the badge.
+                var apptUid = details.AppoinmentUId || details.ApptID || '';
+                $('#siteAppointmentDetailsModal_PopUP').attr('data-uid', apptUid);
+                applyAppointmentUidBadges(apptUid);
 
                 $('#siteAppointmentDetailsModal_PopUP').modal('show');
             } else {
@@ -3252,101 +3279,162 @@ function setDropdownByTextOrValue(elementId, textOrVal) {
     if (foundVal) $el.val(foundVal);
 }
 
+// Saves through Appointments.aspx/UpdateAppointmentWithViewModel - the same endpoint the Service
+// Locations modal uses - rather than Customer.aspx/UpdateAppointmentWithCustomFields. The old path
+// never fired ProcessStatusCommunication, so a status change made from this page silently sent no
+// customer email/SMS at all, and it wrote the appointment and the custom fields in two unrelated
+// statements (custom fields committed first, so a failed appointment update left them applied).
 window.saveAppointmentChanges = function () {
     const apptId = $('#editApptId').val();
     if (!apptId) return;
 
     try {
-    const startMom = moment($('#txt_StartDate').val(), "MM/DD/YYYY hh:mm A");
-    const endMom = moment($('#txt_EndDate').val(), "MM/DD/YYYY hh:mm A");
+        const customerId = $('#editCustomerId').val();
 
-    // Get status text, filtering out placeholder options
-    var statusText = ($('#MainContent_StatusTypeFilter_Edit option:selected').val() || '0').trim();
-    if (!statusText || statusText.toLowerCase().indexOf('select') === 0) statusText = '0';
-    var ticketStatusText = ($('#MainContent_TicketStatusFilter_Edit option:selected').val() || '0').trim();
-    if (!ticketStatusText || ticketStatusText.toLowerCase().indexOf('select') === 0) ticketStatusText = '0';
+        let formSiteId = parseInt($('#editAppointmentForm').data('site-id'), 10);
+        if (isNaN(formSiteId)) formSiteId = 0;
+        const pageSiteId = (typeof siteId !== 'undefined') ? (parseInt(siteId, 10) || 0) : 0;
 
-     
-    var formSiteId = parseInt($('#editAppointmentForm').data('site-id'));
-    if (isNaN(formSiteId)) formSiteId = 0;
-    var pageSiteId = (typeof siteId !== 'undefined') ? siteId : 0;
+        // .val() gives the numeric StatusID (the dropdowns carry StatusID as value / StatusName as
+        // text); reading .text() would send the visible name and corrupt the column.
+        const statusId = parseInt($('#MainContent_StatusTypeFilter_Edit').val(), 10) || 0;
+        const ticketStatusId = parseInt($('#MainContent_TicketStatusFilter_Edit').val(), 10) || 0;
 
-    const appointmentData = {
-        AppoinmentId: apptId,
-        CustomerID: $('#editCustomerId').val(),
-        ServiceType: $('#MainContent_ServiceTypeFilter_Edit').val(),
-        ResourceID: parseInt($('#resource_list').val()) || 0,
-        Status: statusText || '0',
-        TicketStatus: ticketStatusText,
-        RequestDate: startMom.isValid() ? startMom.format("YYYY-MM-DD") : $('#dateInput').val(),
-        StartDateTime: startMom.isValid() ? startMom.format("MM/DD/YYYY hh:mm A") : '',
-        EndDateTime: endMom.isValid() ? endMom.format("MM/DD/YYYY hh:mm A") : '',
-        TimeSlot: ($('#time_slot option:selected').text() || '').trim() || '',
-        Hour: (function() { var d = parseDuration($('#duration').val()); return Math.floor(d / 60); })(),
-        Minute: (function() { var d = parseDuration($('#duration').val()); return d % 60; })(),
-        Note: $('#editApptNote').val(),
-        SiteId: formSiteId || pageSiteId || 0
-    };
+        const startMom = moment($('#txt_StartDate').val(), "MM/DD/YYYY hh:mm A");
+        const totalMinutes = parseDuration($('#duration').val() || '');
 
-    // Collect Custom Fields
-    const customFieldValues = [];
-    $('[name^="custom_"]').each(function () {
-        const fieldId = parseInt($(this).attr('name').split('_')[1]);
-        if ($(this).is(':checkbox')) {
-            if ($(this).is(':checked')) {
-                let entry = customFieldValues.find(f => f.FieldId === fieldId);
-                if (!entry) {
-                    entry = { FieldId: fieldId, Value: [] };
-                    customFieldValues.push(entry);
-                }
-                const currentVals = typeof entry.Value === 'string' ? JSON.parse(entry.Value) : entry.Value;
-                currentVals.push($(this).val());
-                entry.Value = JSON.stringify(currentVals);
-            }
-        } else {
-            customFieldValues.push({ FieldId: fieldId, Value: $(this).val() });
-        }
-    });
+        // Only send a time slot when one is genuinely selected. The placeholder option has an empty
+        // value but the label "Select Time Slot", and blindly sending option:selected.text() writes
+        // that literal string into tbl_Appointment.TimeSlot - Live already has rows polluted exactly
+        // that way. An empty string makes the server skip the column entirely.
+        const slotValue = $('#time_slot').val() || '';
+        const $slotOption = $('#time_slot option:selected');
 
-    const payload = {
-        appointment: appointmentData,
-        customFieldValues: customFieldValues
-    };
+        // '' means the dropdown never matched the appointment's stored resource (it is not in the
+        // current resource list) - keep what is on the row rather than clearing it. An explicit '0'
+        // is the user genuinely choosing Unassigned and is passed through.
+        const resourceRaw = $('#resource_list').val();
+        const resourceId = (resourceRaw === '' || resourceRaw === null || resourceRaw === undefined)
+            ? (parseInt($('#resource_list').attr('data-orig-resource'), 10) || 0)
+            : (parseInt(resourceRaw, 10) || 0);
 
-    $.ajax({
-        type: "POST",
-        url: "Customer.aspx/UpdateAppointmentWithCustomFields",
-        data: JSON.stringify(payload),
-        contentType: "application/json; charset=utf-8",
-        dataType: "json",
-        success: function (response) {
-            if (response.d) {
-                alert("Appointment updated successfully!");
-                $('#siteAppointmentDetailsModal_PopUP').modal('hide');
-                if (typeof loadAppointments === 'function') {
-                    loadAppointments();
-                } else {
-                    location.reload();
+        // Scoped to the modal container so we don't sweep up stray custom_* inputs elsewhere.
+        const customFieldValues = [];
+        $('#customFieldsContainer [name^="custom_"]').each(function () {
+            const fieldId = parseInt($(this).attr('name').split('_')[1]);
+            if ($(this).is(':checkbox')) {
+                if ($(this).is(':checked')) {
+                    let entry = customFieldValues.find(f => f.FieldId === fieldId);
+                    if (!entry) {
+                        entry = { FieldId: fieldId, Value: [] };
+                        customFieldValues.push(entry);
+                    }
+                    const currentVals = typeof entry.Value === 'string' ? JSON.parse(entry.Value) : entry.Value;
+                    currentVals.push($(this).val());
+                    entry.Value = JSON.stringify(currentVals);
                 }
             } else {
-                console.error("Update returned false. Full response:", JSON.stringify(response));
-                alert("Failed to update appointment.");
+                customFieldValues.push({ FieldId: fieldId, Value: $(this).val() });
             }
-        },
-        error: function (xhr, status, error) {
-            console.error("Update AJAX error:", status, error, xhr.responseText);
-            alert("An error occurred while updating: " + (error || status));
+        });
+
+        const viewModel = {
+            AppointmentData: {
+                AppoinmentId: apptId,
+                CustomerID: customerId,
+                SiteId: formSiteId || pageSiteId || 0,
+                ServiceType: $('#MainContent_ServiceTypeFilter_Edit').val(),
+                StatusID: statusId,
+                TicketStatusID: ticketStatusId,
+                ResourceID: resourceId,
+                // Send the full datetime, not just the date. A "YYYY-MM-DD" string makes the server's
+                // Convert.ToDateTime write ApptDateTime at midnight, silently discarding the
+                // appointment's time of day on every save - which is why status/tech emails that read
+                // ApptDateTime ended up announcing "12:00 AM".
+                RequestDate: startMom.isValid() ? startMom.format("YYYY-MM-DD HH:mm:ss") : $('#dateInput').val(),
+                TimeSlot: slotValue ? ($slotOption.text() || '').trim() : '',
+                TimeSlotId: slotValue ? ($slotOption.data('id') || 0) : 0,
+                Note: $('#editApptNote').val(),
+                StartDateTime: $('#txt_StartDate').val(),
+                EndDateTime: $('#txt_EndDate').val(),
+                Hour: Math.floor(totalMinutes / 60),
+                Minute: totalMinutes % 60
+            },
+            SiteData: null,   // this modal doesn't edit the site address; leave it untouched
+            // null (not []) when the panel never loaded - see cdCustomFieldsLoaded.
+            CustomFields: cdCustomFieldsLoaded ? customFieldValues : null
+        };
+
+        const origStatusId = parseInt($('#MainContent_StatusTypeFilter_Edit').attr('data-orig-status'), 10) || 0;
+        const statusChanged = statusId > 0 && statusId !== origStatusId;
+
+        const performSave = (sendNotification) => {
+            window.showApptUpdateLoading('siteAppointmentDetailsModal_PopUP');
+            $.ajax({
+                type: "POST",
+                url: "Appointments.aspx/UpdateAppointmentWithViewModel",
+                data: JSON.stringify({ viewModel: viewModel, sendNotification: sendNotification }),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function (response) {
+                    if (response.d) {
+                        window.showAlert({ icon: 'success', title: 'Success!', text: 'Appointment updated successfully.' });
+                        $('#siteAppointmentDetailsModal_PopUP').modal('hide');
+                        if (typeof window.reloadCustomerAppointments === 'function') {
+                            window.reloadCustomerAppointments();
+                        } else {
+                            location.reload();
+                        }
+                    } else {
+                        // Server returns false when a status that requires a resource is set without one.
+                        console.error("Update returned false. Full response:", JSON.stringify(response));
+                        window.showAlert({ icon: 'error', title: 'Error', text: 'Failed to update appointment. If you changed the status, make sure a resource is assigned.' });
+                    }
+                },
+                error: function (xhr, status, error) {
+                    console.error("Update AJAX error:", status, error, xhr.responseText);
+                    window.showAlert({ icon: 'error', title: 'Error', text: 'Failed to update appointment due to a server error.' });
+                },
+                complete: function () {
+                    window.hideApptUpdateLoading('siteAppointmentDetailsModal_PopUP');
+                }
+            });
+        };
+
+        if (statusChanged && window.statusChangeNeedsNotifyPrompt(statusId)) {
+            window.confirmSendNotificationDialog().then(performSave);
+        } else {
+            performSave(false);
         }
-    });
     } catch (e) {
         console.error('saveAppointmentChanges error:', e.message);
-        alert('Save error: ' + e.message);
+        window.showAlert({ icon: 'error', title: 'Error', text: 'Save error: ' + e.message });
     }
 };
 
+// escapeHTML further up the file is trapped inside the DOMContentLoaded closure; this top-level
+// section needs its own.
+function cdEscapeHTML(str) {
+    return String(str === null || str === undefined ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// The server does DELETE-then-INSERT on whatever CustomFields array it receives, so sending [] is a
+// destructive "clear everything". That is only a legitimate instruction once the panel has actually
+// rendered; until then (still loading, or the request failed) the save must send null so the server
+// skips the custom-field write entirely instead of wiping the appointment's values.
+var cdCustomFieldsLoaded = false;
+
 function loadCustomFields(serviceTypeId, appointmentId) {
-    const container = $('#customFieldsContainer');
-    container.empty();
+    const container = document.getElementById('customFieldsContainer');
+    if (!container) return;
+
+    cdCustomFieldsLoaded = false;
+    container.innerHTML = '<div class="text-center p-3">Loading custom fields...</div>';
 
     $.ajax({
         type: "POST",
@@ -3355,77 +3443,913 @@ function loadCustomFields(serviceTypeId, appointmentId) {
         contentType: "application/json; charset=utf-8",
         dataType: "json",
         success: function (response) {
-            if (response.d) {
+            container.innerHTML = '';
+            if (response.d && response.d.length > 0) {
                 renderCustomFields(response.d, container);
+            } else {
+                container.innerHTML = '<div class="alert alert-info py-1 px-2 small">No active custom fields.</div>';
             }
+            // The company genuinely having no custom fields is still a loaded panel.
+            cdCustomFieldsLoaded = true;
         },
         error: function (xhr) {
             console.error("Failed to load custom fields", xhr.responseText);
+            container.innerHTML = '<div class="text-danger small">Failed to load custom fields.</div>';
         }
     });
 }
 
+// Chip-only render, matching Customer.aspx and FSM. The values themselves come from the mobile app,
+// so this panel never renders editable options - a chip means "this field is linked to the
+// appointment", and hovering shows the current selection.
+//
+// The previous implementation branched on FieldType === 'Text' / 'Dropdown', but the DB stores the
+// type lowercase ('text', 'dropdown', 'checklist', 'number', 'date'), so NOTHING ever matched: every
+// field rendered as a bare <label> with no control at all. That also meant the save collected zero
+// custom_* inputs while the server does DELETE-then-INSERT, so each save silently wiped whatever
+// custom-field values the appointment already had.
 function renderCustomFields(fields, container) {
-    if (!fields || fields.length === 0) return;
+    container.innerHTML = `
+        <label class="form-label">Custom Fields</label>
+        <select id="addCustomFieldDropdown" class="form-select form-select-sm mb-2">
+            <option value="">Select an option</option>
+        </select>
+        <div id="addedCustomFields"></div>
+    `;
 
-    fields.forEach(field => {
-        let fieldHtml = `<div class="mb-2"><label class="form-label">${field.FieldName}</label>`;
-        if (field.FieldType === 'Text') {
-            fieldHtml += `<input type="text" class="form-control" name="custom_${field.FieldId}" value="${field.Value || ''}">`;
-        } else if (field.FieldType === 'Dropdown') {
-            fieldHtml += `<select class="form-select" name="custom_${field.FieldId}">`;
+    const allFields = fields.slice();
+    const $dropdown = $('#addCustomFieldDropdown', container);
+    const $list = $('#addedCustomFields', container);
 
-            let options = [];
-            if (field.Options) {
-                try {
-                    options = typeof field.Options === 'string' ? JSON.parse(field.Options) : field.Options;
-                } catch (e) {
-                    console.error("Error parsing options for field " + field.FieldName, e);
-                }
+    const GROUPS = [
+        { key: 'checklist', label: 'Checklist',        types: ['checklist'] },
+        { key: 'dropdown',  label: 'Dropdown',         types: ['dropdown'] },
+        { key: 'simple',    label: 'Text/Number/Date', types: ['text', 'number', 'date'] }
+    ];
+    const groupForType = (t) => GROUPS.find(g => g.types.indexOf(t) !== -1);
+
+    GROUPS.forEach(g => {
+        const wrap = document.createElement('div');
+        wrap.className = 'cf-group mb-2';
+        wrap.dataset.groupKey = g.key;
+        wrap.style.display = 'none';
+        wrap.innerHTML = `
+            <small class="text-muted d-block mb-1">${g.label}</small>
+            <div class="cf-group-chips d-flex flex-wrap gap-1"></div>
+        `;
+        $list.append(wrap);
+    });
+
+    const refreshDropdown = () => {
+        const addedIds = new Set(
+            Array.from($list[0].querySelectorAll('[data-field-id]')).map(el => parseInt(el.dataset.fieldId, 10))
+        );
+        $dropdown.empty().append('<option value="">Select an option</option>');
+        allFields.forEach(f => {
+            const group = groupForType(f.FieldType);
+            if (!addedIds.has(f.FieldId) && group) {
+                $dropdown.append(`<option value="${f.FieldId}">${cdEscapeHTML(f.FieldName)} - ${group.label}</option>`);
             }
+        });
+    };
 
-            if (Array.isArray(options)) {
-                options.forEach(opt => {
-                    fieldHtml += `<option value="${opt}" ${opt === field.Value ? 'selected' : ''}>${opt}</option>`;
+    const buildHiddenInputs = (field) => {
+        const frag = document.createDocumentFragment();
+        const v = field.Value;
+        if (field.FieldType === 'checklist') {
+            let arr = [];
+            if (v !== null && v !== undefined && v !== '') {
+                try { arr = JSON.parse(v) || []; } catch (e) { arr = []; }
+            }
+            if (arr.length > 0) {
+                arr.forEach(opt => {
+                    const inp = document.createElement('input');
+                    inp.type = 'checkbox';
+                    inp.checked = true;
+                    inp.name = `custom_${field.FieldId}`;
+                    inp.value = opt;
+                    inp.style.display = 'none';
+                    frag.appendChild(inp);
                 });
+            } else {
+                const inp = document.createElement('input');
+                inp.type = 'hidden';
+                inp.name = `custom_${field.FieldId}`;
+                inp.value = '[]';
+                frag.appendChild(inp);
             }
-            fieldHtml += `</select>`;
+        } else {
+            const inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = `custom_${field.FieldId}`;
+            inp.value = (v === null || v === undefined) ? '' : v;
+            frag.appendChild(inp);
         }
-        fieldHtml += `</div>`;
-        container.append(fieldHtml);
+        return frag;
+    };
+
+    const renderChip = (field) => {
+        const group = groupForType(field.FieldType);
+        if (!group) return;
+        const groupWrap = $list[0].querySelector(`[data-group-key="${group.key}"]`);
+        const chipsRow = groupWrap.querySelector('.cf-group-chips');
+
+        const chip = document.createElement('span');
+        chip.className = 'badge border bg-light text-dark d-inline-flex align-items-center cf-chip';
+        chip.dataset.fieldId = field.FieldId;
+        chip.dataset.fieldName = field.FieldName || '';
+        chip.dataset.fieldType = field.FieldType || '';
+        chip.dataset.fieldOptions = field.Options || '[]';
+        chip.dataset.fieldValue = (field.Value === null || field.Value === undefined) ? '' : field.Value;
+        chip.innerHTML = `${cdEscapeHTML(field.FieldName)}
+            <button type="button" class="btn-close btn-close-sm ms-2 cf-chip-remove" aria-label="Remove" style="font-size:.55em;"></button>`;
+        chip.appendChild(buildHiddenInputs(field));
+        chip.querySelector('.cf-chip-remove').addEventListener('click', () => {
+            chip.remove();
+            if (!chipsRow.querySelector('[data-field-id]')) groupWrap.style.display = 'none';
+            refreshDropdown();
+        });
+        chipsRow.appendChild(chip);
+        groupWrap.style.display = '';
+    };
+
+    fields.forEach(f => {
+        if (customFieldHasValue(f)) renderChip(f);
+    });
+    refreshDropdown();
+
+    $dropdown.on('change', function () {
+        const fid = parseInt($(this).val(), 10);
+        if (!fid) return;
+        const field = allFields.find(f => f.FieldId === fid);
+        if (!field) return;
+        renderChip(field);
+        refreshDropdown();
+        $(this).val('');
     });
 }
 
-function loadFormsForModal(appointmentId) {
-    const container = $('#selectedFormsEdit');
-    container.html('<small class="text-muted">Loading...</small>');
+function customFieldHasValue(field) {
+    // Linked = server returned a (possibly empty) FieldValue row. Unlinked = null.
+    const v = field.Value;
+    return v !== null && v !== undefined;
+}
 
+// --- Custom-fields chip hover tooltip -------------------------------------
+// Styles live in Content/customer.css, which this page already loads.
+function ensureCfChipTooltip() {
+    let tip = document.getElementById('cfChipTooltip');
+    if (!tip) {
+        tip = document.createElement('div');
+        tip.id = 'cfChipTooltip';
+        tip.className = 'cf-chip-tooltip';
+        document.body.appendChild(tip);
+    }
+    return tip;
+}
+
+function buildCfChipTooltipHtml(chip) {
+    const name = chip.dataset.fieldName || 'Custom Field';
+    const ftype = chip.dataset.fieldType || '';
+    let opts = [];
+    try { opts = JSON.parse(chip.dataset.fieldOptions || '[]') || []; } catch (e) { opts = []; }
+    if (!Array.isArray(opts)) opts = [];
+    const rawValue = chip.dataset.fieldValue || '';
+
+    let body;
+    if (ftype === 'text' || ftype === 'number' || ftype === 'date') {
+        body = rawValue
+            ? `<div class="cf-tt-value">${cdEscapeHTML(rawValue)}</div>`
+            : `<div class="cf-tt-empty">No value set</div>`;
+    } else {
+        let selected = [];
+        if (ftype === 'checklist') {
+            try { selected = JSON.parse(rawValue) || []; } catch (e) { selected = []; }
+            if (!Array.isArray(selected)) selected = [];
+        } else if (rawValue) {
+            selected = [rawValue];
+        }
+        if (opts.length === 0) {
+            body = `<div class="cf-tt-empty">No options defined</div>`;
+        } else {
+            body = opts.map(opt => {
+                const isSel = selected.indexOf(opt) !== -1;
+                const icon = ftype === 'checklist'
+                    ? (isSel ? '☑' : '☐')
+                    : (isSel ? '●' : '○');
+                return `<div class="cf-tt-opt${isSel ? ' cf-tt-opt-sel' : ''}">${icon} ${cdEscapeHTML(opt)}</div>`;
+            }).join('');
+        }
+    }
+
+    const typeLabel = {
+        checklist: 'Checklist', dropdown: 'Dropdown',
+        text: 'Text', number: 'Number', date: 'Date'
+    }[ftype] || 'Custom Field';
+
+    return `<div class="cf-tt-title">${cdEscapeHTML(name)} <span class="cf-tt-type">${typeLabel}</span></div>
+            <div class="cf-tt-body">${body}</div>`;
+}
+
+function positionCfChipTooltip(tip, chip) {
+    const rect = chip.getBoundingClientRect();
+    tip.style.top = '0px';
+    tip.style.left = '0px';
+    tip.style.display = 'block';
+    const tipRect = tip.getBoundingClientRect();
+    let top = window.scrollY + rect.top - tipRect.height - 8;
+    if (top < window.scrollY + 8) top = window.scrollY + rect.bottom + 8;
+    let left = window.scrollX + rect.left + (rect.width / 2) - (tipRect.width / 2);
+    left = Math.max(window.scrollX + 8,
+        Math.min(left, window.scrollX + window.innerWidth - tipRect.width - 8));
+    tip.style.top = top + 'px';
+    tip.style.left = left + 'px';
+}
+
+$(document)
+    .off('mouseenter.cfchip', '#customFieldsContainer .cf-chip')
+    .on('mouseenter.cfchip', '#customFieldsContainer .cf-chip', function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains('cf-chip-remove')) return;
+        const tip = ensureCfChipTooltip();
+        tip.innerHTML = buildCfChipTooltipHtml(this);
+        positionCfChipTooltip(tip, this);
+    })
+    .off('mouseleave.cfchip', '#customFieldsContainer .cf-chip')
+    .on('mouseleave.cfchip', '#customFieldsContainer .cf-chip', function () {
+        const tip = document.getElementById('cfChipTooltip');
+        if (tip) tip.style.display = 'none';
+    });
+
+// ---------------------------------------------------------------------------
+// Forms lane for the appointment modal's Forms tab
+// ---------------------------------------------------------------------------
+// The tab's markup and its two buttons already existed, but the tab had no nav button so nothing
+// could reach it, and NONE of the functions the buttons call (openFormsSelectionModal /
+// openAppointmentFormsModal / applyFormsSelection / ...) were defined in this file - they would
+// have thrown ReferenceError on click. loadFormsForModal also pointed at
+// Appointments.aspx/GetAppointmentForms, which does not exist in TPM (500); the real endpoint is
+// Forms.aspx/GetAppointmentForms.
+//
+// Wired to TPM's OWN forms endpoints, not FSM's: FSM attaches/detaches per form instance, TPM
+// replaces the whole attached set in one call (Appointments.aspx/UpdateAttachedForms). Mirrors the
+// Service Locations lane in customer.js so the two TPM screens behave identically. Deliberately NOT
+// duplicated: the inline editable form renderer + signature pad from appointments.js - filling a
+// form stays on the Appointments page; here you get attach / status / Email / SMS / read-only
+// response. Globals are namespaced to avoid colliding with appointments.js's selectedForms.
+
+let cslSelectedForms = [];
+let cslCurrentAppointmentForms = [];
+
+function cdEscapeHtmlAttr(s) {
+    return String(s === null || s === undefined ? '' : s)
+        .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function _cslFormsApptId() {
+    return $('#editApptId').val() || $('#AppoinmentId').val() || '';
+}
+function _cslFormsCustomerId() {
+    return $('#editCustomerId').val() || $('#CustomerID').val() || '';
+}
+function _cslFormsAlert(opts) {
+    if (typeof window.showAlert === 'function') { return window.showAlert(opts); }
+    window.alert((opts && (opts.text || opts.title)) || 'Error');
+    return Promise.resolve({ isConfirmed: true });
+}
+
+function getFormStatusClass(status) {
+    switch ((status || '').toLowerCase()) {
+        case 'completed': return 'text-success';
+        case 'inprogress': return 'text-info';
+        case 'submitted': return 'text-primary';
+        default: return 'text-warning';
+    }
+}
+
+// --- Attach / detach ------------------------------------------------------
+
+function openFormsSelectionModal(mode) {
+    if (!_cslFormsApptId()) {
+        _cslFormsAlert({ icon: 'warning', title: 'No Appointment', text: 'Please open an appointment first.' });
+        return;
+    }
+    $('#formsSelectionModal').modal('show');
+    loadAvailableForms();
+    // Tick the boxes for what's already attached once the list has rendered.
+    setTimeout(loadCurrentlySelectedForms, 250);
+}
+
+function loadAvailableForms() {
     $.ajax({
         type: "POST",
-        url: "Appointments.aspx/GetAppointmentForms",
-        data: JSON.stringify({ appointmentId: appointmentId }),
+        url: "Forms.aspx/GetAllTemplates",
         contentType: "application/json; charset=utf-8",
         dataType: "json",
         success: function (response) {
-            if (response.d) {
-                const forms = response.d;
-                populateAttachedFormsTab(forms);
-            }
+            if (response.d) populateAvailableFormsList(response.d);
         },
-        error: function () {
-            container.html('<small class="text-error">Error loading forms</small>');
+        error: function (xhr, status, error) {
+            console.error('Error loading available forms:', error);
+            $('#availableFormsList').html('<p class="text-danger">Failed to load forms.</p>');
         }
     });
 }
 
+function populateAvailableFormsList(forms) {
+    const container = $('#availableFormsList');
+    container.empty();
+
+    const active = (forms || []).filter(f => f.IsActive);
+    if (active.length === 0) {
+        container.append('<p class="text-muted">No active form templates.</p>');
+        return;
+    }
+
+    active.forEach(form => {
+        const name = cdEscapeHTML(form.TemplateName || '');
+        const formItem = $(`
+            <div class="form-check mb-2">
+                <input class="form-check-input csl-form-cb" type="checkbox" id="form_${form.Id}"
+                       value="${form.Id}" data-form-name="${cdEscapeHtmlAttr(form.TemplateName || '')}">
+                <label class="form-check-label" for="form_${form.Id}">
+                    <strong>${name}</strong>
+                    ${form.Description ? '<br><small class="text-muted">' + cdEscapeHTML(form.Description) + '</small>' : ''}
+                    ${form.RequireSignature ? '<br><small class="text-info"><i class="fa fa-pencil"></i> Signature Required</small>' : ''}
+                </label>
+            </div>
+        `);
+        container.append(formItem);
+    });
+}
+
+// Delegated so it survives the list being re-rendered.
+$(document).off('change.cslforms', '#availableFormsList .csl-form-cb')
+    .on('change.cslforms', '#availableFormsList .csl-form-cb', function () {
+        const formId = parseInt($(this).val(), 10);
+        const formName = $(this).data('form-name') || '';
+        toggleFormSelection(formId, formName, this.checked);
+    });
+
+function toggleFormSelection(formId, formName, isSelected) {
+    if (isSelected) {
+        if (!cslSelectedForms.some(f => f.id === formId)) {
+            cslSelectedForms.push({ id: formId, name: formName });
+        }
+    } else {
+        cslSelectedForms = cslSelectedForms.filter(form => form.id !== formId);
+    }
+    updateSelectedFormsList();
+}
+
+function updateSelectedFormsList() {
+    const container = $('#selectedFormsList');
+    container.empty();
+
+    if (cslSelectedForms.length === 0) {
+        container.append('<p class="text-muted">No forms selected</p>');
+        return;
+    }
+
+    cslSelectedForms.forEach(form => {
+        const item = $(`
+            <div class="selected-form-item p-2 mb-2 border rounded">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>${cdEscapeHTML(form.name)}</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger csl-remove-selected"
+                            data-form-id="${form.id}">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `);
+        container.append(item);
+    });
+}
+
+$(document).off('click.cslforms', '.csl-remove-selected')
+    .on('click.cslforms', '.csl-remove-selected', function () {
+        removeSelectedForm(parseInt($(this).data('form-id'), 10));
+    });
+
+function removeSelectedForm(formId) {
+    cslSelectedForms = cslSelectedForms.filter(form => form.id !== formId);
+    $(`#form_${formId}`).prop('checked', false);
+    updateSelectedFormsList();
+}
+
+// Reads what's currently attached and mirrors it into both the checkbox list and the chip strip.
+function loadCurrentlySelectedForms(appointmentId) {
+    if (!appointmentId) appointmentId = _cslFormsApptId();
+    if (!appointmentId) return;
+
+    $.ajax({
+        type: "POST",
+        url: "Forms.aspx/GetAppointmentForms",
+        data: JSON.stringify({ appointmentId: appointmentId.toString() }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            const forms = response.d || [];
+            cslSelectedForms = forms.map(f => ({ id: f.TemplateId || f.Id, name: f.TemplateName }));
+            cslSelectedForms.forEach(f => { $(`#form_${f.id}`).prop('checked', true); });
+            updateSelectedFormsList();
+            populateAttachedFormsTab(forms);
+        },
+        error: function (xhr, status, error) {
+            console.error('Error loading attached forms:', error);
+        }
+    });
+}
+
+// The chip strip inside the modal's Forms tab (#selectedFormsEdit).
 function populateAttachedFormsTab(forms) {
     const container = $('#selectedFormsEdit');
     container.empty();
+
     if (!forms || forms.length === 0) {
         container.html('<small class="text-muted">No forms attached to this appointment</small>');
         return;
     }
+
     forms.forEach(form => {
-        container.append(`<span class="badge bg-success me-2 mb-2">${form.TemplateName}</span>`);
+        const statusClass = getFormStatusClass(form.Status);
+        const badge = $(`
+            <div class="form-badge p-2 mb-2 border rounded d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>${cdEscapeHTML(form.TemplateName || '')}</strong>
+                    <br><small class="${statusClass}">Status: ${cdEscapeHTML(form.Status || 'Pending')}</small>
+                </div>
+                <div>
+                    ${form.RequireSignature ? '<i class="fa fa-pencil text-info" title="Signature Required"></i>' : ''}
+                    ${form.RequireTip ? '<i class="fa fa-dollar text-success ms-1" title="Tip Enabled"></i>' : ''}
+                </div>
+            </div>
+        `);
+        container.append(badge);
     });
 }
+
+// Persists the selection. TPM's UpdateAttachedForms replaces the whole set, so sending the full id
+// list is the detach path too.
+function applyFormsSelection() {
+    const appointmentId = _cslFormsApptId();
+    const customerId = _cslFormsCustomerId();
+
+    if (!appointmentId) {
+        _cslFormsAlert({ icon: 'error', title: 'Error', text: 'No appointment selected' });
+        return;
+    }
+    if (!customerId) {
+        _cslFormsAlert({ icon: 'error', title: 'Error', text: 'No customer selected' });
+        return;
+    }
+
+    const formIds = cslSelectedForms.map(f => f.id);
+
+    $.ajax({
+        type: "POST",
+        url: "Appointments.aspx/UpdateAttachedForms",
+        data: JSON.stringify({ appointmentId: appointmentId.toString(), customerId: customerId.toString(), formIds: formIds }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            if (response.d === true) {
+                $('#formsSelectionModal').modal('hide');
+                _cslFormsAlert({ icon: 'success', title: 'Saved', text: 'Attached forms updated.', timer: 2000 });
+                loadFormsForModal(appointmentId);
+                loadAppointmentSpecificLinks(appointmentId);
+            } else {
+                _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to update attached forms.' });
+            }
+        },
+        error: function (xhr, status, error) {
+            _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to update attached forms: ' + error });
+        }
+    });
+}
+
+// --- View attached forms --------------------------------------------------
+
+function loadFormsForModal(appointmentId) {
+    if (!appointmentId) appointmentId = _cslFormsApptId();
+    if (!appointmentId) return;
+
+    $.ajax({
+        type: "POST",
+        url: "Forms.aspx/GetAppointmentForms",
+        data: JSON.stringify({ appointmentId: appointmentId.toString() }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            const forms = response.d || [];
+            cslCurrentAppointmentForms = forms;
+            cslSelectedForms = forms.map(f => ({ id: f.TemplateId || f.Id, name: f.TemplateName }));
+            populateAttachedFormsTab(forms);
+        },
+        error: function () {
+            $('#selectedFormsEdit').html('<small class="text-danger">Failed to load forms.</small>');
+        }
+    });
+}
+
+function openAppointmentFormsModal() {
+    const appointmentId = _cslFormsApptId();
+    if (!appointmentId) {
+        _cslFormsAlert({ icon: 'warning', title: 'No Appointment Selected', text: 'Please select an appointment first.' });
+        return;
+    }
+
+    $('#formName').empty();
+    $('#formViewerContainer').empty();
+    $('#formActionsContainer').hide();
+    $('#appointmentFormsModal').modal('show');
+    loadAppointmentForms(appointmentId);
+}
+
+function loadAppointmentForms(appointmentId) {
+    $("#loader").show();
+    $.ajax({
+        type: "POST",
+        url: "Forms.aspx/GetAppointmentForms",
+        data: JSON.stringify({ appointmentId: appointmentId.toString() }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            $("#loader").hide();
+            cslCurrentAppointmentForms = response.d || [];
+            populateAppointmentFormsList(cslCurrentAppointmentForms);
+        },
+        error: function () {
+            $("#loader").hide();
+            _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to load appointment forms' });
+        }
+    });
+}
+
+function populateAppointmentFormsList(forms) {
+    const container = $('#appointmentFormsList');
+    container.empty();
+
+    if (!forms || forms.length === 0) {
+        container.append('<p class="text-muted">No forms attached to this appointment</p>');
+        return;
+    }
+
+    forms.forEach(form => {
+        const statusClass = getFormStatusClass(form.Status);
+        const item = $(`
+            <div class="form-item p-3 mb-2 border rounded csl-form-item" style="cursor:pointer;"
+                 data-template-id="${form.TemplateId || form.Id}"
+                 data-template-name="${cdEscapeHtmlAttr(form.TemplateName || '')}">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <strong>${cdEscapeHTML(form.TemplateName || '')}</strong>
+                        <br><small class="text-muted">Status: <span class="${statusClass}">${cdEscapeHTML(form.Status || 'Pending')}</span></small>
+                    </div>
+                    <div class="form-actions">
+                        ${form.RequireSignature ? '<i class="fa fa-pencil text-info" title="Signature Required"></i>' : ''}
+                        ${form.RequireTip ? '<i class="fa fa-dollar text-success ms-1" title="Tip Enabled"></i>' : ''}
+                    </div>
+                </div>
+            </div>
+        `);
+        container.append(item);
+    });
+}
+
+$(document).off('click.cslforms', '#appointmentFormsList .csl-form-item')
+    .on('click.cslforms', '#appointmentFormsList .csl-form-item', function () {
+        const templateId = parseInt($(this).data('template-id'), 10);
+        $('#formName').text($(this).data('template-name') || '');
+        $('#formActionsContainer').show().data('template-id', templateId);
+        openCustomerResponseModal(templateId);
+    });
+
+// Read-only render of what the customer actually submitted.
+function openCustomerResponseModal(templateId) {
+    if (!templateId) templateId = parseInt($('#formActionsContainer').data('template-id'), 10);
+    const appointmentId = parseInt(_cslFormsApptId(), 10) || 0;
+    const customerId = parseInt(_cslFormsCustomerId(), 10) || 0;
+
+    if (!templateId) {
+        _cslFormsAlert({ icon: 'warning', title: 'No Form Selected', text: 'Pick a form from the list first.' });
+        return;
+    }
+
+    $("#loader").show();
+    $.ajax({
+        type: "POST",
+        url: "Appointments.aspx/GetCustomerResponseOnForms",
+        data: JSON.stringify({ templateId: templateId, appointmentId: appointmentId, customerId: customerId }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            $("#loader").hide();
+            let structure = null;
+            try { structure = response.d ? JSON.parse(response.d) : null; } catch (e) { structure = null; }
+            renderCslFormResponse(structure);
+        },
+        error: function () {
+            $("#loader").hide();
+            $('#formViewerContainer').html('<div class="alert alert-danger">Failed to load the customer response.</div>');
+        }
+    });
+}
+
+function renderCslFormResponse(structure) {
+    const container = $('#formViewerContainer');
+    container.empty();
+
+    const fields = (structure && (structure.fields || structure.Fields)) || [];
+    if (!structure || !fields.length) {
+        container.html('<div class="alert alert-info">No response has been submitted for this form yet.</div>');
+        return;
+    }
+
+    const rows = fields.map(f => {
+        const label = f.label || f.Label || f.name || f.Name || '';
+        let value = f.value !== undefined ? f.value : (f.Value !== undefined ? f.Value : '');
+        if (Array.isArray(value)) value = value.join(', ');
+        if (value === null || value === undefined || value === '') value = '<em class="text-muted">- not answered -</em>';
+        else value = cdEscapeHTML(String(value));
+        return `<tr><th class="w-35 align-top">${cdEscapeHTML(String(label))}</th><td>${value}</td></tr>`;
+    }).join('');
+
+    container.html(`
+        <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0">
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `);
+}
+
+// --- Send to customer -----------------------------------------------------
+
+function sendFormsViaEmail() {
+    const appointmentId = _cslFormsApptId();
+    if (!appointmentId) {
+        _cslFormsAlert({ icon: 'error', title: 'Error', text: 'No appointment selected' });
+        return;
+    }
+    if (cslCurrentAppointmentForms.length === 0) {
+        _cslFormsAlert({ icon: 'warning', title: 'Warning', text: 'No forms attached to send' });
+        return;
+    }
+
+    // The modal already shows the resolved site/customer email; fall back to a prompt.
+    let customerEmail = ($('#custModal_Email').val() || '').trim();
+    if (!customerEmail) {
+        customerEmail = prompt('Enter customer email address:');
+        if (!customerEmail) return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(customerEmail)) {
+        _cslFormsAlert({ icon: 'error', title: 'Invalid Email', text: 'Please enter a valid email address' });
+        return;
+    }
+
+    $.ajax({
+        type: "POST",
+        url: "Appointments.aspx/SendFormsViaEmail",
+        data: JSON.stringify({ appointmentId: appointmentId.toString(), customerEmail: customerEmail }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            if (response.d === true) {
+                _cslFormsAlert({ icon: 'success', title: 'Email Sent', text: `Forms have been sent to ${customerEmail} successfully!`, timer: 3000 });
+            } else {
+                _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to send email' });
+            }
+        },
+        error: function (xhr, status, error) {
+            _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to send email: ' + error });
+        }
+    });
+}
+
+function sendFormsViaSMS() {
+    const appointmentId = _cslFormsApptId();
+    if (!appointmentId) {
+        _cslFormsAlert({ icon: 'error', title: 'Error', text: 'No appointment selected' });
+        return;
+    }
+    if (cslCurrentAppointmentForms.length === 0) {
+        _cslFormsAlert({ icon: 'warning', title: 'Warning', text: 'No forms attached to send' });
+        return;
+    }
+
+    let customerPhone = ($('#custModal_Mobile').val() || $('#custModal_Phone').val() || '').trim();
+    if (!customerPhone) {
+        customerPhone = prompt('Enter customer mobile number:');
+        if (!customerPhone) return;
+    }
+
+    $.ajax({
+        type: "POST",
+        url: "Appointments.aspx/SendFormsViaSMS",
+        data: JSON.stringify({ appointmentId: appointmentId.toString(), customerPhone: customerPhone }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            if (response.d === true) {
+                _cslFormsAlert({ icon: 'success', title: 'SMS Sent', text: `Forms have been sent to ${customerPhone} successfully!`, timer: 3000 });
+            } else {
+                _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to send SMS' });
+            }
+        },
+        error: function (xhr, status, error) {
+            _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to send SMS: ' + error });
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Appointment ID badge
+// ---------------------------------------------------------------------------
+// AppoinmentUId ("Pro 1527-12") is the number users and CEC quote; ApptID is the internal PK.
+// Re-applied on shown.bs.modal because Bootstrap fires that after any other listener may have
+// re-rendered the header, which would otherwise blank the badge.
+function applyAppointmentUidBadges(uid) {
+    const text = uid || '';
+    $('#editAppointmentIdDisplay').text(text);
+    $('#bodyAppointmentIdDisplay').text(text);
+}
+
+$(document).off('shown.bs.modal.apptuid', '#siteAppointmentDetailsModal_PopUP')
+    .on('shown.bs.modal.apptuid', '#siteAppointmentDetailsModal_PopUP', function () {
+        applyAppointmentUidBadges($(this).attr('data-uid'));
+    });
+
+// ---------------------------------------------------------------------------
+// Appointment-Specific Items
+// ---------------------------------------------------------------------------
+// Read-only on purpose. Attaching forms happens on the modal's Forms tab, and TPM has no invoice
+// link/unlink endpoints at all (FSM's GetCustomerInvoicesForLinking / LinkInvoiceToAppointment /
+// UnlinkInvoiceFromAppointment have no TPM counterpart), so this panel reports what is attached
+// rather than pretending to manage it. Before this, nothing in the file referenced
+// #appointmentSpecificLinks and it always read "No items attached to this appointment".
+function loadAppointmentSpecificLinks(appointmentId) {
+    if (!appointmentId) appointmentId = $('#editApptId').val();
+    if (!appointmentId) return;
+    loadApptFormsSection(appointmentId);
+    loadApptInvoicesSection(appointmentId);
+}
+
+function loadApptFormsSection(appointmentId) {
+    const $list = $('#apptFormsAttachedList');
+    if (!$list.length) return;
+    $list.html('<small class="text-muted">Loading...</small>');
+
+    $.ajax({
+        type: "POST",
+        url: "Forms.aspx/GetAppointmentForms",
+        data: JSON.stringify({ appointmentId: appointmentId.toString() }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json"
+    }).done(function (resp) {
+        const attached = (resp && resp.d) || [];
+        // Cancelled forms stay in the DB for history but are not "attached" any more.
+        const active = attached.filter(f => (f.Status || '').toString().trim().toLowerCase() !== 'cancelled');
+        if (active.length === 0) {
+            $list.html('<small class="text-muted">No forms attached</small>');
+            return;
+        }
+        const $chips = $('<div class="d-flex flex-wrap gap-1"></div>');
+        active.forEach(function (f) {
+            const status = f.Status || 'Pending';
+            const tplName = f.TemplateName || ('Template #' + (f.TemplateId || ''));
+            const cls = status === 'Submitted'
+                ? 'bg-success-subtle text-success-emphasis border-success-subtle'
+                : 'bg-warning-subtle text-warning-emphasis border-warning-subtle';
+            $chips.append('<span class="badge border ' + cls + '" title="' + cdEscapeHTML(status) + '">'
+                + cdEscapeHTML(tplName) + '</span>');
+        });
+        $list.empty().append($chips);
+    }).fail(function (xhr) {
+        console.error('loadApptFormsSection error', xhr && xhr.responseText);
+        $list.html('<small class="text-danger">Error loading forms</small>');
+    });
+}
+
+function loadApptInvoicesSection(appointmentId) {
+    const $list = $('#apptInvoicesAttachedList');
+    if (!$list.length) return;
+    $list.html('<small class="text-muted">Loading...</small>');
+
+    $.ajax({
+        type: "POST",
+        url: "Appointments.aspx/GetAppointmentInvoices",
+        data: JSON.stringify({ appointmentId: appointmentId.toString() }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json"
+    }).done(function (resp) {
+        const attached = (resp && resp.d) || [];
+        if (attached.length === 0) {
+            $list.html('<small class="text-muted">No invoices or estimates attached</small>');
+            return;
+        }
+        const $chips = $('<div class="d-flex flex-wrap gap-1"></div>');
+        attached.forEach(function (inv) {
+            const typeLabel = inv.InvoiceType === 'Proposal' ? 'Estimate' : 'Invoice';
+            const total = parseFloat(inv.Total || 0).toFixed(2);
+            const cls = (inv.InvoiceStatus === 'Paid')
+                ? 'bg-success-subtle text-success-emphasis border-success-subtle'
+                : 'bg-info-subtle text-info-emphasis border-info-subtle';
+            const label = typeLabel + ' #' + cdEscapeHTML(inv.InvoiceNumber || inv.ID) + ' &middot; $' + total;
+            const inner = inv.ExternalLink
+                ? '<a href="' + cdEscapeHTML(inv.ExternalLink) + '" target="_blank" class="text-decoration-none text-reset">' + label + '</a>'
+                : label;
+            $chips.append('<span class="badge border ' + cls + '" title="' + cdEscapeHTML(inv.InvoiceStatus || '') + '">'
+                + inner + '</span>');
+        });
+        $list.empty().append($chips);
+    }).fail(function (xhr) {
+        console.error('loadApptInvoicesSection error', xhr && xhr.responseText);
+        $list.html('<small class="text-danger">Error loading invoices</small>');
+    });
+}
+
+// ---------------------------------------------------------------------------
+// CSL nav buttons in the appointment modal
+// ---------------------------------------------------------------------------
+// These are pure navigation, NOT Bootstrap tabs - the markup omits data-bs-toggle so a click
+// cannot swap an inline pane, and this handler stops propagation. On the Service Locations page
+// the equivalent buttons open CustomerDetails.aspx in a new tab; here we are already on that page,
+// so they close the modal and activate the matching tab in place.
+$(document).off('click.cslmodal', '#siteAppointmentDetailsModal_PopUP button[id^="csl-"]')
+    .on('click.cslmodal', '#siteAppointmentDetailsModal_PopUP button[id^="csl-"]', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const tabMapping = {
+            'csl-basic-tab': 'basic-tab',
+            'csl-appointments-tab': 'appointments-tab',
+            'csl-invoices-tab': 'invoices-tab',
+            'csl-notes-tab': 'notes-tab',
+            'csl-equipment-tab': 'equipment-tab',
+            'csl-pictures-tab': 'pictures-tab',
+            'csl-files-tab': 'files-tab',
+            'csl-agreements-tab': 'agreements-tab'
+        };
+        const targetTabId = tabMapping[$(this).attr('id')];
+        if (!targetTabId) return;
+        const targetBtn = document.getElementById(targetTabId);
+        if (!targetBtn) {
+            console.warn('CSL nav: page tab not found -', targetTabId);
+            return;
+        }
+        const $modal = $('#siteAppointmentDetailsModal_PopUP');
+        $modal.one('hidden.bs.modal', function () { targetBtn.click(); });
+        $modal.modal('hide');
+    });
+
+// ---------------------------------------------------------------------------
+// Shared UI helpers
+// ---------------------------------------------------------------------------
+// Guarded so a page that already defines them keeps its own version.
+window.showAlert = window.showAlert || function (options) {
+    if (typeof Swal !== 'undefined') { return Swal.fire(options); }
+    if (options && options.showCancelButton) {
+        return Promise.resolve({ isConfirmed: window.confirm(options.text || options.title || '') });
+    }
+    window.alert((options && (options.text || options.title)) || '');
+    return Promise.resolve({ isConfirmed: true });
+};
+
+window.showApptUpdateLoading = window.showApptUpdateLoading || function (modalId) {
+    const $modal = $('#' + modalId);
+    if (!$modal.length || $modal.find('.appt-update-loading').length) return;
+    $modal.find('.modal-content').first().append(
+        '<div class="appt-update-loading d-flex align-items-center justify-content-center" ' +
+        'style="position:absolute;inset:0;background:rgba(255,255,255,.65);z-index:1080;">' +
+        '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Saving...</span></div>' +
+        '</div>'
+    );
+};
+
+window.hideApptUpdateLoading = window.hideApptUpdateLoading || function (modalId) {
+    $('#' + modalId).find('.appt-update-loading').remove();
+};
+
+window.confirmSendNotificationDialog = window.confirmSendNotificationDialog || function () {
+    if (typeof Swal === 'undefined') {
+        return Promise.resolve(window.confirm('Send the confirmation email / text message to the customer?'));
+    }
+    return Swal.fire({
+        title: 'Send notification?',
+        text: 'The status changed. Send the confirmation email / text message to the customer?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, send it',
+        cancelButtonText: 'No, just save'
+    }).then(function (result) { return !!result.isConfirmed; });
+};
+
+// TPM's AppointmentStatusCommunicationProcessor has no WillSendNotificationOnStatus lookup, so this
+// uses FSM's conservative fallback: prompt on every genuine status change rather than 404ing a
+// per-page-load probe.
+window.statusChangeNeedsNotifyPrompt = window.statusChangeNeedsNotifyPrompt || function (statusId) {
+    return true;
+};
