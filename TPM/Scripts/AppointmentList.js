@@ -1,8 +1,7 @@
-﻿
+
 let table = null;
 var sites = [];
-var siteAppointmentsCache = {};
-
+var currentRow = null;
 
 function escapeHTML(str) {
     return String(str ?? '').replace(/[&<>"']/g, s => (
@@ -24,6 +23,33 @@ function closeModal(modalId) {
     }
 }
 
+// Swal comes from the master page; fall back to alert() if it ever fails to load.
+function notify(icon, title, text) {
+    if (typeof Swal !== 'undefined') {
+        return Swal.fire({
+            icon: icon,
+            title: title,
+            text: text || '',
+            timer: icon === 'success' ? 1600 : undefined,
+            showConfirmButton: icon !== 'success'
+        });
+    }
+    alert(title + (text ? '\n' + text : ''));
+}
+
+// Sp_GetAppointmnetData returns ApptDateTime as CONVERT(VARCHAR(10), .., 101) -> "MM/dd/yyyy".
+// Sorting that as a string puts December 2025 above September 2026, so the Date
+// column sorts on a numeric yyyymmdd key instead.
+function dateSortKey(value) {
+    const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(value || '').trim());
+    if (!m) return 0;
+    return Number(m[3] + m[1].padStart(2, '0') + m[2].padStart(2, '0'));
+}
+
+function currentStatusFilter() {
+    return ($('#statusFilter').val() || 'ALL').toLowerCase();
+}
+
 $(document).ready(function () {
 
     LoadAppointments();
@@ -42,114 +68,30 @@ $(document).ready(function () {
         }
     });
 
-    $('#AppointmentListTable tbody').on('click', 'tr', function () {
+    // Delegated from the table itself: DataTables replaces <tbody> on every draw,
+    // so a handler bound to the tbody stops firing after the first reload.
+    $('#AppointmentListTable').on('click', 'tbody tr', function () {
+        if (!table) return;
+        const data = table.row(this).data();
+        if (!data) return; // the "No data available" placeholder row
+
         $('#contact, #sites').slideDown();
         $('#contactBtn, #sitesBtn').addClass('active');
+
+        if (currentRow && currentRow.ApptID === data.ApptID) return;
+        generateCustomerDetails(data);
     });
 
-    $('#addCustomerBtn').on('click', function () {
-        $('#addCustomerForm')[0].reset();
-        openModal('addCustomerModal');
-    });
-
-    $('#closeAddCustomer, #closeAddCustomerIcon').on('click', function () {
-        closeModal('addCustomerModal');
-    });
-
-
+    // The right-hand pane describes the selected work order's site, and the site
+    // edit modal is the one wired to a working save endpoint.
     $('#editCustomerBtn').on('click', function () {
-        const customerData = table.row({ selected: true }).data();
-        if (customerData) {
-            populateAndOpenEditCustomerModal(customerData);
-        } else {
-            alert('Please select a customer to edit.');
+        const site = sites && sites.length ? sites[0] : null;
+        if (!site) {
+            notify('warning', 'Select a work order first.');
+            return;
         }
+        openSiteEditModal(site);
     });
-
-
-    $('#AppointmentListTable tbody').on('click', '.cust-table-edit-btn', function (e) {
-        e.stopPropagation();
-        const customerData = table.row($(this).closest('tr')).data();
-        if (customerData) {
-            populateAndOpenEditCustomerModal(customerData);
-        }
-    });
-
-
-    $('#closeEditCustomer, #closeEditCustomerIcon').on('click', function () {
-        closeModal('editCustomerModal');
-    });
-
-
-    $('#addCustomerForm').on('submit', function (event) {
-        event.preventDefault();
-        if (validateCustomerForm()) {
-            const customer = {
-                FirstName: $('input[name="firstName"]').val().trim(),
-                LastName: $('input[name="lastName"]').val().trim(),
-                Email: $('input[name="email"]').val().trim(),
-                Phone: $('input[name="phone"]').val().trim()
-            };
-
-            $.ajax({
-                type: "POST",
-                url: "AppoinementList.aspx/AddCustomer",
-                data: JSON.stringify({ customer: customer }),
-                contentType: "application/json; charset=utf-8",
-                dataType: "json",
-                success: function (response) {
-                    if (response.d) {
-                        alert("Customer added successfully!");
-                        closeModal('addCustomerModal');
-                        table.ajax.reload(null, false);
-                    } else {
-                        alert("Failed to add customer.");
-                    }
-                },
-                error: function (xhr) {
-                    console.error("Error adding customer: ", xhr.responseText);
-                    alert("An error occurred while adding the customer.");
-                }
-            });
-        }
-    });
-
-    $('#editCustomerForm').on('submit', function (event) {
-        event.preventDefault();
-        if (validateCustomerForm()) {
-            const customer = {
-                CustomerID: $(this).data('customerId'),
-                CustomerGuid: $(this).data('customerGuid'),
-                FirstName: $('#editFirstName').val().trim(),
-                LastName: $('#editLastName').val().trim(),
-                Email: $('#editEmail').val().trim(),
-                Phone: $('#editPhone').val().trim()
-            };
-
-            $.ajax({
-                type: "POST",
-                url: "AppoinementList.aspx/UpdateCustomer",
-                data: JSON.stringify({ customer: customer }),
-                contentType: "application/json; charset=utf-8",
-                dataType: "json",
-                success: function (response) {
-                    if (response.d) {
-                        alert("Customer updated successfully!");
-                        closeModal('editCustomerModal');
-                        table.ajax.reload(null, false);
-                    } else {
-                        alert("Failed to update customer.");
-                    }
-                },
-                error: function (xhr) {
-                    console.error("Error updating customer: ", xhr.responseText);
-                    alert("An error occurred while updating the customer.");
-                }
-            });
-        }
-    });
-
-
 
     const statesData = {
         USA: ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"],
@@ -168,44 +110,11 @@ $(document).ready(function () {
         $('#zipLabel').text(country === 'Canada' ? 'Postal Code' : 'Zip Code');
     }
 
-
-    $('#country').on('change', function () {
-        const selectedCountry = $(this).val();
-        updateStates(selectedCountry);
-        updateZipLabel(selectedCountry);
-    });
-
-
-    $('#sites').on('click', '#addSiteBtn', function () {
-        $('#addSiteForm')[0].reset();
-        $('.cust-modal-title').text('Add Site');
-        $('.cust-modal-submit').text('Save');
-        $('#SiteId').val(0);
-
-        const defaultCountry = 'USA';
-        $('#country').val(defaultCountry);
-        updateStates(defaultCountry);
-        updateZipLabel(defaultCountry);
-
-        $('#CustomerID').val($('#CustomerID').val());
-        $('#CustomerGuid').val($('#CustomerGuid').val());
-        $('#isActive').prop('checked', true);
-
-        openModal('addSiteModal');
-        updateIsActiveLabel();
-    });
-
-    $('#sites').on('click', '.cust-site-edit-btn', function () {
-        const siteId = $(this).data('site-id');
-        const isDefault = $(this).data('is-default') === true;
-        const site = sites.find(s => String(s.Id) === String(siteId));
-        if (!site) {
-            alert('Error: Could not find site data.');
-            return;
-        }
+    window.openSiteEditModal = function (site, isDefault) {
+        isDefault = isDefault === undefined ? site.Id === 0 : isDefault;
 
         $('.cust-modal-title').text(isDefault ? 'Edit Default Site (Customer Info)' : 'Edit Site');
-        $('.cust-modal-submit').text('Update');
+        $('#addSiteModal .cust-modal-submit').text('Update');
 
         // For default site, disable Site Name editing or make it read-only
         if (isDefault) {
@@ -234,114 +143,43 @@ $(document).ready(function () {
 
         openModal('addSiteModal');
         updateIsActiveLabel();
+    };
+
+    $('#country').on('change', function () {
+        const selectedCountry = $(this).val();
+        updateStates(selectedCountry);
+        updateZipLabel(selectedCountry);
     });
 
+    $('#sites').on('click', '.cust-site-edit-btn', function () {
+        const siteId = $(this).data('site-id');
+        const isDefault = $(this).data('is-default') === true;
+        const site = sites.find(s => String(s.Id) === String(siteId));
+        if (!site) {
+            notify('error', 'Could not find site data.');
+            return;
+        }
+        openSiteEditModal(site, isDefault);
+    });
 
-    $('#sites').on('click', '.cust-site-Duplicate-btn', function () {
-        const siteId = $(this).data('siteid');
-
-        const customerId = $(this).attr('data-CustomerID');
-
-        const Sitename = $(this).attr('data-Site-Name');
-
-      
-        //if ($.fn.DataTable.isDataTable('#DuplicatecustomerSiteTable')) {
-
-        //    $('#DuplicatecustomerSiteTable').DataTable().destroy();
-        //    $('#DuplicatecustomerSiteTable').empty(); // Manually empty the table's DOM
-        //}
-
-        $.ajax({
-            type: "POST",
-            url: "Customer.aspx/GetDuplicatecustomerSiteTable",
-            data: function (d) {
-                // Save current filter values on every request
-
-                return JSON.stringify({
-                    customerId: customerId,
-                    siteId: siteId,
-                    Sitename: Sitename
-                });
-            },
-            contentType: "application/json; charset=utf-8",
-            dataType: "json",
-            success: function (response) {
-                console.log(response.d);
-               
-                $('.ajax-loader').css("visibility", "hidden");
-            },
-            error: function (xhr) {
-                console.error("Error loading message: ", xhr.responseText);
-                $('.ajax-loader').css("visibility", "hidden");
-
-            }
+    // Both the eye icon in the header and the button in the card footer open the
+    // duplicate-site check.
+    $('#sites').on('click', '.cust-site-Duplicate-btn, .cust-site-appts-toggle', function () {
+        openDuplicateCheck({
+            customerId: $(this).attr('data-customerid'),
+            siteId: $(this).attr('data-siteid'),
+            siteName: $(this).attr('data-site-name')
         });
+    });
 
-
-
-        //$('#DuplicatecustomerSiteTable').DataTable({
-        //    processing: true,
-        //    serverSide: true,
-        //    filter: true,
-        //    ajax: {
-        //        url: "Customer.aspx/GetDuplicatecustomerSiteTable",
-        //        type: "POST",
-        //        contentType: "application/json; charset=utf-8",
-        //        dataType: "json",
-
-        //        data: function (d) {
-        //            // Save current filter values on every request
-
-        //            return JSON.stringify({
-        //                customerId: customerId,
-        //                siteId: siteId,
-        //                Sitename: Sitename
-        //            });
-        //        },
-
-        //        dataSrc: function (json) {
-        //            if (json.error) {
-        //                alert("Error loading customers: " + json.error);
-        //                return [];
-        //            }
-        //            return json.data;
-        //        }
-        //    },
-        //    paging: true,
-        //    pageLength: 10,
-        //    select: { style: 'single' },
-        //    columns: [
-
-        //        {
-        //            data: "SiteName",
-        //            name: "Select Main Site",
-        //            autoWidth: true,
-        //            render: function (data, type, row) {
-        //                return '<input type="radio" name="row-selection" value="0">';
-
-        //            }
-        //        },
-        //        {
-        //            data: "SiteName",
-        //            name: "Select Sub Site",
-        //            autoWidth: true,
-        //            render: function (data, type, row) {
-        //                return '<input type="radio" name="row-selection" value="0">';
-
-        //            }
-        //        }
-
-        //    ]
-        //});
-
-        openModal('mdl_CheckDuplicate');
-
+    $('#close_mdl_CheckDuplicate, #clossadaseAddSite').on('click', function () {
+        closeModal('mdl_CheckDuplicate');
     });
 
     $('#sites').on('click', '.cust-site-msgview-btn', function () {
         $('#div_Msg').html('');
         openModal('MsgViewModal');
-        $('.ajax-loader').css("visibility", "visible");
+        $('#MsgViewModal .ajax-loader').css("visibility", "visible");
         const ApptID = $(this).attr('data-site-id');
         $.ajax({
             type: "POST",
@@ -350,22 +188,22 @@ $(document).ready(function () {
             contentType: "application/json; charset=utf-8",
             dataType: "json",
             success: function (response) {
-                console.log(response.d);
-                var sites = response.d || [];
-                if (sites.length > 0 && sites[0].Note) {
-                    $('#div_Msg').html(sites[0].Note);
+                var messages = response.d || [];
+                if (messages.length > 0 && messages[0].Note) {
+                    $('#div_Msg').html(messages[0].Note);
                 } else {
                     $('#div_Msg').html('<p class="text-muted">No message found.</p>');
                 }
-                $('.ajax-loader').css("visibility", "hidden");
+                $('#MsgViewModal .ajax-loader').css("visibility", "hidden");
             },
             error: function (xhr) {
                 console.error("Error loading message: ", xhr.responseText);
-                $('.ajax-loader').css("visibility", "hidden");
-
+                $('#div_Msg').html('<p class="text-danger">Failed to load the original message.</p>');
+                $('#MsgViewModal .ajax-loader').css("visibility", "hidden");
             }
         });
     });
+
     $('#closeMsgView').on('click', function () {
         closeModal('MsgViewModal');
     });
@@ -388,118 +226,48 @@ $(document).ready(function () {
         OpenMMSPopUp(mobile, customerId);
     });
 
+    $('#sites').on('change', '.appt-status-select', function () {
+        ApptStatusChanged_Event(this);
+    });
+
+    $('#sites').on('change', '.appt-calendar-select', function () {
+        SchedulingCalendarChanged_Event(this);
+    });
+
     $('#statusFilter').on('change', function () {
         LoadAppointments();
     });
 
-    $('#cslViewFilter').on('change', function () {
-        if (table) {
-            table.draw(false);
-        }
+    $('#addSiteModal').on('change', '#isActive', function () {
+        updateIsActiveLabel();
     });
-
-    $('#hideNA').on('change', function () {
-        if (table) {
-            table.ajax.reload(null, false);
-        }
-    });
-
-    $('#AppointmentListTable').on('draw.dt.statusFilter', function () {
-        applyRowFiltersOnCurrentPage();
-        selectFirstVisibleRow();
-    });
-
-    $('#sites').on('click', '.cust-site-appts-toggle', function () {
-        const siteId = parseInt($(this).data('site-id'), 10);
-        const apptsEl = $(`#site-appts-${siteId}`);
-        if (!apptsEl.length) return;
-
-        const isVisible = apptsEl.is(':visible');
-        if (isVisible) {
-            apptsEl.slideUp();
-            $(this).text('Show Appointments');
-        } else {
-            $(this).text('Hide Appointments');
-            apptsEl.slideDown();
-            if (apptsEl.data('loaded') !== true) {
-                loadSiteAppointments(siteId, apptsEl);
-            }
-        }
-    });
-
 
     updateStates($('#country').val());
     updateZipLabel($('#country').val());
 });
-$('#sites').on('click', '.cust-site-delete-btn', function () {
-    const siteId = $(this).data('site-id');
-    const isDefault = $(this).data('is-default') === true;
-    const site = sites.find(s => String(s.Id) === String(siteId));
 
-    if (!site) {
-        alert('Error: Could not find site data to delete.');
+function LoadAppointments(selectApptId) {
+    // Re-initialising the grid used to destroy() and .empty() the table, which
+    // strips the <thead> cells, so every filter change left the user with an
+    // unlabelled grid. Build it once and refetch afterwards.
+    if (table) {
+        table.ajax.reload(function () { selectRowAfterLoad(selectApptId); }, true);
         return;
     }
 
-    // Prevent deletion of default site
-    if (isDefault || siteId === 0 || siteId === '0') {
-        alert('The default site cannot be deleted. It represents the primary customer location.');
-        return;
-    }
+    clearDetailsPanel();
 
-    // Use a confirmation dialog before deleting
-    if (confirm(`Are you sure you want to delete the site "${site.SiteName}"? This action cannot be undone.`)) {
-        $.ajax({
-            type: "POST",
-            url: "AppoinementList.aspx/DeleteCustomerSite",
-            data: JSON.stringify({ siteId: siteId }),
-            contentType: "application/json; charset=utf-8",
-            dataType: "json",
-            success: function (response) {
-                if (response.d) {
-                    alert("Site deleted successfully!");
-                    loadCustomerSiteData(site.CustomerID);
-                } else {
-                    alert("Something went wrong while deleting the site.");
-                }
-            },
-            error: function (xhr) {
-                console.error("Error deleting site: ", xhr.responseText);
-                alert("An error occurred while deleting the site.");
-            }
-        });
-    }
-});
-function LoadAppointments() {
-    table = null;
-
-  //  $('#sites').html('<p class="text-primary">Please select a item to view details.</p>');
-
-    const sitesHeaderContainer = $('#sites .sites-header');
-    const sitesListContainer = $('#sites .sites-list');
-
-    sitesHeaderContainer.empty();
-    sitesListContainer.empty();
-
-
-    if ($.fn.DataTable.isDataTable('#AppointmentListTable')) {
-      
-        $('#AppointmentListTable').DataTable().destroy();
-        $('#AppointmentListTable').empty(); // Manually empty the table's DOM
-    }
-
-
-    const wantedStatus = ($('#statusFilter').val() || 'all').toLowerCase();
-    $('#AppointmentListTable').DataTable({
+    table = $('#AppointmentListTable').DataTable({
         processing: true,
-        destroy: true,
         filter: true,
         ajax: {
             url: "AppoinementList.aspx/LoadAppointments",
             type: "POST",
             contentType: "application/json; charset=utf-8",
             dataType: "json",
-            data: function (d) {
+            data: function () {
+                // Read the filter here, not at init time, so a reload sends the
+                // status the user has currently selected.
                 return JSON.stringify({
                     SearchBy: "",
                     SearchFor: "",
@@ -507,35 +275,61 @@ function LoadAppointments() {
                     SearchTo: "",
                     SearchCriteria: "",
                     SearchByWarrantyCompany: "",
-                    wantedStatus: wantedStatus
+                    wantedStatus: currentStatusFilter()
                 });
             },
             dataSrc: function (json) {
                 if (json.error) {
-                    alert("Error loading customers: " + json.error);
+                    notify('error', 'Error loading work orders', json.error);
                     return [];
                 }
-                return json.data;
+                return json.data || [];
+            },
+            error: function (xhr) {
+                console.error("LoadAppointments failed: ", xhr.responseText);
+                notify('error', 'Could not load work orders', 'The server returned an error.');
             }
         },
         paging: true,
         pageLength: 10,
         order: [[2, 'desc']],
         select: { style: 'single' },
+        // DataTables 2 cycles asc -> desc -> unsorted by default, and that third
+        // click looks to the user like the sort has gone random.
+        columnDefs: [{ targets: '_all', orderSequence: ['asc', 'desc'] }],
         columns: [
-            { data: "CustomerName", name: "CustomerName", autoWidth: true },
-            { data: "SiteName", name: "First Name", autoWidth: true },
-            { data: "ApptDateTime", name: "Last Name", autoWidth: true },
             {
-                data: "Apptstatus",
-                name: "Status",
-                autoWidth: true,
-                render: function (data) {
-                    let statusText = data || 'N/A'; // Changed from const status to let statusText
+                data: "CustomerName", title: "Source", autoWidth: true,
+                render: function (data, type) {
+                    return type === 'display' ? escapeHTML(data) : (data || '');
+                }
+            },
+            {
+                data: "SiteName", title: "Site Name", autoWidth: true,
+                render: function (data, type) {
+                    return type === 'display' ? escapeHTML(data) : (data || '');
+                }
+            },
+            {
+                data: "ApptDateTime", title: "Date", autoWidth: true,
+                render: function (data, type) {
+                    if (type === 'sort' || type === 'type') return dateSortKey(data);
+                    return escapeHTML(data);
+                }
+            },
+            {
+                data: "Apptstatus", title: "Status", autoWidth: true,
+                render: function (data, type) {
+                    let statusText = data || 'N/A';
+                    // Search and sort on the text, not on the badge markup.
+                    if (type !== 'display') return statusText;
+
                     let statusClass = 'status-na';
-                    switch (statusText.toLowerCase()) { // Used statusText.toLowerCase()
+                    switch (statusText.toLowerCase()) {
                         case 'pending': statusClass = 'status-pending'; break;
-                        case 'Approved': statusClass = 'status-confirmed'; break;
+                        case 'accept':
+                        case 'approved':
+                        case 'confirmed': statusClass = 'status-confirmed'; break;
                         case 'dispatched': statusClass = 'status-dispatched'; break;
                         case 'in-route': statusClass = 'status-in-route'; break;
                         case 'fa-id sent': statusClass = 'status-fa-id-sent'; break;
@@ -545,55 +339,73 @@ function LoadAppointments() {
                         case 'on-hold': statusClass = 'status-on-hold'; break;
                         case '0':
                             statusClass = 'status-default';
-                            statusText = 'Multiple'; // Changed displayed text
+                            statusText = 'Multiple';
                             break;
                         case 'cancelled': statusClass = 'status-cancelled'; break;
                     }
-                    return `<span class="badge ${statusClass}">${statusText}</span>`; // Used statusText
+                    return `<span class="badge ${statusClass}">${escapeHTML(statusText)}</span>`;
                 }
-            },
-        ],
-        drawCallback: function () {
-            var api = this.api();
-            if (api.rows({ page: 'current' }).count() > 0 && !$('#AppointmentListTable tbody tr.selected').length) {
-               // selectFirstVisibleRow(); // Re-added this line
             }
-        }
-    });
-   
-    $('#AppointmentListTable tbody').on('click', 'tr', function () {
-        if ($(this).hasClass('selected')) return;
-        var data = $('#AppointmentListTable').DataTable().row(this).data();
-        if (data) {
-            generateCustomerDetails(data);
+        ],
+        initComplete: function () {
+            selectRowAfterLoad(selectApptId);
         }
     });
 }
-function generateCustomerDetails(data) {
-    if (!data) {
-        $('#customerName').text('Select a Customer');
 
-        $('.ci-item').addClass('is-empty');
-        $('#customerPhone, #customerMobile, #customerEmail, #customerAddress, #customerJobTitle').text('-');
+// Keep the details pane in step with the grid: after a load, show the row the
+// caller asked for, else the first one, else nothing.
+function selectRowAfterLoad(apptId) {
+    if (!table) return;
 
-        $('#sites .sites-header').empty();
-        $('#sites .sites-list').empty().html('<p class="text-muted">Select a customer to see their sites.</p>');
+    const indexes = table.rows({ page: 'current' }).indexes().toArray();
+    if (!indexes.length) {
+        currentRow = null;
+        clearDetailsPanel();
         return;
     }
+
+    let target = indexes[0];
+    if (apptId) {
+        const match = indexes.find(i => String(table.row(i).data().ApptID) === String(apptId));
+        if (match !== undefined) target = match;
+    }
+
+    const row = table.row(target);
+    table.rows({ selected: true }).deselect();
+    row.select();
+    currentRow = null;
+    generateCustomerDetails(row.data());
+}
+
+function clearDetailsPanel() {
+    currentRow = null;
+    $('#customerName').text('Select a Customer');
+    $('.ci-item').addClass('is-empty');
+    $('#customerPhone, #customerMobile, #customerEmail, #customerAddress, #customerJobTitle').text('-');
+    $('#sites .sites-header').empty();
+    $('#sites .sites-list').empty().html('<p class="text-muted">Select a work order to see its details.</p>');
+}
+
+function generateCustomerDetails(data) {
+    if (!data) {
+        clearDetailsPanel();
+        return;
+    }
+
+    currentRow = data;
 
     const safe = (v) => v || '';
     const normPhone = (v) => safe(v).replace(/[^\d+]/g, '');
 
-
-    $('#customerName').text([safe(data.CustomerName)]);
-
+    $('#customerName').text(safe(data.CustomerName));
 
     const updateItem = (id, value, href = null) => {
         const container = $(`#${id}-container`);
         const valueEl = $(`#${id}`);
 
         if (value && value.trim() !== '') {
-            const content = href ? `<a href="${href}" target="_blank">${escapeHTML(value)}</a>` : escapeHTML(value);
+            const content = href ? `<a href="${escapeHTML(href)}" target="_blank">${escapeHTML(value)}</a>` : escapeHTML(value);
             valueEl.html(content);
             container.removeClass('is-empty');
         } else {
@@ -601,7 +413,6 @@ function generateCustomerDetails(data) {
             container.addClass('is-empty');
         }
     };
-
 
     updateItem('customerPhone', data.Phone, `tel:${normPhone(data.Phone)}`);
     updateItem('customerMobile', data.Mobile, `sms:${normPhone(data.Mobile)}`);
@@ -619,7 +430,7 @@ function generateCustomerDetails(data) {
 }
 
 function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApproved, SiteId, ApptDateTime) {
-  
+
     if (!customerId) return;
 
     $.ajax({
@@ -630,15 +441,13 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
         dataType: "json",
         success: function (response) {
             sites = response.d || [];
-            siteAppointmentsCache = {};
 
             const sitesHeaderContainer = $('#sites .sites-header');
             const sitesListContainer = $('#sites .sites-list');
 
             sitesHeaderContainer.empty();
             sitesListContainer.empty();
-          //  sitesHeaderContainer.append('<button id="addSiteBtn" type="button">+ Add Site</button>');
-            console.log(sites);
+
             if (sites.length > 0) {
                 sites.forEach(site => {
                     const isDefaultSite = site.Id === 0;
@@ -646,43 +455,33 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                     const statusTitle = site.IsActive ? 'Active' : 'Inactive';
 
                     const editButton = `
-                        <button class="cust-site-icon-btn cust-site-edit-btn" title="Edit Site" data-site-id="${site.Id}" data-is-default="${isDefaultSite}">
+                        <button class="cust-site-icon-btn cust-site-edit-btn" title="Edit Site" data-site-id="${escapeHTML(site.Id)}" data-is-default="${isDefaultSite}">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg>
                         </button>`;
 
                     const smsButton = `
-                        <button class="cust-site-icon-btn cust-site-SMS-btn" title="Send SMS" data-site-id="${site.Id}" data-customer-id="${site.CustomerID}" data-MobileNumber-id="${site.MobileNumber}" data-is-default="${isDefaultSite}">
+                        <button class="cust-site-icon-btn cust-site-SMS-btn" title="Send SMS" data-site-id="${escapeHTML(site.Id)}" data-customer-id="${escapeHTML(site.CustomerID)}" data-MobileNumber-id="${escapeHTML(site.MobileNumber)}" data-is-default="${isDefaultSite}">
                             <i class="fa-solid fa-message"></i></button>`;
                     const mmsButton = `
-                        <button class="cust-site-icon-btn cust-site-MMS-btn" title="Send MMS" data-site-id="${site.Id}" data-customer-id="${site.CustomerID}" data-MobileNumber-id="${site.MobileNumber}" data-is-default="${isDefaultSite}">
+                        <button class="cust-site-icon-btn cust-site-MMS-btn" title="Send MMS" data-site-id="${escapeHTML(site.Id)}" data-customer-id="${escapeHTML(site.CustomerID)}" data-MobileNumber-id="${escapeHTML(site.MobileNumber)}" data-is-default="${isDefaultSite}">
                             <i class="fa-solid fa-photo-film"></i></button>`;
-                    const emaailButton = `
-                        <button class="cust-site-icon-btn cust-site-MMS-btn" title="Send MMS" data-site-id="${site.Id}" data-customer-id="${site.CustomerID}" data-MobileNumber-id="${site.MobileNumber}" data-is-default="${isDefaultSite}">
-                            <i class="fa-solid fa-photo-film"></i></button>`;
-
-
-                    const deleteButton = `
-                        <button class="cust-site-icon-btn delete-btn cust-site-delete-btn" title="${isDefaultSite ? 'Default site cannot be deleted' : 'Delete Site'}" data-site-id="${site.Id}" data-is-default="${isDefaultSite}" ${isDefaultSite ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.58.22-2.365.468a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193v-.443A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" /></svg>
-                        </button>`;
 
                     const siteCardHTML = `
-                        <div class="cust-site-card" data-site-id="${site.Id}">
+                        <div class="cust-site-card" data-site-id="${escapeHTML(site.Id)}">
                             <div class="cust-site-header">
                                 <div class="cust-site-title-group">
                                     <div class="cust-site-status-indicator ${statusClass}" title="${statusTitle}"></div>
                                     <h3 class="cust-site-title">${escapeHTML(site.SiteName)}</h3>
                                 </div>
                                 <div class="cust-site-actions">
-                                    <button class="cust-site-icon-btn cust-site-Duplicate-btn" title="Check Duplicate"  data-Site-Name="${site.SiteName}"  data-siteid="${site.Id}" data-CustomerID="${site.CustomerID}" >
-                                   <i class="fa fa-eye"></i> </button>
-                                 <button class="cust-site-icon-btn cust-site-msgview-btn" title="View Original Message" data-site-id="${ApptID}" data-is-default="${isDefaultSite}">
-                                   <i class="fa fa-eye"></i> </button>
+                                    <button class="cust-site-icon-btn cust-site-Duplicate-btn" title="Check for duplicate sites" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
+                                        <i class="fa fa-clone"></i></button>
+                                    <button class="cust-site-icon-btn cust-site-msgview-btn" title="View Original Message" data-site-id="${escapeHTML(ApptID)}" data-is-default="${isDefaultSite}">
+                                        <i class="fa fa-envelope-open-text"></i></button>
                                     ${editButton}
-                                     ${smsButton}
-                                     ${mmsButton}
-                                   
-                                    <a href="CustomerDetails.aspx?siteId=${site.Id}&custId=${encodeURIComponent(site.CustomerID)}" class="cust-site-icon-btn ${!site.IsActive ? 'd-none' : ''}" title="View Details">
+                                    ${smsButton}
+                                    ${mmsButton}
+                                    <a href="CustomerDetails.aspx?siteId=${encodeURIComponent(site.Id)}&custId=${encodeURIComponent(site.CustomerID)}" class="cust-site-icon-btn ${!site.IsActive ? 'd-none' : ''}" title="View Details">
                                         <i class="fa fa-arrow-right"></i>
                                     </a>
                                 </div>
@@ -706,33 +505,28 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                 </p>
                             </div>
                                 <p class="cust-site-info"> <i class="fas fa-user fa-fw"></i> ${escapeHTML(site.FirstName || '')} ${escapeHTML(site.LastName || '')}</p>
-                                <p class="cust-site-info"> <i class="fas fa-envelope fa-fw"></i> ${site.Email ? `<a href="mailto:${site.Email}" class="site-email-link" data-customer-id="${site.CustomerID}">${escapeHTML(site.Email)}</a>` : '-'}<br>Requested Date:- ${escapeHTML(ApptDateTime) || '-'}</p>
-                                <p class="cust-site-info"><i class="fas fa-phone-alt fa-fw"></i> ${site.PhoneNumber ? `<a href="tel:${site.PhoneNumber}">${escapeHTML(site.PhoneNumber)}</a>` : '-'}</p>
-                                <p class="cust-site-info"><i class="fas fa-mobile-alt fa-fw"></i> ${site.MobileNumber ? `<a href="tel:${site.MobileNumber}">${escapeHTML(site.MobileNumber)}</a>` : '-'}</p>
+                                <p class="cust-site-info"> <i class="fas fa-envelope fa-fw"></i> ${site.Email ? `<a href="mailto:${encodeURIComponent(site.Email)}" class="site-email-link" data-customer-id="${escapeHTML(site.CustomerID)}">${escapeHTML(site.Email)}</a>` : '-'}<br>Requested Date:- ${escapeHTML(ApptDateTime) || '-'}</p>
+                                <p class="cust-site-info"><i class="fas fa-phone-alt fa-fw"></i> ${site.PhoneNumber ? `<a href="tel:${escapeHTML(site.PhoneNumber)}">${escapeHTML(site.PhoneNumber)}</a>` : '-'}</p>
+                                <p class="cust-site-info"><i class="fas fa-mobile-alt fa-fw"></i> ${site.MobileNumber ? `<a href="tel:${escapeHTML(site.MobileNumber)}">${escapeHTML(site.MobileNumber)}</a>` : '-'}</p>
                             </div>
                             <div class="cust-site-footer">
-                                <button class="cust-site-appts-toggle btn-primary" data-site-id="${site.Id}">
+                                <button class="cust-site-appts-toggle btn-primary" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
                                      Duplicate Site Check
                                 </button>
                                <div class="container">
                                   <div class="row justify-content-start">
                                     <div class="col-3">
-                                      Appointments Status :<select onchange="ApptStatusChanged_Event(event,${ApptID},${customerId},${site.Id})" aria-controls="Appt_Status" class="form-select form-select-sm " style="width:150px;" id="dt-length-0"><option value="0">Select</option><option ${IsApproved ? 'selected' : ''} value="Accept">Accept</option><option value="Confirm">Confirm</option><option ${!IsApproved ? 'selected' : ''} value="Pending">Pending</option><option value="Cancel">Cancel</option></select>
-
+                                      Appointments Status :<select class="form-select form-select-sm appt-status-select" aria-label="Appointment status" style="width:150px;" data-appt-id="${escapeHTML(ApptID)}" data-customer-id="${escapeHTML(customerId)}" data-site-id="${escapeHTML(site.Id)}"><option value="0">Select</option><option ${IsApproved ? 'selected' : ''} value="Accept">Accept</option><option value="Confirm">Confirm</option><option ${!IsApproved ? 'selected' : ''} value="Pending">Pending</option><option value="Cancel">Cancel</option></select>
                                     </div>
                                     <div class="col-3">
-                                     Scheduling Calendar :<select onchange="SchedulingCalendarChanged_Event(event,${ApptID})" aria-controls="Appt_Status" class="form-select form-select-sm " style="width:150px;" id="dt-length-0"><option value="0">Select</option><option ${SchedulingCal == 'FSM' ? 'selected' : ''}  value="FSM">FSM</option><option ${SchedulingCal == 'CEC' ? 'selected' : ''} value="CEC">CEC</option></select>
-
+                                     Scheduling Calendar :<select class="form-select form-select-sm appt-calendar-select" aria-label="Scheduling calendar" style="width:150px;" data-appt-id="${escapeHTML(ApptID)}"><option value="0">Select</option><option ${SchedulingCal == 'FSM' ? 'selected' : ''} value="FSM">FSM</option><option ${SchedulingCal == 'CEC' ? 'selected' : ''} value="CEC">CEC</option></select>
                                     </div>
                                   </div>
                                 </div>
-                                 Notes :<br>"${notes}"
-                               
+                                 Notes :<br>"${escapeHTML(notes)}"
                             </div>
                         </div>`;
                     sitesListContainer.append(siteCardHTML);
-                   // alert(SchedulingCal);
-                   // loadAppointmentCount(site.CustomerID, site.Id);
                 });
             } else {
                 sitesListContainer.append('<p class="text-muted">No sites have been added for this customer.</p>');
@@ -740,99 +534,141 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
         },
         error: function (xhr) {
             console.error("Error loading site data: ", xhr.responseText);
-            $('#sites').html('<p class="text-danger">Failed to load site data.</p>');
+            $('#sites .sites-list').html('<p class="text-danger">Failed to load site data.</p>');
         }
     });
 }
-function ApptStatusChanged_Event(event, ApptID, customerID, siteID) {
 
-    var selectElement = event.target;
-    var value = selectElement.value;
-    if (value == '0') return;
+// TPM has no site-merge endpoint, so this lists the sites that share a name and
+// leaves the resolving to the user.
+function openDuplicateCheck(opts) {
+    const tbody = $('#DuplicatecustomerSiteTable').find('tbody');
+    const body = tbody.length ? tbody : $('<tbody></tbody>').appendTo('#DuplicatecustomerSiteTable');
+
+    body.html('<tr><td colspan="2" class="text-muted">Loading…</td></tr>');
+    openModal('mdl_CheckDuplicate');
+
+    $.ajax({
+        type: "POST",
+        url: "Customer.aspx/GetDuplicatecustomerSiteTable",
+        data: JSON.stringify({
+            customerId: opts.customerId,
+            siteId: opts.siteId,
+            Sitename: opts.siteName
+        }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            let payload = response.d;
+            if (typeof payload === 'string') {
+                try { payload = JSON.parse(payload); } catch (e) { payload = null; }
+            }
+            const rows = (payload && payload.data) || [];
+
+            if (!rows.length) {
+                body.html('<tr><td colspan="2" class="text-muted">No other site matches this name.</td></tr>');
+                return;
+            }
+
+            body.html(rows.map(site => {
+                const address = [site.Address, site.City, site.State, site.Zip].filter(Boolean).join(', ');
+                const isCurrent = String(site.Id) === String(opts.siteId);
+                return `<tr>
+                            <td>${escapeHTML(site.SiteName)}${isCurrent ? ' <span class="badge status-confirmed">this site</span>' : ''}</td>
+                            <td>${escapeHTML(address) || '-'}</td>
+                        </tr>`;
+            }).join(''));
+        },
+        error: function (xhr) {
+            console.error("Error loading duplicate sites: ", xhr.responseText);
+            body.html('<tr><td colspan="2" class="text-danger">Failed to load duplicate sites.</td></tr>');
+        }
+    });
+}
+
+function ApptStatusChanged_Event(selectElement) {
+    const $select = $(selectElement);
+    const value = $select.val();
+    if (value === '0') return;
+
+    const previous = $select.data('previous') || '0';
+    const ApptID = $select.data('appt-id');
+    const customerID = $select.data('customer-id');
+    const siteID = $select.data('site-id');
+
+    $select.prop('disabled', true);
 
     $.ajax({
         type: 'POST',
         url: 'AppoinementList.aspx/ApptStatusChanged_Event',
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
-        data: JSON.stringify({ ApptID: ApptID, ApptStatus: value, CustomerID: customerID, SiteID: siteID }),
+        data: JSON.stringify({
+            ApptID: String(ApptID ?? ''),
+            ApptStatus: value,
+            CustomerID: String(customerID ?? ''),
+            SiteID: String(siteID ?? '')
+        }),
         success: function (resp) {
+            $select.prop('disabled', false);
             if (resp.d) {
-                alert('Status updated successfully!');
+                $select.data('previous', value);
+                notify('success', 'Status updated');
+                // The grid's Status column is derived from IsApproved, so refetch
+                // it and keep this work order selected.
+                LoadAppointments(ApptID);
+            } else {
+                $select.val(previous);
+                notify('error', 'Status update failed', 'The server rejected the change.');
             }
-            else {
-                alert('Status updated Failed!');
-            }
-           // LoadAppointments();
         },
-        error: function () {
-            countEl.text('!');
+        error: function (xhr) {
+            console.error('ApptStatusChanged_Event failed: ', xhr.responseText);
+            $select.prop('disabled', false).val(previous);
+            notify('error', 'Status update failed', 'The server returned an error.');
         }
     });
-
-
-  
 }
-function SchedulingCalendarChanged_Event(event, ApptID) {
 
-    var selectElement = event.target;
-    var value = selectElement.value;
-    if (value == '0') return;
+function SchedulingCalendarChanged_Event(selectElement) {
+    const $select = $(selectElement);
+    const value = $select.val();
+    if (value === '0') return;
+
+    const previous = $select.data('previous') || '0';
+    const ApptID = $select.data('appt-id');
+
+    $select.prop('disabled', true);
 
     $.ajax({
         type: 'POST',
         url: 'AppoinementList.aspx/SchedulingCalendarChanged_Event',
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
-        data: JSON.stringify({ ApptID: ApptID, SchedulingEvent: value }),
+        data: JSON.stringify({ ApptID: String(ApptID ?? ''), SchedulingEvent: value }),
         success: function (resp) {
+            $select.prop('disabled', false);
             if (resp.d) {
-                alert('Scheduling updated successfully!');
+                $select.data('previous', value);
+                notify('success', 'Scheduling calendar updated');
+                LoadAppointments(ApptID);
+            } else {
+                $select.val(previous);
+                notify('error', 'Scheduling update failed', 'The server rejected the change.');
             }
-            else {
-                alert('Scheduling updated Failed!');
-            }
-            LoadAppointments();
         },
-        error: function () {
-            countEl.text('!');
-        }
-    });
-   
-}
-function loadAppointmentCount(customerId, siteId) {
-    const countEl = $(`#appt-count-${siteId}`);
-
-    // Check cache first
-    if (siteAppointmentsCache[siteId]) {
-        countEl.text(siteAppointmentsCache[siteId].length);
-        return;
-    }
-
-    $.ajax({
-        type: 'POST',
-        url: 'CustomerDetails.aspx/GetCustomerAppoinmets',
-        contentType: 'application/json; charset=utf-8',
-        dataType: 'json',
-        data: JSON.stringify({ customerId: customerId, SiteId: siteId }),
-        success: function (resp) {
-            const list = resp && Array.isArray(resp.d) ? resp.d : [];
-            siteAppointmentsCache[siteId] = list;
-            countEl.text(list.length);
-        },
-        error: function () {
-            countEl.text('!');
+        error: function (xhr) {
+            console.error('SchedulingCalendarChanged_Event failed: ', xhr.responseText);
+            $select.prop('disabled', false).val(previous);
+            notify('error', 'Scheduling update failed', 'The server returned an error.');
         }
     });
 }
+
 function updateIsActiveLabel() {
     const isChecked = $('#isActive').is(':checked');
     $('#isActiveText').text(isChecked ? 'Active' : 'Deactivated');
 }
-
-$('#addSiteModal').on('change', '#isActive', function () {
-    updateIsActiveLabel();
-});
 
 function saveSite(event) {
     event.preventDefault();
@@ -867,16 +703,16 @@ function saveSite(event) {
                 dataType: "json",
                 success: function (response) {
                     if (response.d) {
-                        alert('Default site (customer information) updated successfully!');
                         closeModal('addSiteModal');
-                        location.reload(); // Reload to refresh customer data
+                        notify('success', 'Customer information updated');
+                        if (currentRow) generateCustomerDetails(currentRow);
                     } else {
-                        alert("Something went wrong while updating the customer information.");
+                        notify('error', 'Update failed', 'Something went wrong while updating the customer information.');
                     }
                 },
                 error: function (xhr) {
                     console.error("Error updating customer: ", xhr.responseText);
-                    alert("An error occurred while updating the customer information.");
+                    notify('error', 'Update failed', 'An error occurred while updating the customer information.');
                 }
             });
         } else {
@@ -888,16 +724,16 @@ function saveSite(event) {
                 dataType: "json",
                 success: function (response) {
                     if (response.d) {
-                        alert(`Site ${site.Id > 0 ? 'updated' : 'saved'} successfully!`);
                         closeModal('addSiteModal');
-                        loadCustomerSiteData(site.CustomerID);
+                        notify('success', `Site ${site.Id > 0 ? 'updated' : 'saved'}`);
+                        if (currentRow) generateCustomerDetails(currentRow);
                     } else {
-                        alert("Something went wrong while saving the site.");
+                        notify('error', 'Save failed', 'Something went wrong while saving the site.');
                     }
                 },
                 error: function (xhr) {
                     console.error("Error saving site: ", xhr.responseText);
-                    alert("An error occurred while saving the site.");
+                    notify('error', 'Save failed', 'An error occurred while saving the site.');
                 }
             });
         }
@@ -909,153 +745,15 @@ function validateSiteForm() {
     if ($("#siteName").val().trim() === "") errorMessage += "Site Name is required.\n";
     if ($("#address").val().trim() === "") errorMessage += "Street Address is required.\n";
     if (errorMessage) {
-        alert(errorMessage);
+        notify('warning', 'Missing information', errorMessage);
         return false;
     }
     return true;
 }
-
-function validateCustomerForm() {
-    let errorMessage = "";
-    if ($("#editFirstName").val().trim() === "") errorMessage += "First Name is required.\n";
-    if ($("#editLastName").val().trim() === "") errorMessage += "Last Name is required.\n";
-    if ($("#editEmail").val().trim() === "") {
-        errorMessage += "Email is required.\n";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($("#editEmail").val().trim())) {
-        errorMessage += "Invalid email format.\n";
-    }
-    if (errorMessage) {
-        alert(errorMessage);
-        return false;
-    }
-    return true;
-}
-
-function populateAndOpenEditCustomerModal(customerData) {
-    $('#editFirstName').val(customerData.FirstName || '');
-    $('#editLastName').val(customerData.LastName || '');
-    $('#editEmail').val(customerData.Email || '');
-    $('#editPhone').val(customerData.Phone || '');
-    $('#editCustomerForm').data('customerId', customerData.CustomerID);
-    $('#editCustomerForm').data('customerGuid', customerData.CustomerGuid);
-    openModal('editCustomerModal');
-}
-
-function applyRowFiltersOnCurrentPage() {
-    if (!table) return;
-    const wantedStatus = ($('#statusFilter').val() || 'all').toLowerCase();
-    const hideNA = $('#hideNA').is(':checked');
-
-    table.rows({ page: 'current' }).every(function () {
-        const data = this.data();
-        const status = (data && data.StatusName ? data.StatusName : 'n/a').toLowerCase();
-        let visible = true;
-        if (wantedStatus !== 'all' && status !== wantedStatus) {
-            visible = false;
-        }
-        $(this.node()).toggle(visible);
-    });
-}
-
-function selectFirstVisibleRow() {
-    if (!table) return;
-    const firstVisibleRow = $('#AppointmentListTable tbody tr:visible').first();
-    if (firstVisibleRow.length) {
-        table.rows().deselect();
-        const row = table.row(firstVisibleRow);
-        row.select();
-        generateCustomerDetails(row.data());
-    } else {
-
-        generateCustomerDetails(null);
-    }
-}
-function loadSiteAppointments(siteId, containerEl) {
-    const customerId = $('#CustomerID').val();
-    if (!customerId) {
-        containerEl.html('<div class="text-danger small">Missing customer ID.</div>');
-        return;
-    }
-
-    containerEl.html('<div class="text-muted small">Loading appointments…</div>');
-
-    if (siteAppointmentsCache[siteId]) {
-        renderSiteAppointments(siteId, siteAppointmentsCache[siteId], containerEl);
-        containerEl.data('loaded', true);
-        return;
-    }
-
-    $.ajax({
-        type: 'POST',
-        url: 'CustomerDetails.aspx/GetCustomerAppoinmets',
-        contentType: 'application/json; charset=utf-8',
-        dataType: 'json',
-        data: JSON.stringify({ customerId: customerId, siteId: siteId }),
-        success: function (resp) {
-            const list = resp && Array.isArray(resp.d) ? resp.d : [];
-            siteAppointmentsCache[siteId] = list;
-            renderSiteAppointments(siteId, list, containerEl);
-            containerEl.data('loaded', true);
-        },
-        error: function (xhr) {
-            console.error('GetCustomerAppoinmets failed:', xhr.responseText);
-            containerEl.html('<div class="text-danger small">Failed to load appointments.</div>');
-        }
-    });
-}
-
-// FILE: customer.js
-// This is the corrected function.
-
-function renderSiteAppointments(siteId, list, containerEl) {
-    if (!list || !list.length) {
-        containerEl.html('<div class="text-muted small">No appointments for this site.</div>');
-        return;
-    }
-
-    const customerId = $('#CustomerID').val();
-
-    const rows = list.map(item => {
-        const status = item.AppoinmentStatus || 'N/A';
-        let statusClass = 'status-na';
-
-        const lowerCaseStatus = status.toLowerCase();
-
-        if (lowerCaseStatus === 'confirmed' || lowerCaseStatus === 'installation in progress') {
-            statusClass = 'status-confirmed';
-        } else if (lowerCaseStatus === 'pending') {
-            statusClass = 'status-pending';
-        } else if (lowerCaseStatus === 'closed') {
-            statusClass = 'status-closed';
-        }
-
-        const detailsUrl = `CustomerDetails.aspx?siteId=${siteId}&custId=${encodeURIComponent(customerId)}&tab=appointments`;
-
-        return `
-            <div class="cust-appt-row">
-                <div class="appt-main">
-                    <div class="appt-date">${escapeHTML(item.AppoinmentDate || item.RequestDate || '—')}</div>
-                    <div class="appt-type">${escapeHTML(item.ServiceType || '—')}</div>
-                </div>
-                <a href="${detailsUrl}" class="appt-status">
-                    <span class="badge ${statusClass}">${escapeHTML(status)}</span>
-                    <span class="appt-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 6l6 6-6 6"></path></svg></span>
-                </a>
-            </div>`;
-    }).join('');
-
-    containerEl.html(`<div class="cust-appt-list">${rows}</div>`);
-}
-
-
 
 function OpenCustomerChatHistory(mobile, name, customerId) {
     if (!mobile || mobile.trim() === "") {
-        if (typeof Swal !== 'undefined') {
-            Swal.fire('Validation Error', 'Please insert a phone number for this customer.', 'warning');
-        } else {
-            alert('Please insert a phone number for this customer.');
-        }
+        notify('warning', 'Validation Error', 'Please insert a phone number for this customer.');
         return;
     }
     window.open(`CustomerChatHistory.aspx?mobile=${encodeURIComponent(mobile)}&name=${encodeURIComponent(name)}&customerId=${encodeURIComponent(customerId)}`, '_blank');
