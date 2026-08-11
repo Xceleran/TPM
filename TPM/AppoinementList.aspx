@@ -71,11 +71,12 @@
                     <div class="pt-2 ps-2 d-flex align-items-center gap-3">
                         <div>
                             <label for="statusFilter" class="form-label">Filter by Status:</label>
+                            <%-- Sp_GetAppointmnetData only branches on 'accept' and 'pending'; an
+                                 appointment's status here is IsApproved, so there is no Cancel to filter by. --%>
                             <asp:DropDownList ID="statusFilter"  ClientIDMode="Static" runat="server" CssClass="form-select w-auto">
                                 <asp:ListItem Text="All Statuses" Value="ALL"></asp:ListItem>
                                  <asp:ListItem Text="Accept" Value="Accept"></asp:ListItem>
                                 <asp:ListItem Text="Pending" Value="Pending"></asp:ListItem>
-                                <asp:ListItem Text="Cancel" Value="Cancel"></asp:ListItem>
                             </asp:DropDownList>
                         </div>
                     </div>
@@ -105,7 +106,7 @@
                     </div>
                     <div class="cust-details-actions">
 
-                        <button class="cust-table-edit-btn" title="Edit Customer" id="editCustomerBtn">
+                        <button class="cust-table-edit-btn" title="Edit Site" id="editCustomerBtn">
                             <i class="fa-solid fa-user-pen"></i>
                         </button>
                     </div>
@@ -177,18 +178,17 @@
                          <table id="DuplicatecustomerSiteTable" class="display" style="width: 100%">
                                     <thead>
                                         <tr>
-                                             <th>Select Main Site</th>
-                                            <th>Select Sub Site</th>
-                                          
+                                             <th>Site Name</th>
+                                            <th>Address</th>
                                         </tr>
                                     </thead>
+                                    <tbody></tbody>
                                 </table>
                     </div>
                 </div>
-                <!-- Buttons -->
+                <%-- Read-only: TPM has no endpoint for merging a sub site into a main site. --%>
                 <div class="cust-modal-btns">
-                    <button type="button" class="cust-modal-cancel" id="clossadaseAddSite">Cancel</button>
-                    <button type="button" onclick="saveSite(event )" class="cust-modal-submit">Submit</button>
+                    <button type="button" class="cust-modal-cancel" id="clossadaseAddSite">Close</button>
                 </div>
 
         </div>
@@ -210,64 +210,10 @@
                     </div>
     </div>
 
-    <div class="cust-modal" id="addCustomerModal">
-        <div class="cust-modal-content">
-            <button class="cust-modal-close" id="closeAddCustomerIcon">×</button>
-            <h2 class="cust-modal-title">Add New Customer</h2>
-            <form id="addCustomerForm" class="cust-modal-form">
-                <div class="cust-modal-field">
-                    <label class="cust-modal-label">First Name</label>
-                    <input type="text" name="firstName" class="cust-modal-input" required />
-                </div>
-                <div class="cust-modal-field">
-                    <label class="cust-modal-label">Last Name</label>
-                    <input type="text" name="lastName" class="cust-modal-input" required />
-                </div>
-                <div class="cust-modal-field">
-                    <label class="cust-modal-label">Email</label>
-                    <input type="email" name="email" class="cust-modal-input" required />
-                </div>
-                <div class="cust-modal-field">
-                    <label class="cust-modal-label">Phone</label>
-                    <input type="text" name="phone" class="cust-modal-input" />
-                </div>
-                <div class="cust-modal-btns">
-                    <button type="button" class="cust-modal-cancel" id="closeAddCustomer">Cancel</button>
-                    <button type="submit" class="cust-modal-submit">Add Customer</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Edit Customer Modal -->
-    <div class="cust-modal" id="editCustomerModal">
-        <div class="cust-modal-content">
-            <button class="cust-modal-close" id="closeEditCustomerIcon">×</button>
-            <h2 class="cust-modal-title">Edit Customer</h2>
-            <form id="editCustomerForm" class="cust-modal-form">
-                <div class="cust-modal-field">
-                    <label class="cust-modal-label">First Name</label>
-                    <input type="text" name="firstName" id="editFirstName" class="cust-modal-input" required />
-                </div>
-                <div class="cust-modal-field">
-                    <label class="cust-modal-label">Last Name</label>
-                    <input type="text" name="lastName" id="editLastName" class="cust-modal-input" required />
-                </div>
-                <div class="cust-modal-field">
-                    <label class="cust-modal-label">Email</label>
-                    <input type="email" name="email" id="editEmail" class="cust-modal-input" required />
-                </div>
-                <div class="cust-modal-field">
-                    <label class="cust-modal-label">Phone</label>
-                    <input type="text" name="phone" id="editPhone" class="cust-modal-input" />
-                </div>
-                <div class="cust-modal-btns">
-                    <button type="button" class="cust-modal-cancel" id="closeEditCustomer">Cancel</button>
-                    <button type="submit" class="cust-modal-submit">Save Changes</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <%-- The Add/Edit Customer modals were removed: nothing on this page opened them,
+         and the grid carries CustomerName rather than FirstName/LastName, so saving
+         from here posted blank names to UpdateCustomer. Customer records are edited
+         on Customer.aspx / CustomerDetails.aspx. --%>
        <!-- SMS Modal -->
         <div class="modal fade" id="modalSendSMS" tabindex="-1" role="dialog" aria-labelledby="modalSendSMS"
             aria-hidden="true">
@@ -469,17 +415,6 @@
    
     <script>
 
-        $(document).ready(function () {
-            $('#customerTable tbody').on('click', 'tr', function () {
-                $('#contact').show();
-                $('#sites').show();
-
-                // Optionally, adding 'active' class to toggle styling
-                $('#contactBtn').addClass('active');
-                $('#sitesBtn').addClass('active');
-            });
-        });
-
         function OpenCustomerChatHistory(mobile, name, customerId) {
             if (!mobile || mobile.trim() === "") {
                 Swal.fire('Validation Error', 'Please insert phone number for this customer.', 'warning');
@@ -539,36 +474,5 @@
         }
 
     </script>
-    <script>
-        // JavaScript to handle close icon functionality
-        $(document).ready(function () {
-            $('#closeAddCustomerIcon').on('click', function () {
-                $('#addCustomerModal').hide();
-            });
-            $('#closeEditCustomerIcon').on('click', function () {
-                $('#editCustomerModal').hide();
-            });
-            $('#closeAddSiteIcon').on('click', function () {
-                $('#addSiteModal').hide();
-            });
-        });
-
-    </script>
-    <script>
-        $('#customerTable tbody').on('click', '.cust-table-edit-btn', function () {
-            const customerId = $(this).data('customer-id');
-            const customerData = table.row($(this).closest('tr')).data();
-            if (customerData) {
-                document.getElementById('editFirstName').value = customerData.FirstName || '';
-                document.getElementById('editLastName').value = customerData.LastName || '';
-                document.getElementById('editEmail').value = customerData.Email || '';
-                document.getElementById('editPhone').value = customerData.Phone || '';
-                document.getElementById('editCustomerForm').dataset.customerId = customerData.CustomerID;
-                document.getElementById('editCustomerForm').dataset.customerGuid = customerData.CustomerGuid;
-                openModal('editCustomerModal');
-            }
-        });
-    </script>
-
-     <script src="Scripts/AppointmentList.js?v=10"></script>
+     <script src="Scripts/AppointmentList.js?v=11"></script>
 </asp:Content>

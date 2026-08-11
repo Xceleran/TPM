@@ -204,7 +204,10 @@ namespace TPM
                         cmd.Parameters.Add("@SearchText", System.Data.SqlDbType.NVarChar, 200).Value = SearchFor;
                         cmd.Parameters.Add("@From", System.Data.SqlDbType.DateTime).Value = _SearchFrom;
                         cmd.Parameters.Add("@To", System.Data.SqlDbType.DateTime).Value = _SearchTo;
-                        cmd.Parameters.Add("@IsWarrantyCompany", System.Data.SqlDbType.DateTime).Value = _SearchTo;
+                        // @IsWarrantyCompany is nvarchar in Sp_GetAppointmnetData; it was being
+                        // handed the @To datetime.
+                        cmd.Parameters.Add("@IsWarrantyCompany", System.Data.SqlDbType.NVarChar, 500).Value =
+                            (object)SearchByWarrantyCompany ?? DBNull.Value;
                         cmd.Parameters.Add("@Status", System.Data.SqlDbType.NVarChar).Value = wantedStatus;
 
                         cmd.CommandTimeout = 900;
@@ -678,7 +681,12 @@ namespace TPM
         public static List<CustomerSite> GetCustomerSiteData(string customerId,string SiteId)
         {
             var sites = new List<CustomerSite>();
-            string companyid = HttpContext.Current.Session["CompanyID"].ToString();
+            string companyid = HttpContext.Current.Session?["CompanyID"]?.ToString();
+            if (string.IsNullOrEmpty(companyid))
+            {
+                System.Diagnostics.Debug.WriteLine("GetCustomerSiteData: CompanyID is missing from session");
+                return sites;
+            }
             Database db = new Database();
             DataTable dt = new DataTable();
             try
@@ -704,6 +712,8 @@ namespace TPM
                             FirstName = dr["FirstName"].ToString() ?? "",
                             LastName = dr["LastName"].ToString() ?? "",
                             Address = dr["Address"].ToString() ?? "",
+                            // City was never mapped, so the site card always showed "City: -"
+                            City = dr["City"].ToString() ?? "",
                             Country = dr["Country"].ToString() ?? "",
                             State = LocationHelper.GetFullName(dr["State"].ToString() ?? ""),
                             Zip = dr["Zip"].ToString() ?? "",
