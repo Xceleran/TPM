@@ -6,16 +6,20 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.13.1/js/bootstrap-select.min.js"></script>
      <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.0.1/css/bootstrap.min.css" />
-    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.3/css/jquery.dataTables.min.css" />
-    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/2.0.1/css/buttons.dataTables.min.css" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/2.2.2/css/dataTables.dataTables.min.css" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/3.2.0/css/buttons.dataTables.min.css" />
 
-    <script src="https://cdn.datatables.net/buttons/2.0.1/js/dataTables.buttons.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.0.1/js/buttons.html5.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.0.1/js/buttons.print.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.0.1/js/buttons.colVis.min.js"></script>
+    <%-- The DataTables CORE library. It was missing entirely: the page loaded the DataTables
+         stylesheet and the Buttons extension but never the library those depend on, so
+         $('#example').dataTable() threw "is not a function" and the grid rendered as a plain
+         static table with no search, sort, paging or export. Core must come before Buttons.
+         Versions match Customer.aspx / AppoinementList.aspx (DataTables 2.2.2 + Buttons 3.x). --%>
+    <script src="https://cdn.datatables.net/2.2.2/js/dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/3.2.0/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/3.2.0/js/buttons.html5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/3.2.0/js/buttons.print.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/3.2.0/js/buttons.colVis.min.js"></script>
     <style>
         .datatableButton, .dt-down-arrow {
             background-color: #4d78b1 !important; /* Green */
@@ -70,8 +74,19 @@
             float: left;
             width: 20%;
         }
-		.dataTables_scrollBody{
-	        min-height: 400px;
+        /* The grid no longer uses DataTables' scrolling mode, so the old
+           .dataTables_scrollBody min-height rule (a DataTables 1.x class name that
+           DataTables 2.x does not emit anyway) has been dropped. */
+
+        /* The row action menu sits inside .table-responsive, whose overflow would clip a
+           dropdown. Let it escape; the table is only seven columns wide. */
+        .table-responsive:has(.dropdown-menu.show) {
+            overflow: visible;
+        }
+
+        td.tp-actions {
+            width: 1%;
+            white-space: nowrap;
         }
     </style>
 
@@ -120,7 +135,7 @@
                             <div class="row">
                                 <div style="display:none" runat="server" id="div_SearchFor" class="col-lg-2 mt-0">
                                     <h6>Search For :</h6>
-                                    <asp:DropDownList ID="ddl_SearchFor" runat="server" class="form-select">
+                                    <asp:DropDownList ID="ddl_SearchFor" ClientIDMode="Static" runat="server" class="form-select">
                                         <asp:ListItem Selected="True" Value="Customer">Customer</asp:ListItem>
                                         <asp:ListItem Value="Contact"> Contact</asp:ListItem>
                                         <asp:ListItem Value="Business"> Business</asp:ListItem>
@@ -128,7 +143,9 @@
                                 </div>
                                 <div class="col-lg-2 mt-0">
                                     <h6>Search By</h6>
-                                    <asp:DropDownList ID="SearchBy" runat="server" class="form-select">
+                                    <%-- ClientIDMode=Static: the inline JS below binds to #SearchBy / #ddl_SearchFor /
+                                         #ddlTag by their bare ids, which never matched the ASP.NET-generated ids. --%>
+                                    <asp:DropDownList ID="SearchBy" ClientIDMode="Static" runat="server" class="form-select">
                                         <asp:ListItem Value="LastName">Last Name</asp:ListItem>
                                         <asp:ListItem Value="FirstName">First Name</asp:ListItem>
                                         <asp:ListItem Value="BusinessName">Business Name</asp:ListItem>
@@ -142,7 +159,7 @@
                                 </div>
                                 <div class="col-lg-2 mt-0">
                                     <h6>Tag</h6>
-                                    <select id="ddlTag" runat="server" title="Select Tags" style="width: 100%" class="form-control selectpicker" multiple="true" data-live-search="true">
+                                    <select id="ddlTag" clientidmode="Static" runat="server" title="Select Tags" style="width: 100%" class="form-control selectpicker" multiple="true" data-live-search="true">
                                     </select>
                                 </div>
                                 <div class="col-lg-4 mt-0">
@@ -154,31 +171,14 @@
 
                                 <div class="col-lg-2 mt-0">
                                     <h6>&nbsp;</h6>
-                                    <asp:Button ID="Search" ClientIDMode="Static" runat="server" OnClick="Search_Click" Text="Search" Width="20px" class="btn btn-secondary w-100" />
+                                    <asp:Button ID="Search" ClientIDMode="Static" runat="server" OnClick="Search_Click" Text="Search" class="btn btn-secondary w-100" />
 
                                 </div>
 
-
-                                <div class="col-12" style="margin-top: 10px;display:none;">
-                                    <div class="row">
-                                        <div class="float-start">
-                                            <p style="display: none" id="ProgressGIF">
-                                                <img id="imgProcess" src="images/Rolling.gif" />
-                                                Sync on progress....
-                                            </p>
-                                        </div>
-
-
-                                    </div>
-                                    <div style="float: left">
-                                        <span class="btn btn-primary" title="QuickBooks Online Sync" runat="server" id="SyncQuickBook" onclick="SyncQuickBook()">QuickBooks Online Sync</span>
-                                        <span style="display: none" class="btn btn-primary" title="AM Manager Sync" id="spn_AiremasterSync" runat="server" onclick="AMManagerSync()">Aire-Master Customer Sync</span>
-                                    </div>
-                                    <%--<div style="float:right">
-                                         <asp:Button ID="btnConnect" runat="server" class="btn btn-primary" Text="Connect QuickBooks Online" OnClick="ConQuickBook_Click">
-                                        </asp:Button>
-                                     </div>--%>
-                                </div>
+                                <%-- Removed: a permanently hidden QuickBooks Online / Aire-Master sync block whose
+                                     handlers posted to CustomerList.aspx/SyncCustomerToQBO and
+                                     CustomerList.aspx/SyncCustomerAPItoDB. CustomerList.aspx does not exist in TPM,
+                                     so both were guaranteed 404s. --%>
                             </div>
                             <hr />
                             <div class="row">
@@ -200,9 +200,10 @@
                         <div class="modal-content">
                             <div class="modal-header">
                                 <h5 class="modal-title" id="AddEditLongTitle">Ratings </h5>
-                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                    <span aria-hidden="true">&times;</span>
-                                </button>
+                                <%-- btn-close + data-bs-dismiss: the page runs Bootstrap 5, where data-dismiss
+                                     is a no-op. This × was the only close control with no onclick fallback,
+                                     so the Ratings modal could not be closed at all. --%>
+                                <button type="button" class="btn-close" onclick="hideModal();" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
                                 <div class="row mt-2">
@@ -227,14 +228,14 @@
                                 <div class="row mt-2">
                                     <div class="col-12 mt-0">
                                         <label for="validationCustom01" class="form-label mb-0">Email Subject :</label>
-                                        <asp:TextBox ID="txt_EmailSubject" Rows="2" TextMode="MultiLine" runat="server" class="form-control"></asp:TextBox>
+                                        <asp:TextBox ID="txt_EmailSubject" ClientIDMode="Static" Rows="2" TextMode="MultiLine" runat="server" class="form-control"></asp:TextBox>
 
                                     </div>
                                 </div>
                                 <div class="row mt-2">
                                     <div class="col-12 mt-0">
                                         <label for="validationCustom01" class="form-label mb-0">Email Body :</label>
-                                        <asp:TextBox ID="txt_EmailBody" Rows="5" TextMode="MultiLine" runat="server" class="form-control"></asp:TextBox>
+                                        <asp:TextBox ID="txt_EmailBody" ClientIDMode="Static" Rows="5" TextMode="MultiLine" runat="server" class="form-control"></asp:TextBox>
 
                                     </div>
                                 </div>
@@ -247,7 +248,7 @@
                             </div>--%>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" onclick="hideModal();" data-dismiss="modal">Close</button>
+                                <button type="button" class="btn btn-secondary" onclick="hideModal();" data-bs-dismiss="modal">Close</button>
                                 <asp:LinkButton ToolTip="Send Ratings/Survey Email." CssClass="float-end btn btn-secondary m-2" ID="lnkEdit"
                                     runat="server" Text='Send Ratings/Survey Email.' OnClick="lnkFollowUP_Click1"><i class="fas fa-envelope"></i> Send Ratings Email.</asp:LinkButton>&nbsp;
                             </div>
@@ -263,19 +264,22 @@
                             </div>
                             <div class="modal-body">
 
-                                <asp:HiddenField ID="CustomerID" runat="server" />
+                                <%-- ClientIDMode=Static throughout this modal: FillEmailBody() populates these
+                                     by bare id ($("#_To"), $("#EmailBody") ...), which never matched the
+                                     ASP.NET-generated ids, so the modal always opened blank. --%>
+                                <asp:HiddenField ID="CustomerID" ClientIDMode="Static" runat="server" />
 
                                 <div class="row mt-3">
                                     <div class="col-12 mt-0">
                                         <label for="validationCustom01" class="form-label mb-0">To</label>
-                                        <input type="email" id="_To" placeholder="you@yourcompany.com" class="form-control" runat="server" />
+                                        <input type="email" id="_To" clientidmode="Static" placeholder="you@yourcompany.com" class="form-control" runat="server" />
                                     </div>
                                 </div>
 
                                 <div class="row mt-2">
                                     <div class="col-12 mt-0">
                                         <label for="validationCustom01" class="form-label mb-0">CC</label>
-                                        <input type="email" id="_CC" placeholder="you@yourcompany.com" class="form-control" runat="server" />
+                                        <input type="email" id="_CC" clientidmode="Static" placeholder="you@yourcompany.com" class="form-control" runat="server" />
                                         <small class="form-text text-black-50">Add multiple email with comma.(xyz@w.com,Abc@T.com)</small>
                                     </div>
                                 </div>
@@ -283,7 +287,7 @@
                                 <div class="row mt-2">
                                     <div class="col-12 mt-0">
                                         <label for="validationCustom01" class="form-label mb-0">BCC</label>
-                                        <input type="email" id="_BCC" placeholder="someoneelse@yourcompany.com" class="form-control" runat="server" />
+                                        <input type="email" id="_BCC" clientidmode="Static" placeholder="someoneelse@yourcompany.com" class="form-control" runat="server" />
                                         <small class="form-text text-black-50">Add multiple email with comma.(xyz@w.com,Abc@T.com)</small>
                                     </div>
                                 </div>
@@ -294,7 +298,7 @@
                                     <div class="col-12 mt-0">
                                         <label for="EmailSubject" class="col-sm-2 col-form-label">Subject</label>
                                         <div class="col-sm-12">
-                                            <input type="text" id="_EmailSubject" name="EmailSubject" runat="server" class="form-control col-6" max="500" />
+                                            <input type="text" id="_EmailSubject" clientidmode="Static" name="EmailSubject" runat="server" class="form-control col-6" max="500" />
                                         </div>
 
                                     </div>
@@ -316,7 +320,7 @@
                                     <div class="col-12 mt-0">
                                         <label for="EmailBody" class="col-sm-2 col-form-label"><span>Email Body</span></label>
                                         <div class="col-sm-12">
-                                            <textarea id="EmailBody" name="EmailBody" rows="5" runat="server" class="form-control"></textarea>
+                                            <textarea id="EmailBody" clientidmode="Static" name="EmailBody" rows="5" runat="server" class="form-control"></textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -324,7 +328,7 @@
 
                             </div>
                             <div class="modal-footer justify-content-between">
-                                <button type="button" class="btn btn-secondary  btn-block ml-1" data-dismiss="modal" onclick="ClosePopup()" style="float: left">Close</button>
+                                <button type="button" class="btn btn-secondary  btn-block ml-1" data-bs-dismiss="modal" onclick="ClosePopup()" style="float: left">Close</button>
                                 <asp:Button ID="btnSendMail" ClientIDMode="Static" runat="server" Text="Send" CssClass="btn btn-secondary text-nowrap" OnClick="btnSendMail_Click" />
                             </div>
                         </div>
@@ -351,8 +355,12 @@
                     <div class="row mt-3">
                         <div class="col-12 mt-0">
                             <label for="validationCustom01" class="form-label mb-0">Mobile Number</label>
-                            <input type="text" id="txtMobile" class="form-control" runat="server" readonly />
-                            <input runat="server" type="text" id="txtCustomerId" hidden />
+                            <%-- ClientIDMode=Static: OpenSMSPopUp/CloseSMSPopup and the btnSendSms validation
+                                 handler address these by bare id. Without it the handler threw
+                                 "Cannot read properties of null" and, because it threw before
+                                 e.preventDefault(), the postback went through with an empty number. --%>
+                            <input type="text" id="txtMobile" clientidmode="Static" class="form-control" runat="server" readonly />
+                            <input runat="server" type="text" id="txtCustomerId" clientidmode="Static" hidden />
 
                         </div>
                     </div>
@@ -361,7 +369,7 @@
                         <div class="col-12 mt-0">
                             <label for="EmailBody" class="col-sm-2 col-form-label"><span>Text</span></label>
                             <div class="col-sm-12">
-                                <textarea id="txtSMS" name="SMSBody" rows="5" runat="server" class="form-control"></textarea>
+                                <textarea id="txtSMS" clientidmode="Static" name="SMSBody" rows="5" runat="server" class="form-control"></textarea>
                             </div>
                         </div>
                     </div>
@@ -369,7 +377,7 @@
 
                 </div>
                 <div class="modal-footer justify-content-between">
-                    <button type="button" class="btn btn-warning  btn-block ml-1" data-dismiss="modal" onclick="CloseSMSPopup()" style="float: left">Close</button>
+                    <button type="button" class="btn btn-warning  btn-block ml-1" data-bs-dismiss="modal" onclick="CloseSMSPopup()" style="float: left">Close</button>
                     <asp:Button ID="btnSendSms" ClientIDMode="Static" runat="server" Text="Send SMS" CssClass="btn btn-success text-nowrap" OnClick="btnSendSMS_Click" />
                 </div>
             </div>
@@ -391,8 +399,8 @@
                     <div class="row mt-3">
                         <div class="col-12 mt-0">
                             <label for="txtCustMob" class="form-label mb-0">Mobile Number</label>
-                            <input type="text" id="txtCustMob" class="form-control" runat="server" readonly />
-                            <input runat="server" type="text" id="txtCustId" hidden />
+                            <input type="text" id="txtCustMob" clientidmode="Static" class="form-control" runat="server" readonly />
+                            <input runat="server" type="text" id="txtCustId" clientidmode="Static" hidden />
 
                         </div>
                     </div>
@@ -401,7 +409,7 @@
                         <div class="col-12 mt-0">
                             <label for="EmailBody" class="col-sm-2 col-form-label"><span>MMS Body</span></label>
                             <div class="col-sm-12">
-                                <textarea id="txtMMSBody" name="MMSBody" rows="4" runat="server" class="form-control"></textarea>
+                                <textarea id="txtMMSBody" clientidmode="Static" name="MMSBody" rows="4" runat="server" class="form-control"></textarea>
                             </div>
                         </div>
                     </div>
@@ -409,7 +417,11 @@
                     <div class="row mt-3">
                         <div class="cold-12 mt-0">
                             <label for="fuAttachment" class="form-label mb-0">Attachment</label>
-                            <asp:FileUpload ID="fuAttachment" runat="server" CssClass="form-control" />
+                            <%-- ClientIDMode=Static on fuAttachment and btnSendMMS. btnSendMMS lacked it while
+                                 btnSendSms had it, so document.getElementById("btnSendMMS") returned null and
+                                 the resulting TypeError aborted the rest of the inline script block — which is
+                                 why the .pdf/.jpg/.jpeg/.png attachment check below never got registered. --%>
+                            <asp:FileUpload ID="fuAttachment" ClientIDMode="Static" runat="server" CssClass="form-control" />
                             <p id="fileHint" class="text-muted small mb-0">Allowed file types: .pdf, .jpg, .jpeg, .png</p>
                             <span id="fileError" class="text-danger small"></span>
                         </div>
@@ -417,8 +429,8 @@
 
                 </div>
                 <div class="modal-footer justify-content-between">
-                    <button type="button" class="btn btn-warning  btn-block ml-1" data-dismiss="modal" onclick="CloseMMSPopup()" style="float: left">Close</button>
-                    <asp:Button ID="btnSendMMS" ClientIDMode="Static" runat="server" Text="Send SMS" CssClass="btn btn-success text-nowrap" OnClick="btnSendMMS_Click" />
+                    <button type="button" class="btn btn-warning  btn-block ml-1" data-bs-dismiss="modal" onclick="CloseMMSPopup()" style="float: left">Close</button>
+                    <asp:Button ID="btnSendMMS" ClientIDMode="Static" runat="server" Text="Send MMS" CssClass="btn btn-success text-nowrap" OnClick="btnSendMMS_Click" />
                 </div>
             </div>
         </div>
@@ -430,162 +442,135 @@
 
 
     <script>
-        $("#SearchValue").on("keypress", function(e) {
+        // ---------------------------------------------------------------------------
+        // Modal helpers.
+        // The page ends up with Bootstrap 5 in charge ($.fn.modal is whatever the last
+        // bundle registered), so go through the native BS5 API and only fall back to the
+        // jQuery plugin. Previously every close button used the Bootstrap 4 data-dismiss
+        // attribute, which BS5 ignores.
+        // ---------------------------------------------------------------------------
+        function showBsModal(id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            if (window.bootstrap && bootstrap.Modal) bootstrap.Modal.getOrCreateInstance(el).show();
+            else $(el).modal('show');
+        }
+        function hideBsModal(id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            if (window.bootstrap && bootstrap.Modal) {
+                var inst = bootstrap.Modal.getInstance(el);
+                if (inst) inst.hide();
+            } else {
+                $(el).modal('hide');
+            }
+        }
+        function htmlEscape(s) {
+            return $('<div>').text(s == null ? '' : s).html();
+        }
+
+        $("#SearchValue").on("keypress", function (e) {
             if (e.keyCode == 13) {
+                e.preventDefault();   // stop the browser firing its own default submit as well
                 $("#Search").click();
-
-            //alert("Enter pressed");
-            //return false; // prevent the button click from happening
-        }
-});
-
-         function AMManagerSync() {
-            var prgBar = document.getElementById("ProgressGIF");
-            prgBar.style.display = "block";
-            $.ajax({
-                type: "POST",
-                url: "CustomerList.aspx/SyncCustomerAPItoDB",
-                contentType: "application/json",
-                dataType: "json",
-                success: function (msg) {
-                    alert(msg.d);
-                    prgBar.style.display = "none";
-                    window.location.href = "CustomerList.aspx?m=2&Type=Business";
-                }
-            });
-        }
-
-         function SyncQuickBook() {
-            var prgBar = document.getElementById("ProgressGIF");
-            prgBar.style.display = "block";
-            $.ajax({
-                type: "POST",
-                url: "CustomerList.aspx/SyncCustomerToQBO",
-                contentType: "application/json",
-                dataType: "json",
-                success: function (msg) {
-                    alert(msg.d);
-                    prgBar.style.display = "none";
-                    window.location.href = "CustomerList.aspx";
-                }
-            });
-        }
-
-        $('#file').on('change', function () {
-            var fd = new FormData();
-            var filename = this.value;
-            var lastIndex = filename.lastIndexOf("\\");
-            var count = 0;
-            if (lastIndex >= 0) {
-                filename = filename.substring(lastIndex + 1);
             }
-            var files = $('#file')[0].files;
-            for (var i = 0; i < files.length; i++) {
-                if (files[i].size < 4242880) {
-                    $("#custom-file").append('<span>' + '<div class="filenameupload">' + files[i].name + ' abc</div>' + '<p class="close" >X</p></span>');
-                    fd.append("file-" + (count++), files[i])
-                }
-            }
-            var request = new XMLHttpRequest();
-            request.open("POST", "/path/to/server", true);
-            request.send(fd);
-            fileCount = Array.from(fd.keys()).length;
-            showFileCount();
         });
-        updateList = function () {
+
+        // Attachment list for the Send Email modal. The previous change handler built a
+        // FormData, POSTed it to the literal placeholder URL "/path/to/server" and then
+        // called showFileCount(), which is not defined anywhere - so picking a file threw
+        // and fired a 404. Only the list rendering was ever wanted.
+        function updateList() {
             var input = document.getElementById('file');
             var output = document.getElementById('fileList');
+            if (!input || !output) return;
             var children = "";
             for (var i = 0; i < input.files.length; ++i) {
-                // children += '<li>' + input.files.item(i).name + '<span class="remove-list fa fa-check" onclick="return this.parentNode.remove()"></span>' + '</li>'
-                children += '<li><span class="remove-list fa fa-check"></span>' + input.files.item(i).name + '</li>';
-
-                // input.files.item(i).parent().remove();
+                children += '<li><span class="remove-list fa fa-check"></span>' + htmlEscape(input.files.item(i).name) + '</li>';
             }
             output.innerHTML = children;
         }
 
-
-
+        // ---------------------------------------------------------------------------
+        // Ratings / survey email
+        // ---------------------------------------------------------------------------
         function OpenSurveyMailPopUp(emailto, customerID) {
+            if (!emailto) {
+                Swal.fire('Validation Error', 'This provider has no email address on file.', 'warning');
+                return;
+            }
             $("#txt_EmailTO").val(emailto);
             $("#txt_CustID").val(customerID);
-
+            $("#optSurvey").val("");
+            $("#txt_EmailSubject").val("");
+            $("#txt_EmailBody").val("");
             showModal();
         }
         function showModal() {
-
-            $('#SurveyMail').modal('show');
+            showBsModal('SurveyMail');
         }
         function hideModal() {
-            $('#SurveyMail').modal('hide');
+            hideBsModal('SurveyMail');
             $('.modal-backdrop').remove();
-
         }
         function FillSurveyEmailBody() {
             var id = $("#optSurvey").val();
             var customerid = $("#txt_CustID").val();
-
+            if (!id) {
+                $("#txt_EmailSubject").val("");
+                $("#txt_EmailBody").val("");
+                return;
+            }
 
             $.ajax({
-                url: 'CustomerList.aspx/optSurvey_Changed',
+                // was CustomerList.aspx/optSurvey_Changed - CustomerList.aspx does not exist
+                // in TPM, so this was always a 404. The WebMethod lives on this page.
+                url: 'TpList.aspx/optSurvey_Changed',
                 type: "POST",
                 contentType: 'application/json',
-                data: "{SurveyID:'" + id + "',CustomerID:'" + customerid + "'}",
+                data: JSON.stringify({ SurveyID: id, CustomerID: customerid }),
                 dataType: 'json',
                 success: function (sR) {
-                    console.log(sR)
-                    $("#txt_EmailSubject").val(sR.d[0]);
-                    $("#txt_EmailBody").val(sR.d[1]);
-
-                    //  alert($("#_From").val())
-
+                    var d = sR.d || [];
+                    $("#txt_EmailSubject").val(d[0] || "");
+                    $("#txt_EmailBody").val(d[1] || "");
                 },
-                error: function (error) {
-                    alert(error);
+                error: function (xhr) {
+                    Swal.fire('Error', 'Could not load the ratings template.', 'error');
+                    console.error('optSurvey_Changed failed', xhr.status, xhr.responseText);
                 }
-            })
-
-        }
-        function Add_new_Customer() {
-            window.location.href = "customerDetail.aspx?m=0&cid=0&Mode=Add";
+            });
         }
 
+        // ---------------------------------------------------------------------------
+        // Ad-hoc email
+        // ---------------------------------------------------------------------------
         function ShowPopup() {
-
-            $("#modalCustomerMail").modal('show');
+            showBsModal('modalCustomerMail');
         }
-
         function ClosePopup() {
-
-            $("#modalCustomerMail").modal('hide');
+            hideBsModal('modalCustomerMail');
         }
         function OpenMailPopUp(CustomerID) {
-            FillEmailBody(CustomerID);
             $("#CustomerID").val(CustomerID);
-            // $("#_To").val(emailTo);
-
-
-
+            FillEmailBody(CustomerID);
         }
 
         function FillEmailBody(customerid) {
-            //  alert("caled");
             $.ajax({
-                url: 'CustomerList.aspx/FillEmailModal',
-                type: "Post",
+                // was CustomerList.aspx/FillEmailModal - see note above.
+                url: 'TpList.aspx/FillEmailModal',
+                type: "POST",
                 contentType: 'application/json',
-                data: "{CustomerID:'" + customerid + "'}",
+                data: JSON.stringify({ CustomerID: customerid }),
                 dataType: 'json',
                 success: function (sR) {
-                   // $("#form1")[0].reset();
                     $("#_EmailSubject").val("");
                     $("#EmailBody").val("");
                     $("#_CC").val("");
                     $("#_BCC").val("");
                     $("#_To").val("");
 
-                   
                     if (sR.d != "0") {
                         var data = $.parseJSON(sR.d);
                         $("#_EmailSubject").val(data.StandardMailSubject);
@@ -594,18 +579,20 @@
                         $("#_BCC").val(data.EmailBCC);
                         $("#_To").val(data.EmailTo);
 
-                        $("#file").val();
+                        $("#file").val('');
                         $("#fileList").empty();
                         ShowPopup();
+                    } else {
+                        Swal.fire('Not configured', 'No standard email template is set up for this company.', 'info');
                     }
-
                 },
-                error: function (error) {
-                    alert(error);
+                error: function (xhr) {
+                    Swal.fire('Error', 'Could not load the email template.', 'error');
+                    console.error('FillEmailModal failed', xhr.status, xhr.responseText);
                 }
-            })
-
+            });
         }
+
         $('#btnSendMail').on('click', function (evt) {
             evt.preventDefault();
             Swal.fire({
@@ -621,58 +608,30 @@
                     denyButton: 'order-3',
                 }
             }).then((result) => {
-
                 if (result.isConfirmed) {
                     window.__doPostBack("<%= btnSendMail.UniqueID %>", "");
-
-                } else if (result.isDenied) {
-                    evt.preventDefault();
-
                 }
-                //return true;
-            })
-
+            });
         });
 
-        function checkValidDate() {
-            // alert("enter")
-            var from = $("#FromDate").val();
-            var to = $("#ToDate").val();
-
-            if (Date.parse(from) > Date.parse(to)) {
-                alert("Invalid Date Range");
-                $("#ToDate").val("");
-                $('#ToDate').css("border-color", "red");
-            }
-        }
-
+        // ---------------------------------------------------------------------------
+        // Tag picker
+        // ---------------------------------------------------------------------------
         function initializeSelectPicker() {
             try {
                 var $ddlTag = $('#<%= ddlTag.ClientID %>');
                 if ($ddlTag.length > 0) {
-                    console.log('Initializing selectpicker for ddlTag, options count: ' + $ddlTag.find('option').length);
-                    
-                    // Destroy existing selectpicker if it exists
                     if ($ddlTag.next('.bootstrap-select').length > 0) {
-                        try {
-                            $ddlTag.selectpicker('destroy');
-                        } catch (e) {
-                            console.log('Error destroying selectpicker: ' + e.message);
-                        }
+                        try { $ddlTag.selectpicker('destroy'); }
+                        catch (e) { console.log('Error destroying selectpicker: ' + e.message); }
                     }
-                    
-                    // Small delay to ensure DOM is ready
-                    setTimeout(function() {
-                        // Re-initialize selectpicker
+                    setTimeout(function () {
                         $ddlTag.selectpicker({
                             noneSelectedText: 'Select Tags',
                             selectAllText: 'Select All',
                             deselectAllText: 'Deselect All'
                         });
-                        
-                        // Refresh to show any server-side selected values and loaded options
                         $ddlTag.selectpicker('refresh');
-                        console.log('Selectpicker initialized and refreshed');
                     }, 100);
                 } else {
                     console.log('ddlTag element not found');
@@ -682,168 +641,200 @@
             }
         }
 
+        // ---------------------------------------------------------------------------
+        // Grid
+        // ---------------------------------------------------------------------------
+        var providerTable = null;
+
         $(document).ready(function () {
-            // Initialize selectpicker for ddlTag
             initializeSelectPicker();
-            
-            ClosePopup()
-            $('#example').dataTable({
-                "scrollX": true,
-                "scrollY": true,
+
+            providerTable = $('#example').DataTable({
+                // "scrollY": true was invalid (it expects a CSS length) and scrollX put the
+                // grid inside its own overflow container, which clipped the row action menu.
+                // The surrounding .table-responsive already handles narrow viewports.
                 "order": [],
-                "dom": 'Bfrtip',
-                //"buttons": [
-                //    'copy', 'csv', 'excel', 'pdf', 'print'
-                //]
-                "buttons": [
-
-                    {
-                        extend: 'excel',
-                        text: 'Excel',
-                        className: 'datatableButton',
-                         exportOptions: {
-                    columns: [1, 2, 3, 4, 5, 6]
-                }
-                    },
-                    {
-                        extend: 'print',
-                        exportOptions: {
-                            columns: ':visible'
-                        },
-                        className: 'datatableButton',
-                         exportOptions: {
-                    columns: [1, 2, 3, 4, 5, 6]
-                }
-                    }
-
-
+                "pageLength": 25,
+                "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+                "columnDefs": [
+                    // action column: not sortable, not searchable, not exported
+                    { targets: 0, orderable: false, searchable: false, className: 'no-export' },
+                    { targets: '_all', orderSequence: ['asc', 'desc'] }
                 ],
-
-
+                "layout": {
+                    topStart: {
+                        buttons: [
+                            {
+                                extend: 'excel',
+                                text: 'Excel',
+                                className: 'datatableButton',
+                                title: 'Third Party Providers',
+                                // was columns: [1,2,3,4,5,6] against a 6-column table (0-5),
+                                // which dropped Business Name and asked for a column that did
+                                // not exist. Select by class instead so it cannot drift again.
+                                exportOptions: { columns: ':visible:not(.no-export)' }
+                            },
+                            {
+                                extend: 'print',
+                                text: 'Print',
+                                className: 'datatableButton',
+                                title: 'Third Party Providers',
+                                exportOptions: { columns: ':visible:not(.no-export)' }
+                            }
+                        ]
+                    },
+                    topEnd: 'search',
+                    bottomStart: ['pageLength', 'info'],
+                    bottomEnd: 'paging'
+                }
             });
 
             if ($("#SearchBy").val() == "All") {
-                $("#SearchValue").val("")
+                $("#SearchValue").val("");
                 $("#SearchValue").prop('disabled', true);
             }
-        })
-        
-       $("#ddl_SearchFor").change(function () {
-            if ($("#ddl_SearchFor").val() == "Business") {
-              
-            } else {
+        });
+
+        $("#ddl_SearchFor").change(function () {
+            if ($("#ddl_SearchFor").val() != "Business") {
                 $("#SearchValue").prop('disabled', false);
             }
         });
 
         $("#SearchBy").change(function () {
             if ($("#SearchBy").val() == "All") {
-                $("#SearchValue").val("")
+                $("#SearchValue").val("");
                 $("#SearchValue").prop('disabled', true);
             } else {
                 $("#SearchValue").prop('disabled', false);
             }
         });
-         function OpenSMSPopUp(mobile, customerID) {
+
+        // ---------------------------------------------------------------------------
+        // SMS
+        // ---------------------------------------------------------------------------
+        function OpenSMSPopUp(mobile, customerID) {
             if (!mobile) {
                 Swal.fire('Validation Error', 'Please add mobile number for this customer.', 'warning');
                 return;
             }
             $("#txtMobile").val(mobile);
             $("#txtCustomerId").val(customerID);
-            $('#modalSendSMS').modal('show');
+            $("#txtSMS").val('');
+            showBsModal('modalSendSMS');
         }
         function CloseSMSPopup() {
             $("#txtMobile").val('');
             $("#txtCustomerId").val('');
             $("#txtSMS").val('');
-            $("#modalSendSMS").modal('hide');
+            hideBsModal('modalSendSMS');
         }
 
-        document.getElementById("btnSendSms").addEventListener("click", function (e) {
-            var mobile = document.getElementById("txtMobile").value.trim();
-            var sms = document.getElementById("txtSMS").value.trim();
+        (function () {
+            var btn = document.getElementById("btnSendSms");
+            if (!btn) return;
+            btn.addEventListener("click", function (e) {
+                var mobileEl = document.getElementById("txtMobile");
+                var smsEl = document.getElementById("txtSMS");
+                var mobile = mobileEl ? mobileEl.value.trim() : "";
+                var sms = smsEl ? smsEl.value.trim() : "";
 
-            if (!mobile || !sms) {
-                Swal.fire('Validation Error', 'Mobile number and SMS text cannot be empty.', 'warning');
-                e.preventDefault(); // Stop form submission
-            }
-        });
+                // This used to throw before reaching preventDefault (the ids did not resolve),
+                // so the postback went through and an empty SMS was handed to Twilio.
+                if (!mobile || !sms) {
+                    e.preventDefault();
+                    Swal.fire('Validation Error', 'Mobile number and SMS text cannot be empty.', 'warning');
+                }
+            });
+        })();
 
-
+        // ---------------------------------------------------------------------------
+        // MMS
+        // ---------------------------------------------------------------------------
         function OpenMMSPopUp(mobile, customerID) {
-            
-             var IsMMSAllowed = <%= Session["IsMMSAllowed"].ToString().ToLower() %>;
-        
+            // Server-side guard: Session["IsMMSAllowed"] used to be dereferenced directly in
+            // the markup, so a session without that key rendered a NullReferenceException
+            // instead of the page.
+            var IsMMSAllowed = <%= IsMMSAllowedJs %>;
+
             if (!IsMMSAllowed) {
-                ShowCustomAlert('\MS disabled.Please contact Support');
+                Swal.fire('MMS disabled', 'MMS is not enabled for this account. Please contact Support.', 'warning');
                 return;
             }
-
             if (!mobile) {
                 Swal.fire('Validation Error', 'Please add mobile number for this customer.', 'warning');
                 return;
             }
             $("#txtCustMob").val(mobile);
             $("#txtCustId").val(customerID);
-            $('#modalSendMMS').modal('show');
+            $("#txtMMSBody").val('');
+            $("#fuAttachment").val('');
+            $("#fileError").text('');
+            showBsModal('modalSendMMS');
         }
         function CloseMMSPopup() {
             $("#txtCustMob").val('');
             $("#txtCustId").val('');
             $("#txtMMSBody").val('');
             $("#fuAttachment").val('');
-            $("#modalSendMMS").modal('hide');
+            $("#fileError").text('');
+            hideBsModal('modalSendMMS');
         }
 
-        document.getElementById("btnSendMMS").addEventListener("click", function (e) {
-            var mobile = document.getElementById("fuAttachment").value.trim();
-            var sms = document.getElementById("txtMMSBody").value.trim();
+        (function () {
+            var btn = document.getElementById("btnSendMMS");
+            if (!btn) return;   // this getElementById returned null and its TypeError killed
+                                // the rest of the script block, including the validator below
+            btn.addEventListener("click", function (e) {
+                var fileEl = document.getElementById("fuAttachment");
+                var bodyEl = document.getElementById("txtMMSBody");
+                var attachment = fileEl ? fileEl.value.trim() : "";
+                var body = bodyEl ? bodyEl.value.trim() : "";
 
-            if (!mobile || !sms) {
-                Swal.fire('Validation Error', 'MMS body and file cannot be empty.', 'warning');
-                e.preventDefault(); // Stop form submission
-            }
-        });
-
-        document.addEventListener("DOMContentLoaded", function () {
-            var fileInput = document.getElementById("<%= fuAttachment.ClientID %>");
-            var errorLabel = document.getElementById("fileError");
-
-            fileInput.addEventListener("change", function () {
-                errorLabel.innerText = ""; // clear previous error
-
-                if (fileInput.files.length > 0) {
-                    var fileName = fileInput.files[0].name.toLowerCase();
-                    var allowedExtensions = [".pdf", ".jpg", ".jpeg", ".png"];
-
-                    var isValid = allowedExtensions.some(function (ext) {
-                        return fileName.endsWith(ext);
-                    });
-
-                    if (!isValid) {
-                        errorLabel.innerText = "❌ Invalid file type! Only PDF, JPG, JPEG, PNG are allowed.";
-                        fileInput.value = "";
-                    }
+                if (!attachment || !body) {
+                    e.preventDefault();
+                    Swal.fire('Validation Error', 'MMS body and file cannot be empty.', 'warning');
                 }
             });
-        });
+        })();
 
+        // Attachment type check for the MMS modal. Never ran before: it is registered after
+        // the throw above, and it is a DOMContentLoaded handler in a script block that had
+        // already been aborted.
+        (function () {
+            function bindAttachmentValidation() {
+                var fileInput = document.getElementById("fuAttachment");
+                var errorLabel = document.getElementById("fileError");
+                if (!fileInput || !errorLabel) return;
 
-        function OpenSMSHistory(mobile, customerName, customerId) {
-            if (!mobile) {
-                Swal.fire('Validation Error', 'Please add mobile number for this customer.', 'warning');
-                return;
+                fileInput.addEventListener("change", function () {
+                    errorLabel.innerText = "";
+                    if (fileInput.files.length > 0) {
+                        var fileName = fileInput.files[0].name.toLowerCase();
+                        var allowedExtensions = [".pdf", ".jpg", ".jpeg", ".png"];
+                        var isValid = allowedExtensions.some(function (ext) {
+                            return fileName.endsWith(ext);
+                        });
+                        if (!isValid) {
+                            errorLabel.innerText = "Invalid file type! Only PDF, JPG, JPEG, PNG are allowed.";
+                            fileInput.value = "";
+                        }
+                    }
+                });
             }
-            var url = "CustomerTextHistory.aspx?mobile=" + encodeURIComponent(mobile)
-                + "&name=" + encodeURIComponent(customerName)
-                + "&customerId=" + encodeURIComponent(customerId);
+            if (document.readyState === 'loading') {
+                document.addEventListener("DOMContentLoaded", bindAttachmentValidation);
+            } else {
+                bindAttachmentValidation();
+            }
+        })();
 
-            window.location.href = url;
-        }
-
-
-         function OpenAllHistory(mobile, customerName, customerId) {
+        // ---------------------------------------------------------------------------
+        // History
+        // ---------------------------------------------------------------------------
+        // OpenSMSHistory() was removed: it navigated to CustomerTextHistory.aspx, which does
+        // not exist in TPM. CustomerChatHistory.aspx does, and is what OpenAllHistory uses.
+        function OpenAllHistory(mobile, customerName, customerId) {
             if (!mobile) {
                 Swal.fire('Validation Error', 'Please add mobile number for this customer.', 'warning');
                 return;
@@ -858,4 +849,3 @@
     </script>
 
 </asp:Content>
-

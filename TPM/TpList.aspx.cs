@@ -91,192 +91,232 @@ namespace TPM
 
     
        
+        /// <summary>
+        /// Emitted into the page so OpenMMSPopUp() has a literal to test. The markup used to
+        /// call Session["IsMMSAllowed"].ToString() inline, which threw a NullReferenceException
+        /// during render - i.e. a blank page - for any session that never set the key.
+        /// </summary>
+        protected string IsMMSAllowedJs
+        {
+            get
+            {
+                bool allowed = false;
+                object flag = Session != null ? Session["IsMMSAllowed"] : null;
+                if (flag != null) bool.TryParse(flag.ToString(), out allowed);
+                return allowed ? "true" : "false";
+            }
+        }
+
+        /// <summary>
+        /// Escapes the LIKE metacharacters in a user-supplied search term. Paired with
+        /// ESCAPE '\' in the SQL so that a literal % or _ is matched as itself.
+        /// </summary>
+        private static string EscapeLike(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return value;
+            return value.Replace("\\", "\\\\")
+                        .Replace("%", "\\%")
+                        .Replace("_", "\\_")
+                        .Replace("[", "\\[");
+        }
+
+        /// <summary>
+        /// Renders a value into a single-quoted JavaScript string inside a double-quoted
+        /// HTML attribute.
+        /// </summary>
+        private static string JsArg(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            return HttpUtility.HtmlAttributeEncode(value.Replace("\\", "\\\\").Replace("'", "\\'"));
+        }
+
+        private static string Enc(object value)
+        {
+            return HttpUtility.HtmlEncode(value == null ? string.Empty : value.ToString());
+        }
+
+        private DataTable GetProviders(string sql, List<SqlParameter> parameters)
+        {
+            DataTable dt = new DataTable();
+            using (SqlConnection conn = new SqlConnection(connStr))
+            using (SqlCommand cmd = new SqlCommand(sql, conn))
+            {
+                cmd.CommandType = CommandType.Text;
+                cmd.CommandTimeout = 900;
+                if (parameters != null && parameters.Count > 0)
+                {
+                    cmd.Parameters.AddRange(parameters.ToArray());
+                }
+                using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                {
+                    adapter.Fill(dt);
+                }
+            }
+            return dt;
+        }
+
         public void LoadBusinessontactTable(string searchPerameter, string searchValue, string selectedTags)
         {
-            searchPerameter = Common.CleanInput(searchPerameter);
-            searchValue = Common.CleanInput(searchValue);
             table.Append("<div><table id='example' class='table table-striped table-bordered nowrap'  style='border: 1px solid #ccc;font-size: 9pt;font-family:Arial;width:100%' >");
 
+            // The grid used to show tbl_Customer.Title (a salutation, empty on every provider
+            // row) while the "Job Title" search option filtered on JobTitle - two different
+            // columns. Both now use JobTitle so the column and its filter agree.
+            table.Append("<thead><tr>"
+                       + "<th class='no-export'></th>"
+                       + "<th>Business Name</th><th>Job Title</th><th>Address</th>"
+                       + "<th>Mobile</th><th>Phone</th><th>Email</th>"
+                       + "</tr></thead>");
 
+            List<SqlParameter> parameters = new List<SqlParameter>();
+            parameters.Add(new SqlParameter("@CompanyID", SqlDbType.VarChar, 100)
+            {
+                Value = Session["CompanyID"].ToString()
+            });
 
-            string IssearchValue = "";
-            bool IsSearchForContact = false;
+            // Whitelist of searchable columns. searchPerameter comes off a server-side
+            // DropDownList, but keying a switch off it means nothing from the request can
+            // reach the SQL text either way.
+            string searchClause = string.Empty;
+            if (!string.IsNullOrWhiteSpace(searchValue))
+            {
+                string column = null;
+                switch (searchPerameter)
+                {
+                    case "BusinessName": column = "BusinessName"; break;
+                    case "FirstName": column = "FirstName"; break;
+                    case "LastName": column = "LastName"; break;
+                    case "JobTitle": column = "JobTitle"; break;
+                    case "City": column = "City"; break;
+                    case "Mobile": column = "Mobile"; break;
+                    case "Phone": column = "Phone"; break;
+                    case "Email": column = "Email"; break;
+                    case "Address":
+                        column = "CONCAT(Address1, ', ', City, ', ', State, ' ', ZipCode)";
+                        break;
+                }
 
+                if (column != null)
+                {
+                    // Business/First/Last name used to be prefix-only ("value%") while every
+                    // other field was a contains match. On Live, 11 of 19 providers contain
+                    // "Home" but only 2 start with it, so searching "Home" hid 9 real matches.
+                    searchClause = " and " + column + " like '%' + @SearchValue + '%' escape '\\' ";
+                    parameters.Add(new SqlParameter("@SearchValue", SqlDbType.NVarChar, 400)
+                    {
+                        Value = EscapeLike(searchValue.Trim())
+                    });
+                }
+            }
 
-            string query = " ";
-            string checkCompanyID = string.Empty;
-            string orderby = string.Empty;
+            string tagClause = string.Empty;
+            if (!string.IsNullOrEmpty(selectedTags))
+            {
+                List<string> tagIds = selectedTags.Split(',')
+                                                  .Select(t => t.Trim())
+                                                  .Where(t => t.Length > 0)
+                                                  .ToList();
+                if (tagIds.Count > 0)
+                {
+                    List<string> ors = new List<string>();
+                    for (int i = 0; i < tagIds.Count; i++)
+                    {
+                        string p = "@Tag" + i.ToString();
+                        ors.Add("',' + isnull(CSLTagString,'') + ',' like '%,' + " + p + " + ',%'");
+                        parameters.Add(new SqlParameter(p, SqlDbType.NVarChar, 50) { Value = tagIds[i] });
+                    }
+                    tagClause = " and (" + string.Join(" or ", ors) + ")";
+                }
+            }
 
-
-            table.Append("<thead><tr><th>Business Name</th><th>Title</th><th>Address</th><th>Mobile</th><th>Phone</th><th>Email</th></thead>");
-            query = @"  SELECT  [CompanyID]
+            string query = @"  SELECT  [CompanyID]
                               ,[BusinessID],CustomerID
                               ,[CustomerGuid]
                               ,[BusinessName]
-                              ,(FirstName +' '+ LastName) as name
-                              ,CustomerGuid
-                              ,[Address1],Title
+                              ,(isnull(FirstName,'') + ' ' + isnull(LastName,'')) as name
+                              ,[Address1],JobTitle
                               ,City,State,ZipCode
                               ,[Phone]
                               ,[Mobile]
-                              ,[Email] FROM [msSchedulerV3].[dbo].[tbl_Customer] where IsBusinessContact=1 ";
+                              ,[Email] FROM [msSchedulerV3].[dbo].[tbl_Customer]
+                               where IsBusinessContact=1 and CompanyID=@CompanyID and WarrentyCompanyID > 0 "
+                        + searchClause + tagClause + " order by BusinessName asc";
 
-
-            if (!string.IsNullOrEmpty(searchPerameter.Trim()) && !string.IsNullOrEmpty(searchValue.Trim()))
-            {
-                if (searchPerameter == "All") IssearchValue = "  and 1=1 ";
-                if (searchPerameter == "BusinessName") IssearchValue = " and ( BusinessName like '" + searchValue.Trim() + "%') ";
-                if (searchPerameter == "FirstName") IssearchValue = " and ( FirstName like '" + searchValue.Trim() + "%') ";
-                if (searchPerameter == "LastName") IssearchValue = " and ( LastName like '" + searchValue + "%' ) ";
-
-                if (searchPerameter == "City") IssearchValue = " and  City like '%" + searchValue.Trim() + "%' ";
-                if (searchPerameter == "JobTitle") IssearchValue = " and  JobTitle like '%" + searchValue.Trim() + "%' ";
-                if (searchPerameter == "Address") IssearchValue = " and concat(Address1 , ', ' , City , ', ', State , ' ' , ZipCode) like '%" + searchValue.Trim() + "%' ";
-                if (searchPerameter == "Mobile") IssearchValue = " and  Mobile like '%" + searchValue.Trim() + "%' ";
-                if (searchPerameter == "Phone") IssearchValue = " and  Phone like '%" + searchValue.Trim() + "%' ";
-                if (searchPerameter == "Email") IssearchValue = " and  Email like '%" + searchValue.Trim() + "%' ";
-
-            }
-            // Search by multiple tags using CSLTagString
-            if (!string.IsNullOrEmpty(selectedTags))
-            {
-                string[] tagIds = selectedTags.Split(',');
-
-                if (tagIds.Length > 0)
-                {
-                    string tagCondition = " and (";
-
-                    for (int tagIndex = 0; tagIndex < tagIds.Length; tagIndex++)
-                    {
-                        string tagId = tagIds[tagIndex].Trim();
-
-                        if (!string.IsNullOrEmpty(tagId))
-                        {
-                            if (tagIndex > 0) tagCondition += " OR ";
-
-                            // Check if CSLTagString contains this tag ID safely
-                            tagCondition +=
-                                "(CSLTagString = '" + tagId +
-                                "' OR CSLTagString LIKE '" + tagId + ",%'" +
-                                " OR CSLTagString LIKE '%," + tagId + ",%'" +
-                                " OR CSLTagString LIKE '%," + tagId + "')";
-                        }
-                    }
-
-                    tagCondition += ")";
-                    IssearchValue += tagCondition;
-                }
-            }
-
-            checkCompanyID = " and CompanyID= '" + Session["CompanyID"].ToString() + "' and WarrentyCompanyID > 0";
-            orderby = " order by BusinessName  asc";
-
-
-
-
-
-
-
-            query = query + checkCompanyID + IssearchValue + orderby;
-            Database db = new Database(connStr);
-
-
-            DataTable dt = new DataTable();
-
-
-
-
-            DataSet dataSet = db.Get_DataSet(query, Session["CompanyID"].ToString());
-            dt = dataSet.Tables[0];
-
-
+            DataTable dt = GetProviders(query, parameters);
 
             table.Append(" <tbody>");
 
-            int i = 0;
-            if (dt != null)
+            int i2 = 0;
+            if (dt != null && dt.Rows.Count > 0)
             {
-                if (dt.Rows.Count > 0)
-
+                foreach (DataRow dr in dt.Rows)
                 {
-                    foreach (DataRow dr in dt.Rows)
-                    {
-                        i++;
-                        //string sUrl = "Customer.aspx?ID=" + dr["CustomerGuid"].ToString();
+                    i2++;
+                    string custGuid = dr["CustomerGuid"].ToString();
+                    string custId = dr["CustomerID"].ToString();
+                    string businessName = dr["BusinessName"].ToString();
+                    string contactName = dr["name"].ToString().Trim();
+                    string mobile = dr["Mobile"].ToString();
+                    string email = dr["Email"].ToString();
+                    string displayName = string.IsNullOrWhiteSpace(businessName) ? contactName : businessName;
 
+                    table.Append("<tr>");
 
-                        table.Append("<tr>");
-                        //table.Append(@"<td><div class='dropdown'>
-                        //          <button class='btn btn-secondary btn-sm dropdown-toggle' type='button' id='Action" + i.ToString() + @"' data-bs-toggle='dropdown' aria-expanded='false'>
-                        //            <i class='fas fa-align-justify'></i>
-                        //          </button>
-                        //          <ul class='dropdown-menu' aria-labelledby='Action" + i.ToString() + @"'>" +
-                        //              "<li><a class='dropdown-item' href='customerDetail.aspx?BusinessGuID=" + dr["CustomerGuid"].ToString() + "'>Add Link Contact</a></li>" +
-                        //            "</ul></div></td>");
-                        //table.Append(@"<td><div class='dropdown'>
-                        //          <button class='btn btn-secondary btn-sm dropdown-toggle' type='button' id='Action" + i.ToString() + @"' data-bs-toggle='dropdown' aria-expanded='false'>
-                        //            <i class='fas fa-align-justify'></i>
-                        //          </button>
-                        //          <ul class='dropdown-menu' aria-labelledby='Action" + i.ToString() + @"'>" +
-                        //             "<li><a class='dropdown-item' href='#'>Access Portal</ a></li>" +
-                        //               "<li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId=" + dr["CustomerGuid"].ToString() + "&InType=Invoice'>Create Invoice</a></li>" +
-                                 
-                        //             "<li><a class='dropdown-item' href='#'>View Invoice</a></li>" +
-                        //             "<li><a class='dropdown-item' href='#'>View Files</a></li>" +
-                        //               "<li><hr class='dropdown-divider'></li>" +
-                        //             "<li><a class='dropdown-item' href='#'>Send E-Mail</a></li>" +
-                        //             "<li><a class='dropdown-item' href='#'>E-Mail History</a></li>" +
-                        //              "<li><a class='dropdown-item' href='#'>Send Text</a></li>" +
-                        //               "<li><a class='dropdown-item' href='#'>Send SMS</a></li>" +
-                        //               "<li><a class='dropdown-item' href='#'>Text History</a></li>" );
-                                     
+                    // Row action menu. The original was commented out, which left every modal
+                    // on this page (Send Email / SMS / MMS / Ratings) unreachable - and it is
+                    // why the export config addressed columns 1-6 of a 7-column table.
+                    table.Append("<td class='tp-actions no-export'><div class='dropdown'>"
+                        + "<button class='btn btn-sm btn-outline-secondary dropdown-toggle' type='button' id='tpAction" + i2.ToString() + "' data-bs-toggle='dropdown' aria-expanded='false'>"
+                        + "<i class='fas fa-ellipsis-v'></i></button>"
+                        + "<ul class='dropdown-menu' aria-labelledby='tpAction" + i2.ToString() + "'>"
+                        + "<li><a class='dropdown-item' href='BusinessContact.aspx?id=" + HttpUtility.HtmlAttributeEncode(custGuid) + "'><i class='fas fa-up-right-from-square me-2'></i>Open Provider</a></li>"
+                        + "<li><hr class='dropdown-divider'></li>"
+                        + "<li><a class='dropdown-item' href='javascript:void(0);' onclick=\"OpenMailPopUp('" + JsArg(custId) + "')\"><i class='fas fa-envelope me-2'></i>Send Email</a></li>"
+                        + "<li><a class='dropdown-item' href='javascript:void(0);' onclick=\"OpenSMSPopUp('" + JsArg(mobile) + "','" + JsArg(custId) + "')\"><i class='fas fa-comment me-2'></i>Send SMS</a></li>"
+                        + "<li><a class='dropdown-item' href='javascript:void(0);' onclick=\"OpenMMSPopUp('" + JsArg(mobile) + "','" + JsArg(custId) + "')\"><i class='fas fa-image me-2'></i>Send MMS</a></li>"
+                        + "<li><a class='dropdown-item' href='javascript:void(0);' onclick=\"OpenSurveyMailPopUp('" + JsArg(email) + "','" + JsArg(custId) + "')\"><i class='fas fa-star me-2'></i>Send Ratings Email</a></li>"
+                        + "<li><hr class='dropdown-divider'></li>"
+                        + "<li><a class='dropdown-item' href='javascript:void(0);' onclick=\"OpenAllHistory('" + JsArg(mobile) + "','" + JsArg(displayName) + "','" + JsArg(custId) + "')\"><i class='fas fa-clock-rotate-left me-2'></i>Message History</a></li>"
+                        + "</ul></div></td>");
 
-                        //table.Append("</ul></div></td>");
-                        table.Append("<td><a style='color:#526288' href='BusinessContact.aspx?id=" + dr["CustomerGuid"].ToString() + "'>" + (dr["BusinessName"].ToString()) + "</a></td>");
+                    // Every cell below is HtmlEncoded. These values were previously concatenated
+                    // into the markup raw, so a provider name containing < or a quote broke the
+                    // table and a script tag would have executed (stored XSS). CleanInput only
+                    // ever guarded the search box, never what came back out of the database.
+                    table.Append("<td><a style='color:#526288' href='BusinessContact.aspx?id=" + HttpUtility.HtmlAttributeEncode(custGuid) + "'>" + Enc(businessName) + "</a></td>");
+                    table.Append("<td>" + Enc(dr["JobTitle"]) + "</td>");
 
-                        string FullAddress = string.Empty;
-                        table.Append("<td>" + dr["Title"].ToString() + "</td>");
+                    string FullAddress = string.Empty;
+                    if (!string.IsNullOrEmpty(dr["Address1"].ToString())) FullAddress += dr["Address1"].ToString() + ", ";
+                    if (!string.IsNullOrEmpty(dr["City"].ToString())) FullAddress += dr["City"].ToString() + ", ";
+                    if (!string.IsNullOrEmpty(dr["State"].ToString())) FullAddress += dr["State"].ToString() + ", ";
+                    if (!string.IsNullOrEmpty(dr["ZipCode"].ToString())) FullAddress += dr["ZipCode"].ToString();
+                    if (FullAddress.EndsWith(", ")) FullAddress = FullAddress.Substring(0, FullAddress.Length - 2);
 
-                        if (!string.IsNullOrEmpty(dr["Address1"].ToString()))
-                        {
-                            FullAddress += dr["Address1"].ToString() + ", ";
-                        }
-                        if (!string.IsNullOrEmpty(dr["City"].ToString()))
-                        {
+                    table.Append("<td>" + Enc(FullAddress) + "</td>");
 
-                            FullAddress += dr["City"].ToString() + ", ";
-                        }
-                        if (!string.IsNullOrEmpty(dr["State"].ToString()))
-                        {
-                            FullAddress += dr["State"].ToString() + ", ";
-                        }
-                        if (!string.IsNullOrEmpty(dr["ZipCode"].ToString()))
-                        {
-                            FullAddress += dr["ZipCode"].ToString();
-                        }
+                    // Only render a tel:/mailto: link when there is actually something to dial
+                    // or mail; the old markup emitted <a href='tel: '></a> on every blank cell.
+                    table.Append("<td>" + (string.IsNullOrWhiteSpace(mobile)
+                        ? string.Empty
+                        : "<a style='color:#526288' href='tel:" + HttpUtility.HtmlAttributeEncode(mobile.Trim()) + "'>" + Enc(mobile) + "</a>") + "</td>");
 
-                        if (FullAddress.EndsWith(", "))
-                        {
-                            FullAddress = FullAddress.Substring(0, FullAddress.Length - 2);
-                        }
+                    string phone = dr["Phone"].ToString();
+                    table.Append("<td>" + (string.IsNullOrWhiteSpace(phone)
+                        ? string.Empty
+                        : "<a style='color:#526288' href='tel:" + HttpUtility.HtmlAttributeEncode(phone.Trim()) + "'>" + Enc(phone) + "</a>") + "</td>");
 
-                        table.Append("<td>" + FullAddress + "</td>");
-                        table.Append("<td><a style='color:#526288' href='tel: " + dr["Mobile"].ToString() + "'>" + dr["Mobile"].ToString() + "</a></td>");
-                        table.Append("<td><a style='color:#526288' href='tel: " + dr["Phone"].ToString() + "'>" + dr["Phone"].ToString() + "</a></td>");
-                        table.Append("<td><a href='mailto:" + dr["Email"].ToString() + "'>" + dr["Email"].ToString() + "</a></td>");
+                    table.Append("<td>" + (string.IsNullOrWhiteSpace(email)
+                        ? string.Empty
+                        : "<a href='mailto:" + HttpUtility.HtmlAttributeEncode(email.Trim()) + "'>" + Enc(email) + "</a>") + "</td>");
 
-
-
-                        table.Append("</tr>");
-                    }
+                    table.Append("</tr>");
                 }
-
             }
+
             table.Append(" </tbody>");
             table.Append("</table></div>");
             ListTable.Controls.Add(new Literal { Text = table.ToString() });
-
-
         }
 
       
@@ -351,8 +391,11 @@ namespace TPM
                 selectedTags = string.Join(",", selectedTagArray);
             }
 
-            searchPerameter = Common.CleanInput(searchPerameter);
-            searchValue = Common.CleanInput(searchValue);
+            // Common.CleanInput used to run over the search term. It strips ' ; -- < > ( ) = *
+            // and the literal substrings "script", "html" and "href", so a provider named
+            // "Prescription ..." was searched for as "Pretion ..." and any name with an
+            // apostrophe could never be matched. The query is parameterised now, so the term
+            // is passed through untouched.
 
 
 
@@ -437,7 +480,7 @@ namespace TPM
             }
             EmailProcessor emailProcessor = new EmailProcessor();
             string returnMessage = emailProcessor.SendHtmlFormattedEmail(CompanyID, txtCustomerID, "Customer Email", txtEmailSubject, txtEmailBody, RecepientToEmail, RecepientCCEmail, RecepientBCCEmail, emailContents);
-            string exception = " Swal.fire('" + returnMessage + "', '', 'Successfully');window.location.replace('CustomerList.aspx?m=2');";
+            string exception = " Swal.fire('" + returnMessage + "', '', 'Successfully');window.location.replace('TpList.aspx');";
             ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", exception, true);
 
 
@@ -499,7 +542,7 @@ namespace TPM
             bool success = SendSurveyMail(custid, CompanyID, EmailSubject, EmailBody, TextMessage, EmailTo, SurveyID);
             if (success)
             {
-                ScriptManager.RegisterStartupScript(this, this.GetType(), "scr", "javascript: Swal.fire('Server/Rating mail sent successfully.'); location.href='CustomerList.aspx?m=2'", true);
+                ScriptManager.RegisterStartupScript(this, this.GetType(), "scr", "javascript: Swal.fire('Server/Rating mail sent successfully.'); location.href='TpList.aspx'", true);
                 //lbl_Msg.InnerText = "Server/Rating mail sent successfully.";
             }
         }
@@ -708,11 +751,11 @@ namespace TPM
             string exception;
             if (result == true)
             {
-                exception = " Swal.fire('SMS Sent Successfully', '', 'Success');window.location.replace('CustomerList.aspx?m=2');";
+                exception = " Swal.fire('SMS Sent Successfully', '', 'Success');window.location.replace('TpList.aspx');";
             }
             else
             {
-                exception = " Swal.fire('Something went wrong, Please try again.', '', 'Warning');window.location.replace('CustomerList.aspx?m=2');";
+                exception = " Swal.fire('Something went wrong, Please try again.', '', 'Warning');window.location.replace('TpList.aspx');";
             }
 
             ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", exception, true);
@@ -756,17 +799,17 @@ namespace TPM
                 string response = "";
                 if (result)
                 {
-                    response = " Swal.fire('MMS Sent Successfully', '', 'Success'); window.location.replace('CustomerList.aspx?m=2');";
+                    response = " Swal.fire('MMS Sent Successfully', '', 'Success'); window.location.replace('TpList.aspx');";
                 }
                 else
                 {
-                    response = " Swal.fire('Something went wrong, Please try again.', '', 'Warning'); window.location.replace('CustomerList.aspx?m=2');";
+                    response = " Swal.fire('Something went wrong, Please try again.', '', 'Warning'); window.location.replace('TpList.aspx');";
                 }
                 ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", response, true);
             }
             catch (Exception ex)
             {
-                ScriptManager.RegisterStartupScript(this, this.GetType(), "Error", $"Swal.fire('Error: {ex.Message}', '', 'warning'); window.location.replace('CustomerList.aspx?m=2');", true);
+                ScriptManager.RegisterStartupScript(this, this.GetType(), "Error", $"Swal.fire('Error: {ex.Message}', '', 'warning'); window.location.replace('TpList.aspx');", true);
 
 
             }
