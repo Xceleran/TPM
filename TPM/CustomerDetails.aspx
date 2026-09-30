@@ -1830,5 +1830,5 @@
                 });
             })();
         </script>
-               <script src="Scripts/customerdetails.js?v=16"></script>
+               <script src="Scripts/customerdetails.js?v=17"></script>
     </asp:Content>

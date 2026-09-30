@@ -179,6 +179,7 @@
         }
         /* Advanced Settings Buttons */
     </style>
+    <link rel="stylesheet" href="Content/fsm-loading.css?v=1">
 </head>
 <body runat="server" id="bodyTag">
     <form runat="server">
@@ -1141,6 +1142,12 @@
             })
         });
     </script>
+
+    <%-- The branded loading overlay (Scripts/fsm-loading.js). A .js file cannot call ResolveUrl
+         itself, and TPM does not always sit at the same relative path to /images/ across
+         environments, so the master page resolves and publishes the logo URL here. --%>
+    <script>window.FSM_BRAND_LOGO = '<%= ResolveUrl("~/images/TPM.png") %>';</script>
+    <script src="<%= ResolveUrl("~/Scripts/fsm-loading.js") %>?v=1"></script>
 
 </body>
 </html>

@@ -1,0 +1,109 @@
+/*
+    The one loading overlay for FSM.
+
+    Before this, every page rolled its own: Appointments had four separate .loading-overlay
+    divs, BillableItems had #loadingOverlay, the CSL grids wrote "Loading…" into a table cell,
+    and the appointment modals used showApptUpdateLoading. They looked different from each
+    other and none of them carried the product's branding.
+
+    Markup is built by Scripts/fsm-loading.js -- nothing here should be hand-written into a page.
+*/
+
+.fsm-loading-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 20000; /* above Bootstrap modals (1055) and the dispatch drawer */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+    .fsm-loading-backdrop.is-visible {
+        opacity: 1;
+    }
+
+/* Scoped to a panel rather than the whole window. */
+.fsm-loading-backdrop.fsm-loading-inline {
+    position: absolute;
+    z-index: 900;
+}
+
+.fsm-loading-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 26px 34px;
+    border-radius: 12px;
+    background: #fff;
+    border: 1px solid #e3e6ea;
+    box-shadow: 0 10px 34px rgba(16, 24, 40, 0.14);
+    min-width: 210px;
+    max-width: min(88vw, 360px);
+    text-align: center;
+}
+
+.fsm-loading-logo {
+    max-width: 168px;
+    max-height: 46px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+/* Sized off the logo so the two read as one unit. */
+.fsm-loading-spinner {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 3px solid #dfe3e8;
+    border-top-color: #4f46e5;
+    animation: fsm-loading-spin 0.75s linear infinite;
+}
+
+@keyframes fsm-loading-spin {
+    to { transform: rotate(360deg); }
+}
+
+.fsm-loading-text {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #475467;
+    line-height: 1.35;
+    margin: 0;
+}
+
+/* Respect a viewer who has asked for less motion: keep the cue, drop the spin. */
+@media (prefers-reduced-motion: reduce) {
+    .fsm-loading-spinner {
+        animation-duration: 2.4s;
+    }
+
+    .fsm-loading-backdrop {
+        transition: none;
+    }
+}
+
+[data-theme="dark"] .fsm-loading-backdrop {
+    background: rgba(16, 19, 23, 0.82);
+}
+
+[data-theme="dark"] .fsm-loading-card {
+    background: #1f2429;
+    border-color: #343b43;
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .fsm-loading-text {
+    color: #cbd3dc;
+}
+
+[data-theme="dark"] .fsm-loading-spinner {
+    border-color: #3a424b;
+    border-top-color: #8b85f5;
+}

@@ -1071,12 +1071,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log('Loading notes for customerId:', customerId, 'siteId:', siteId);
 
+        // Guarded: this file still works if fsm-loading.js is missing from a publish.
+        if (window.FSMLoading) FSMLoading.showIn('#notes .custdet-container', 'Loading notes…');
+
         $.ajax({
             url: 'CustomerDetails.aspx/GetCustomerNotes',
             type: "POST",
             contentType: "application/json; charset=utf-8",
             data: JSON.stringify({ customerId: customerId, siteId: siteId }),
             dataType: 'json',
+            complete: () => {
+                if (window.FSMLoading) FSMLoading.hideIn('#notes .custdet-container');
+            },
             success: (rs) => {
                 console.log('Notes response:', rs);
 
@@ -1228,6 +1234,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Typing in the search box (or changing a filter) fires one of these per burst; only the
         // newest response is allowed to paint, since they can otherwise resolve out of order.
         const seq = ++invRequestSeq;
+        // Guarded: this file still works if fsm-loading.js is missing from a publish.
+        if (window.FSMLoading) FSMLoading.showIn('#invoices .custdet-container', 'Loading invoices…');
 
         $.ajax({
             url: 'CustomerDetails.aspx/GetCustomerInvoices',
@@ -1245,6 +1253,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 sortColumn: invSortColumn,
                 sortDirection: invSortDirection
             }),
+            complete: () => {
+                if (seq === invRequestSeq && window.FSMLoading) FSMLoading.hideIn('#invoices .custdet-container');
+            },
             dataType: 'json',
             success: (rs) => {
                 if (seq !== invRequestSeq) return;
@@ -1311,6 +1322,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Typing in #equipSearch fires one request per keystroke-burst; only the most recent
         // response is allowed to land, since they can otherwise resolve out of order.
         const seq = ++eqpRequestSeq;
+        // Guarded: this file still works if fsm-loading.js is missing from a publish.
+        if (window.FSMLoading) FSMLoading.showIn('#equipment .custdet-container', 'Loading equipment…');
 
         $.ajax({
             url: 'CustomerDetails.aspx/GetSiteEquipmentData',
@@ -1326,6 +1339,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 sortDirection: eqpSortDirection
             }),
             dataType: 'json',
+            complete: () => {
+                if (seq === eqpRequestSeq && window.FSMLoading) FSMLoading.hideIn('#equipment .custdet-container');
+            },
             success: (rs) => {
                 if (seq !== eqpRequestSeq) return;
                 const pageResult = (rs && rs.d) ? rs.d : {};

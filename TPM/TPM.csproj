@@ -228,6 +228,7 @@
     <Content Include="Content\appointments.css" />
     <Content Include="Content\customer.css" />
     <Content Include="Content\customerdetails.css" />
+    <Content Include="Content\fsm-loading.css" />
     <Content Include="Content\invoice.css" />
     <Content Include="Content\inquiry-portal.css" />
     <Content Include="Content\Site.css" />
@@ -251,6 +252,7 @@
     <Content Include="Scripts\AppointmentList.js" />
     <Content Include="Scripts\customer.js" />
     <Content Include="Scripts\customerdetails.js" />
+    <Content Include="Scripts\fsm-loading.js" />
     <Content Include="Scripts\forms.js" />
     <Content Include="Scripts\form-response.js" />
     <Content Include="Scripts\jquery\jquery-3.5.1.js" />
