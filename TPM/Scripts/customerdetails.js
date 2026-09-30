@@ -1667,23 +1667,22 @@ document.addEventListener('DOMContentLoaded', () => {
         let html = '';
         notes.forEach(note => {
             const noteText = note.Description || '';
-            const truncatedNote = noteText.length > 100 ? noteText.substring(0, 100) + '...' : noteText;
-            const showReadMore = noteText.length > 100;
 
+            // The full note stays in the DOM; the two-row collapse is done in CSS
+            // (.note-text.clamped) and syncNoteReadMore() below decides whether the
+            // Read More link is needed by measuring actual overflow, not character count.
             html += `
                 <tr ${note.AppointmentId ? `data-appointment-id="${note.AppointmentId}"` : ''}>
                     <td>${note.AppointmentId ? `<a href="javascript:void(0);" onclick="showAppointmentDetailsModal('${note.AppointmentId}')">${note.AppointmentId}</a>` : '-'}</td>
                     <td class="note-content-cell">
-                        <div class="note-text truncated" data-full-text="${escapeHTML(noteText)}">
-                            ${escapeHTML(truncatedNote)}
-                        </div>
-                        ${showReadMore ? `<button class="btn btn-sm btn-link read-more-btn p-0" style="text-decoration: none;">Read More</button>` : ''}
+                        <div class="note-text clamped">${escapeHTML(noteText)}</div>
+                        <button type="button" class="btn btn-sm btn-link read-more-btn p-0 d-none" style="text-decoration: none;">Read More</button>
                     </td>
                     <td>${note.CreatedAt || '-'}</td>
                     <td>${escapeHTML(note.Reference || '-')}</td>
                     <td>${note.UserId || '-'}</td>
                     <td>
-                        <div class="d-flex gap-2">                        
+                        <div class="d-flex gap-2">
                             <button type="button" class="btn btn-sm btn-outline-primary edit-note-btn" data-note-id="${note.Id}" title="Edit"><i class="fas fa-edit"></i></button>
                               <button type="button" class="btn btn-sm btn-outline-secondary email-note-btn" data-note-id="${note.Id}" title="Email"><i class="fas fa-envelope"></i></button>
                             <button type="button" class="btn btn-sm btn-outline-danger delete-note-btn" data-note-id="${note.Id}" title="Delete"><i class="fas fa-trash-alt"></i></button>
@@ -1693,7 +1692,28 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         });
         $('#notesTableBody').html(html);
+        syncNoteReadMore();
     }
+
+    // Reveal "Read More" only on notes that actually overflow their two-line clamp.
+    // Measuring beats counting characters: this column's width changes with the viewport,
+    // so the same note wraps to two lines wide and four narrow.
+    function syncNoteReadMore() {
+        $('#notesTableBody .note-text').each(function () {
+            const $text = $(this);
+            const $btn = $text.siblings('.read-more-btn');
+            if (!$btn.length || !$text.hasClass('clamped')) return;
+            // A hidden tab measures zero; renderNotesTable() runs again when the tab is shown.
+            if (!this.clientHeight) return;
+            $btn.toggleClass('d-none', this.scrollHeight <= this.clientHeight + 1);
+        });
+    }
+
+    let noteClampResizeTimer;
+    $(window).on('resize', function () {
+        clearTimeout(noteClampResizeTimer);
+        noteClampResizeTimer = setTimeout(syncNoteReadMore, 200);
+    });
 
     // Forms, Pictures, Files, Agreements loading and rendering
     function loadForms() {
@@ -2332,17 +2352,9 @@ document.addEventListener('DOMContentLoaded', () => {
     $(document).on('click', '.read-more-btn', function (e) {
         e.preventDefault();
         const $btn = $(this);
-        const $content = $btn.siblings('.note-text');
-        const fullText = $content.data('full-text');
-
-        if ($content.hasClass('truncated')) {
-            $content.html(fullText).removeClass('truncated');
-            $btn.text('Show Less');
-        } else {
-            const truncated = fullText.substring(0, 100) + '...';
-            $content.html(truncated).addClass('truncated');
-            $btn.text('Read More');
-        }
+        // The text never leaves the DOM -- expanding just drops the CSS clamp.
+        const clamped = $btn.siblings('.note-text').toggleClass('clamped').hasClass('clamped');
+        $btn.text(clamped ? 'Read More' : 'Show Less');
     });
 
     // Clear button functionality

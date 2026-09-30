@@ -10,7 +10,7 @@
         <link rel="stylesheet" type="text/css"
             href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
 
-        <link rel="stylesheet" href="Content/customerdetails.css">
+        <link rel="stylesheet" href="Content/customerdetails.css?v=1">
         <link rel="stylesheet" href="Content/customer.css?v=4">
         <style>
             #siteAppointmentDetailsModal_PopUP .modal-dialog {
@@ -1830,5 +1830,5 @@
                 });
             })();
         </script>
-               <script src="Scripts/customerdetails.js?v=13"></script>
+               <script src="Scripts/customerdetails.js?v=14"></script>
     </asp:Content>
