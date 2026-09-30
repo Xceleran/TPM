@@ -25,6 +25,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let invEndDate = null;
     let apptStartDate = null;
     let apptEndDate = null;
+    let eqpTotal = 0;
+    let eqpRequestSeq = 0;
 
     // Global event listener for picture deletion
     $(document).on('click', '.delete-picture-btn', function () {
@@ -262,6 +264,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Sortable header click handler for Appointments table
         $(document).on('click', '.sortable-header', function () {
+            // Equipment sorts server-side and has its own handler below -- this one otherwise
+            // fires (and wrongly re-sorts Appointments) for every tab's headers.
+            if ($(this).closest('#equipment').length) return;
             const sortColumn = $(this).data('sort');
             if (apptSortColumn === sortColumn) {
                 apptSortDirection = apptSortDirection === 'asc' ? 'desc' : 'asc';
@@ -274,6 +279,42 @@ document.addEventListener('DOMContentLoaded', () => {
             const icon = $(this).find('i');
             icon.removeClass('fa-sort').addClass(apptSortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
             applyFiltersAppt();
+        });
+
+        // Sortable header click handler for the Equipment table (server-side sort/paging).
+        $(document).on('click', '#equipment .sortable-header', function () {
+            const sortColumn = $(this).data('sort');
+            if (eqpSortColumn === sortColumn) {
+                eqpSortDirection = eqpSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                eqpSortColumn = sortColumn;
+                eqpSortDirection = 'asc';
+            }
+            $('#equipment .sortable-header i').removeClass('fa-sort-up fa-sort-down').addClass('fa-sort');
+            const icon = $(this).find('i');
+            icon.removeClass('fa-sort').addClass(eqpSortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+            reloadEquipmentFromFirstPage();
+        });
+
+        // Equipment pager and search (server-side).
+        $('#eqpPrev').on('click', function () {
+            if (currentPageEqp > 1) {
+                currentPageEqp--;
+                loadEquipment();
+            }
+        });
+        $('#eqpNext').on('click', function () {
+            if (currentPageEqp < eqpPageCount()) {
+                currentPageEqp++;
+                loadEquipment();
+            }
+        });
+        // keyup alone misses paste and the browser's native clear (X) button, which fire only
+        // 'input'; debounced since both events fire for a normal keystroke too.
+        let eqpSearchTimer;
+        $('#equipSearch').on('keyup input', function () {
+            clearTimeout(eqpSearchTimer);
+            eqpSearchTimer = setTimeout(reloadEquipmentFromFirstPage, 400);
         });
 
         function getRedirectionURL() {
@@ -1167,6 +1208,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Equipment is paged, searched and sorted server-side (GetSiteEquipmentData). A table with
+    // 79,243 rows on Live, and up to 31,718 on a single site, can't be loaded whole and filtered
+    // in the browser the way this used to work.
     function loadEquipment() {
         if (!customerGuid) {
             console.error('Cannot load equipment: customerGuid is missing');
@@ -1174,44 +1218,69 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        console.log('Loading equipment for siteId:', siteId, 'customerGuid:', customerGuid);
+        // Typing in #equipSearch fires one request per keystroke-burst; only the most recent
+        // response is allowed to land, since they can otherwise resolve out of order.
+        const seq = ++eqpRequestSeq;
 
         $.ajax({
             url: 'CustomerDetails.aspx/GetSiteEquipmentData',
             type: "POST",
             contentType: "application/json; charset=utf-8",
-            data: JSON.stringify({ siteId: siteId, customerGuid: customerGuid }),
+            data: JSON.stringify({
+                siteId: siteId,
+                customerGuid: customerGuid,
+                page: currentPageEqp,
+                pageSize: pageSizeEqp,
+                search: ($('#equipSearch').val() || '').trim(),
+                sortColumn: eqpSortColumn,
+                sortDirection: eqpSortDirection
+            }),
             dataType: 'json',
             success: (rs) => {
-                console.log('Equipment response:', rs);
-
-                // Handle both direct array and wrapped response
-                if (rs && rs.d !== undefined) {
-                    equipmentData = rs.d || [];
-                } else if (Array.isArray(rs)) {
-                    equipmentData = rs;
-                } else {
-                    equipmentData = [];
-                }
-
-                console.log('Equipment data:', equipmentData);
-                console.log('Equipment count:', equipmentData.length);
+                if (seq !== eqpRequestSeq) return;
+                const pageResult = (rs && rs.d) ? rs.d : {};
+                equipmentData = pageResult.Equipment || [];
+                eqpTotal = pageResult.Total || 0;
+                currentPageEqp = pageResult.Page || currentPageEqp;
 
                 if (equipmentData.length === 0) {
-                    $('#equipTableBody').html('<tr><td colspan="12" class="text-center text-muted">No equipment found for this customer/site.</td></tr>');
+                    const searching = ($('#equipSearch').val() || '').trim();
+                    $('#equipTableBody').html('<tr><td colspan="12" class="text-center text-muted">'
+                        + (searching ? 'No equipment matches that search.' : 'No equipment found for this customer/site.')
+                        + '</td></tr>');
                 } else {
-                    console.log('Rendering equipment...');
-                    renderEquipments();
+                    renderEquipmentTable(equipmentData);
                 }
+                renderEqpPager();
             },
             error: (xhr, status, error) => {
+                if (seq !== eqpRequestSeq) return;
                 console.error('Error loading equipment:', error);
-                console.error('XHR Status:', xhr.status);
-                console.error('XHR Response:', xhr.responseText);
                 equipmentData = [];
+                eqpTotal = 0;
                 $('#equipTableBody').html('<tr><td colspan="12" class="text-center text-danger">Error loading equipment. Please check console for details.</td></tr>');
+                renderEqpPager();
             }
         });
+    }
+
+    function eqpPageCount() {
+        return Math.max(1, Math.ceil(eqpTotal / pageSizeEqp));
+    }
+
+    function renderEqpPager() {
+        const pageCount = eqpPageCount();
+        if (currentPageEqp > pageCount) currentPageEqp = pageCount;
+        $('#eqpPageInfo').text(eqpTotal
+            ? `Page ${currentPageEqp} of ${pageCount} (${eqpTotal} item${eqpTotal === 1 ? '' : 's'})`
+            : 'No equipment');
+        $('#eqpPrev').prop('disabled', currentPageEqp <= 1);
+        $('#eqpNext').prop('disabled', currentPageEqp >= pageCount);
+    }
+
+    function reloadEquipmentFromFirstPage() {
+        currentPageEqp = 1;
+        loadEquipment();
     }
 
     // Equipment delete handler
@@ -1315,9 +1384,10 @@ document.addEventListener('DOMContentLoaded', () => {
         applyFiltersInv();
     }
 
+    // Equipment is paged/searched/sorted server-side now (see loadEquipment()), so showing the
+    // tab always refetches the current page rather than re-filtering a client-side array.
     function renderEquipments() {
-        console.log('Rendering equipment, data count:', equipmentData.length);
-        applyFiltersEqp();
+        loadEquipment();
     }
 
     function renderNotes() {
@@ -1334,11 +1404,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function applyFiltersInv() {
         let filtered = getFilteredInvoices();
         renderInvoicesTable(filtered);
-    }
-
-    function applyFiltersEqp() {
-        let filtered = getFilteredEquipment();
-        renderEquipmentTable(filtered);
     }
 
     function applyFiltersNotes() {
@@ -1434,36 +1499,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (invSortDirection === 'asc') {
-                return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-            } else {
-                return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-            }
-        });
-
-        return filtered;
-    }
-
-    function getFilteredEquipment() {
-        let filtered = [...equipmentData];
-
-        // Apply sorting
-        filtered.sort((a, b) => {
-            let aVal, bVal;
-            switch (eqpSortColumn) {
-                case 'InstallDate':
-                    aVal = parseMDY(a.InstallDate) || moment(0);
-                    bVal = parseMDY(b.InstallDate) || moment(0);
-                    break;
-                case 'EquipmentType':
-                    aVal = (a.EquipmentType || '').toLowerCase();
-                    bVal = (b.EquipmentType || '').toLowerCase();
-                    break;
-                default:
-                    aVal = a[eqpSortColumn] || '';
-                    bVal = b[eqpSortColumn] || '';
-            }
-
-            if (eqpSortDirection === 'asc') {
                 return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
             } else {
                 return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
@@ -1625,6 +1660,10 @@ document.addEventListener('DOMContentLoaded', () => {
         $('#invTableBody').html(html);
     }
 
+    // Cell order follows the <th> order in CustomerDetails.aspx (Type, Serial Number, Make,
+    // Model, Warranty Start, Warranty End, Labor Warranty Start, Labor Warranty End, SKU,
+    // Install Date, Notes) -- 9 of these 11 cells were previously in the wrong order relative
+    // to their headers (e.g. Make rendered under the Serial Number column).
     function renderEquipmentTable(equipment) {
         if (!equipment || equipment.length === 0) {
             $('#equipTableBody').html('<tr><td colspan="12" class="text-center text-muted">No equipment found.</td></tr>');
@@ -1635,17 +1674,17 @@ document.addEventListener('DOMContentLoaded', () => {
         equipment.forEach(eq => {
             html += `
                 <tr>
-                    <td>${eq.EquipmentType || '-'}</td>
-                    <td>${eq.Make || '-'}</td>
-                    <td>${eq.Model || '-'}</td>
-                    <td>${eq.SerialNumber || '-'}</td>
-                    <td>${eq.Barcode || '-'}</td>
-                    <td>${eq.InstallDate || '-'}</td>
+                    <td>${escapeHTML(eq.EquipmentType) || '-'}</td>
+                    <td>${escapeHTML(eq.SerialNumber) || '-'}</td>
+                    <td>${escapeHTML(eq.Make) || '-'}</td>
+                    <td>${escapeHTML(eq.Model) || '-'}</td>
                     <td>${eq.WarrantyStart || '-'}</td>
                     <td>${eq.WarrantyEnd || '-'}</td>
                     <td>${eq.LaborWarrantyStart || '-'}</td>
                     <td>${eq.LaborWarrantyEnd || '-'}</td>
-                    <td>${eq.Notes || '-'}</td>
+                    <td>${escapeHTML(eq.Barcode) || '-'}</td>
+                    <td>${eq.InstallDate || '-'}</td>
+                    <td>${escapeHTML(eq.Notes) || '-'}</td>
                     <td>
                         <div class="d-flex gap-2">
                             <button class="btn btn-sm btn-outline-primary" onclick="editEquipment(${eq.Id})" title="Edit"><i class="fas fa-edit"></i></button>

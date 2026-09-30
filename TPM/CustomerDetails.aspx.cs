@@ -887,80 +887,155 @@ namespace TPM
 
         [WebMethod(EnableSession = true)]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
-        public static List<Equipment> GetSiteEquipmentData(int siteId, string customerGuid)
+        public static EquipmentPage GetSiteEquipmentData(int siteId, string customerGuid, int page, int pageSize,
+            string search, string sortColumn, string sortDirection)
         {
+            var result = new EquipmentPage
+            {
+                Equipment = new List<Equipment>(),
+                Total = 0,
+                Page = page < 1 ? 1 : page,
+                PageSize = (pageSize < 1 || pageSize > 200) ? 25 : pageSize,
+                HasMore = false
+            };
+
             string companyid = HttpContext.Current.Session["CompanyID"]?.ToString();
             if (string.IsNullOrEmpty(companyid))
             {
                 System.Diagnostics.Debug.WriteLine("GetSiteEquipmentData: CompanyID is missing from session");
-                return new List<Equipment>();
+                return result;
             }
-            var equipments = new List<Equipment>();
+
+            search = (search ?? "").Trim();
+            sortDirection = string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
+
+            // tbl_EquipmentType.equipmentTypeID is unique only WITHIN a company -- id 2 is
+            // "Refrigeration" for one company and "Furnace - Gas" for another -- so the plain
+            // join this used to be matched on equipmentTypeID alone, with no CompanyID. On Live
+            // that multiplied a 17-row site's equipment grid to 175 rows and leaked other
+            // companies' type names into the Type column. TOP 1 is kept even with CompanyID
+            // added, since nothing in the schema guarantees (companyID, equipmentTypeID) is
+            // unique within a company either. The customer join had the identical
+            // missing-CompanyID hazard and gets the same fix.
+            const string typeApply = @"
+                OUTER APPLY (
+                    SELECT TOP 1 t.equipmentTypeDesc
+                      FROM [msSchedulerV3].dbo.tbl_EquipmentType t
+                     WHERE t.equipmentTypeID = eqp.EquipmentTypeID AND t.companyID = eqp.CompanyID
+                ) et";
+            const string custApply = @"
+                OUTER APPLY (
+                    SELECT TOP 1 c.CustomerID, c.FirstName, c.LastName
+                      FROM [msSchedulerV3].dbo.tbl_Customer c
+                     WHERE c.CustomerGuid = eqp.CustomerGuid AND c.CompanyID = eqp.CompanyID
+                ) cus";
+
+            var sortMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "EquipmentType",      "et.equipmentTypeDesc" },
+                { "SerialNumber",       "eqp.SerialNumber" },
+                { "Make",               "eqp.Make" },
+                { "Model",              "eqp.Model" },
+                { "Barcode",            "eqp.Barcode" },
+                { "WarrantyStart",      "eqp.WarrantyStart" },
+                { "WarrantyEnd",        "eqp.WarrantyEnd" },
+                { "LaborWarrantyStart", "eqp.LaborWarrantyStart" },
+                { "LaborWarrantyEnd",   "eqp.LaborWarrantyEnd" },
+                { "InstallDate",        "eqp.InstallDate" }
+            };
+            string orderExpr = sortMap.ContainsKey(sortColumn ?? "") ? sortMap[sortColumn] : "eqp.CreatedDateTime";
+
+            string whereClause = " WHERE eqp.CustomerGuid = @CustomerGuid AND eqp.CompanyID = @CompanyID AND eqp.SiteId = @SiteId";
+            if (!string.IsNullOrEmpty(search))
+            {
+                whereClause += @" AND (ISNULL(et.equipmentTypeDesc,'') LIKE @Search OR ISNULL(eqp.SerialNumber,'') LIKE @Search
+                                       OR ISNULL(eqp.Make,'') LIKE @Search OR ISNULL(eqp.Model,'') LIKE @Search
+                                       OR ISNULL(eqp.Barcode,'') LIKE @Search)";
+            }
+
+            int offset = (result.Page - 1) * result.PageSize;
             Database db = new Database();
             DataTable dt = new DataTable();
             try
             {
                 db.Open();
-                // Show equipment for the specific site only, join with EquipmentType to get the description
-                string strSQL = @"SELECT eqp.*, cus.CustomerID, cus.FirstName, cus.LastName, et.equipmentTypeDesc
-                                FROM [msSchedulerV3].dbo.tbl_Equipment eqp 
-                                LEFT JOIN [msSchedulerV3].dbo.tbl_Customer cus ON eqp.CustomerGuid = cus.CustomerGuid
-                                LEFT JOIN [msSchedulerV3].dbo.tbl_EquipmentType et ON eqp.EquipmentTypeID = et.equipmentTypeID
-                                WHERE eqp.CustomerGuid=@CustomerGuid AND eqp.CompanyID = @CompanyID AND eqp.SiteId = @SiteId order by eqp.CreatedDateTime desc;";
 
-                db.AddParameter("@CustomerGuid", customerGuid, SqlDbType.NVarChar);
-                db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
-                db.AddParameter("@SiteId", siteId, SqlDbType.Int);
+                Action addParams = () =>
+                {
+                    db.Command.Parameters.Clear();
+                    db.AddParameter("@CustomerGuid", customerGuid, SqlDbType.NVarChar);
+                    db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+                    db.AddParameter("@SiteId", siteId, SqlDbType.Int);
+                    if (!string.IsNullOrEmpty(search)) db.AddParameter("@Search", "%" + search + "%", SqlDbType.NVarChar);
+                };
 
+                DataTable countDt = new DataTable();
+                addParams();
+                db.ExecuteParam(
+                    "SELECT COUNT(*) AS Total FROM [msSchedulerV3].dbo.tbl_Equipment eqp" + typeApply + whereClause + ";",
+                    out countDt);
+                result.Total = countDt.Rows.Count > 0 ? Convert.ToInt32(countDt.Rows[0]["Total"]) : 0;
+
+                string strSQL = $@"SELECT eqp.*, cus.CustomerID, cus.FirstName, cus.LastName, et.equipmentTypeDesc
+                                FROM [msSchedulerV3].dbo.tbl_Equipment eqp
+                                {custApply}
+                                {typeApply}
+                                {whereClause}
+                                ORDER BY {orderExpr} {sortDirection}, eqp.Id {sortDirection}
+                                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
+
+                addParams();
+                db.AddParameter("@Offset", offset, SqlDbType.Int);
+                db.AddParameter("@PageSize", result.PageSize, SqlDbType.Int);
                 db.ExecuteParam(strSQL, out dt);
 
                 System.Diagnostics.Debug.WriteLine($"GetSiteEquipmentData: Found {dt?.Rows?.Count ?? 0} equipment items for CustomerGuid={customerGuid}, SiteId={siteId}");
 
-                db.Close();
-                if (dt.Rows.Count > 0)
+                foreach (DataRow dr in dt.Rows)
                 {
-                    foreach (DataRow dr in dt.Rows)
+                    result.Equipment.Add(new Equipment
                     {
-                        equipments.Add(new Equipment
-                        {
-                            Id = Convert.ToInt32(dr["Id"]),
-                            SiteId = dr["SiteId"] != DBNull.Value ? Convert.ToInt32(dr["SiteId"]) : 0,
-                            CustomerGuid = customerGuid,
-                            CustomerName = dr.Field<string>("FirstName") + " " + dr.Field<string>("LastName"),
-                            CustomerID = dr["CustomerID"].ToString() ?? "",
-                            Make = dr["Make"].ToString() ?? "",
-                            Barcode = dr["Barcode"].ToString() ?? "",
-                            SerialNumber = dr["SerialNumber"].ToString() ?? "",
-                            Model = dr["Model"].ToString() ?? "",
-                            Notes = dr["Notes"].ToString() ?? "",
-                            EquipmentTypeID = dr["EquipmentTypeID"] != DBNull.Value ? Convert.ToInt32(dr["EquipmentTypeID"]) : 0,
-                            EquipmentType = dr["equipmentTypeDesc"].ToString() ?? "",
-                            CreatedDateTime = Convert.ToDateTime(dr["CreatedDateTime"]),
-                            WarrantyStart = dr["WarrantyStart"] != DBNull.Value && !string.IsNullOrEmpty(dr["WarrantyStart"].ToString())
-                                   ? Convert.ToDateTime(dr["WarrantyStart"]).ToString("yyyy-MM-dd") : string.Empty,
-                            WarrantyEnd = dr["WarrantyEnd"] != DBNull.Value && !string.IsNullOrEmpty(dr["WarrantyEnd"].ToString())
-                                   ? Convert.ToDateTime(dr["WarrantyEnd"]).ToString("yyyy-MM-dd") : string.Empty,
-                            LaborWarrantyStart = dr["LaborWarrantyStart"] != DBNull.Value && !string.IsNullOrEmpty(dr["LaborWarrantyStart"].ToString())
-                                   ? Convert.ToDateTime(dr["LaborWarrantyStart"]).ToString("yyyy-MM-dd") : string.Empty,
-                            LaborWarrantyEnd = dr["LaborWarrantyEnd"] != DBNull.Value && !string.IsNullOrEmpty(dr["LaborWarrantyEnd"].ToString())
-                                   ? Convert.ToDateTime(dr["LaborWarrantyEnd"]).ToString("yyyy-MM-dd") : string.Empty,
-                            InstallDate = dr["InstallDate"] != DBNull.Value && !string.IsNullOrEmpty(dr["InstallDate"].ToString())
-                                   ? Convert.ToDateTime(dr["InstallDate"]).ToString("yyyy-MM-dd") : string.Empty,
-                        });
-                    }
+                        Id = Convert.ToInt32(dr["Id"]),
+                        SiteId = dr["SiteId"] != DBNull.Value ? Convert.ToInt32(dr["SiteId"]) : 0,
+                        CustomerGuid = customerGuid,
+                        CustomerName = dr.Field<string>("FirstName") + " " + dr.Field<string>("LastName"),
+                        CustomerID = dr["CustomerID"].ToString() ?? "",
+                        Make = dr["Make"].ToString() ?? "",
+                        Barcode = dr["Barcode"].ToString() ?? "",
+                        SerialNumber = dr["SerialNumber"].ToString() ?? "",
+                        Model = dr["Model"].ToString() ?? "",
+                        Notes = dr["Notes"].ToString() ?? "",
+                        // EquipmentTypeID is nvarchar on the table but int on the entity;
+                        // int.TryParse rather than Convert.ToInt32 so a non-numeric value in the
+                        // column doesn't throw and take the whole page down with it.
+                        EquipmentTypeID = dr["EquipmentTypeID"] != DBNull.Value && int.TryParse(dr["EquipmentTypeID"].ToString(), out int etid) ? etid : 0,
+                        EquipmentType = dr["equipmentTypeDesc"].ToString() ?? "",
+                        CreatedDateTime = Convert.ToDateTime(dr["CreatedDateTime"]),
+                        WarrantyStart = dr["WarrantyStart"] != DBNull.Value && !string.IsNullOrEmpty(dr["WarrantyStart"].ToString())
+                               ? Convert.ToDateTime(dr["WarrantyStart"]).ToString("yyyy-MM-dd") : string.Empty,
+                        WarrantyEnd = dr["WarrantyEnd"] != DBNull.Value && !string.IsNullOrEmpty(dr["WarrantyEnd"].ToString())
+                               ? Convert.ToDateTime(dr["WarrantyEnd"]).ToString("yyyy-MM-dd") : string.Empty,
+                        LaborWarrantyStart = dr["LaborWarrantyStart"] != DBNull.Value && !string.IsNullOrEmpty(dr["LaborWarrantyStart"].ToString())
+                               ? Convert.ToDateTime(dr["LaborWarrantyStart"]).ToString("yyyy-MM-dd") : string.Empty,
+                        LaborWarrantyEnd = dr["LaborWarrantyEnd"] != DBNull.Value && !string.IsNullOrEmpty(dr["LaborWarrantyEnd"].ToString())
+                               ? Convert.ToDateTime(dr["LaborWarrantyEnd"]).ToString("yyyy-MM-dd") : string.Empty,
+                        InstallDate = dr["InstallDate"] != DBNull.Value && !string.IsNullOrEmpty(dr["InstallDate"].ToString())
+                               ? Convert.ToDateTime(dr["InstallDate"]).ToString("yyyy-MM-dd") : string.Empty,
+                    });
                 }
+
+                result.HasMore = offset + dt.Rows.Count < result.Total;
             }
             catch (Exception ex)
             {
                 // Log the exception for debugging
                 System.Diagnostics.Debug.WriteLine($"Error in GetSiteEquipmentData: {ex.Message}");
-                return null;
             }
             finally
             {
-                db.Close();
+                try { db.Close(); } catch { }
             }
-            return equipments;
+            return result;
         }
 
 
@@ -1918,14 +1993,9 @@ namespace TPM
                 data.Invoices = GetCustomerInvoices(customerId);
                 data.Notes = GetCustomerNotes(customerId, siteId);
 
-                if (!string.IsNullOrEmpty(data.CustomerInfo.CustomerGuid))
-                {
-                    data.Equipment = GetSiteEquipmentData(siteId, data.CustomerInfo.CustomerGuid);
-                }
-                else
-                {
-                    data.Equipment = new List<Equipment>();
-                }
+                // GetSiteEquipmentData is paged now; the Equipment tab fetches its own page,
+                // so the drawer no longer loads equipment eagerly on every CSL tab open.
+                data.Equipment = new List<Equipment>();
 
                 // Fetch Pictures, Files, and Maintenance Agreements
                 try

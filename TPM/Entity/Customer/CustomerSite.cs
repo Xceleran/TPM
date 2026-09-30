@@ -49,6 +49,17 @@ namespace FSM.Entity.Customer
         public string CustomerName { get; set; }
     }
 
+    // One page of a site's equipment. Paged because tbl_Equipment holds 79,243 rows on
+    // Live and one site alone carries 31,718 of them.
+    public class EquipmentPage
+    {
+        public List<Equipment> Equipment { get; set; }
+        public int Total { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public bool HasMore { get; set; }
+    }
+
     public class EquipmentType
     {
         public string Id { get; set; }
