@@ -750,28 +750,40 @@ namespace TPM
                 db.Open();
                 DataTable dt = new DataTable();
 
-                // InvoiceDate now falls back to CreatedDate/ExpirationDate if null
+                // InvoiceDate now falls back to CreatedDate/ExpirationDate if null.
+                //
+                // The Appointment ID column is meant to show the appointment's UId (the
+                // CEC-facing identifier, e.g. "Pro 17489-1") -- the same value the Appointments
+                // and Notes tabs already display. tbl_Invoice.AppointmentId instead holds the
+                // FSM/TPM primary key, so it has to be looked up. OUTER APPLY ... TOP 1 rather
+                // than a JOIN: 123 (CompanyID, ApptID) pairs are duplicated on Live, so a plain
+                // join would silently multiply invoice rows.
                 string sql = @"
-            SELECT 
-                inv.ID, 
+            SELECT
+                inv.ID,
                 inv.Number,
                 inv.Subtotal,
                 ISNULL(inv.AmountCollect, 0.00) as AmountCollect,
                 ISNULL(inv.DepositAmount, 0.00) as DepositAmount,
-                inv.Discount, 
-                inv.Tax, 
-                (inv.Total - ISNULL(inv.AmountCollect, 0.00)) as Due, 
-                inv.Type, 
-                CONVERT(VARCHAR(10), COALESCE(inv.InvoiceDate, inv.CreatedDate, inv.ExpirationDate), 101) as InvoiceDate, 
-                inv.Total, 
+                inv.Discount,
+                inv.Tax,
+                (inv.Total - ISNULL(inv.AmountCollect, 0.00)) as Due,
+                inv.Type,
+                CONVERT(VARCHAR(10), COALESCE(inv.InvoiceDate, inv.CreatedDate, inv.ExpirationDate), 101) as InvoiceDate,
+                inv.Total,
                 inv.AppointmentId,
                 cust.CustomerGuid,
+                appt.AppoinmentUId,
                 gen.AppointmentPrefix
             FROM tbl_Invoice as inv
-            LEFT JOIN tbl_Customer as cust 
+            LEFT JOIN tbl_Customer as cust
               ON inv.CustomerID = cust.CustomerID AND inv.CompnyID = cust.CompanyID
             LEFT JOIN tbl_AppointmentAutoGenerate gen
               ON inv.CompnyID = gen.CompanyID
+            OUTER APPLY (
+                SELECT TOP 1 a.AppoinmentUId FROM tbl_Appointment a
+                 WHERE a.ApptID = TRY_CAST(inv.AppointmentId AS INT) AND a.CompanyID = inv.CompnyID
+            ) appt
             WHERE inv.CustomerID = @CustomerID AND inv.CompnyID = @CompanyID;";
 
                 db.AddParameter("@CustomerID", customerId, SqlDbType.NVarChar);
@@ -791,11 +803,34 @@ namespace TPM
                         invoice.InvoiceNumber = row.Field<string>("Number") ?? "";
                         invoice.InvoiceType = row.Field<string>("Type") ?? "";
 
-                        // Format Appointment ID: Prefix-CompanyID-SeedNumber
+                        // rawApptId stays the FSM/TPM primary key: the CEC invoice link below is
+                        // built from it, because CEC looks the appointment up by that, not by UId.
                         string rawApptId = row.Field<string>("AppointmentId");
-                        if (!string.IsNullOrEmpty(rawApptId))
+
+                        // "0" is the not-linked-to-an-appointment sentinel -- composing it produces
+                        // an id that does not exist ("APPT-14628-0"), so treat it as blank up front.
+                        if (rawApptId == "0") rawApptId = "";
+
+                        string apptUid = row.Table.Columns.Contains("AppoinmentUId") ? (row["AppoinmentUId"]?.ToString() ?? "") : "";
+
+                        if (!string.IsNullOrEmpty(apptUid))
                         {
-                            string prefix = row.Table.Columns.Contains("AppointmentPrefix") ? (row["AppointmentPrefix"]?.ToString() ?? "APPT") : "APPT";
+                            // What the column is for, and what the Appointments/Notes tabs already show.
+                            invoice.AppointmentId = apptUid;
+                        }
+                        else if (!string.IsNullOrEmpty(rawApptId))
+                        {
+                            // No appointment row to read a UId from (deleted appointment, or an
+                            // imported invoice) -- fall back to the old composed identifier.
+                            //
+                            // AppointmentPrefix is read through IsNullOrEmpty, not a bare ?? : the
+                            // column comes from a LEFT JOIN, and a company with no
+                            // tbl_AppointmentAutoGenerate row yields DBNull, whose ToString() is ""
+                            // rather than null -- so ?? never fired and the cell rendered with a
+                            // leading dash ("-14628-79").
+                            string prefix = row.Table.Columns.Contains("AppointmentPrefix")
+                                && !string.IsNullOrEmpty(row["AppointmentPrefix"]?.ToString())
+                                ? row["AppointmentPrefix"].ToString() : "APPT";
                             invoice.AppointmentId = $"{prefix}-{companyid}-{rawApptId}";
                         }
                         else
@@ -824,8 +859,10 @@ namespace TPM
                         if (!string.IsNullOrEmpty(invoice.ID) && !string.IsNullOrEmpty(invoice.CustomerGuid))
                         {
                             string inTypeForUrl = (invoice.InvoiceType == "Proposal") ? "Estimate" : invoice.InvoiceType;
+                            // AppID= deliberately stays the raw primary key, not the UId now shown
+                            // in the column: CEC looks appointments up by that key.
                             invoice.ExternalLink =
-                                $"https://testsite.myserviceforce.com/cec/Invoice.aspx?InvNum={invoice.ID}&cId={invoice.CustomerGuid}&InType={inTypeForUrl}&AppID={invoice.AppointmentId}&FromInvoices=1";
+                                $"https://testsite.myserviceforce.com/cec/Invoice.aspx?InvNum={invoice.ID}&cId={invoice.CustomerGuid}&InType={inTypeForUrl}&AppID={rawApptId}&FromInvoices=1";
                         }
                         else
                         {
