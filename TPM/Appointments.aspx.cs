@@ -2505,7 +2505,11 @@ namespace TPM
                 }
 
                 data.Appointments = CustomerDetails.GetCustomerAppoinmets(customerId, siteId);
-                data.Invoices = CustomerDetails.GetCustomerInvoices(customerId);
+                // GetCustomerInvoices is paged now; this drawer renders at most 10 plus an
+                // "...and more" marker, so ask for 11 rather than every invoice on the customer
+                // (up to 35,171 on Live).
+                data.Invoices = CustomerDetails.GetCustomerInvoices(customerId,
+                    1, 11, null, null, null, null, null, "InvoiceDate", "desc").Invoices;
                 data.Notes = CustomerDetails.GetCustomerNotes(customerId, siteId);
 
                 if (!string.IsNullOrEmpty(data.CustomerInfo.CustomerGuid))

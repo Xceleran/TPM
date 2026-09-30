@@ -735,30 +735,124 @@ namespace TPM
 
         [WebMethod(EnableSession = true)]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
-        public static List<CustomerInvoice> GetCustomerInvoices(string customerId)
+        public static CustomerInvoicePage GetCustomerInvoices(string customerId, int page, int pageSize,
+            string search, string status, string type, string startDate, string endDate,
+            string sortColumn, string sortDirection)
         {
-            var invoices = new List<CustomerInvoice>();
-            string companyid = HttpContext.Current.Session["CompanyID"]?.ToString();
-            if (string.IsNullOrEmpty(companyid))
+            var result = new CustomerInvoicePage
             {
-                System.Diagnostics.Debug.WriteLine("GetCustomerInvoices: CompanyID is missing from session");
-                return invoices;
+                Invoices = new List<CustomerInvoice>(),
+                Total = 0,
+                Page = page < 1 ? 1 : page,
+                PageSize = (pageSize < 1 || pageSize > 200) ? 25 : pageSize,
+                HasMore = false
+            };
+
+            string companyid = HttpContext.Current.Session["CompanyID"]?.ToString();
+            if (string.IsNullOrEmpty(companyid) || string.IsNullOrEmpty(customerId))
+            {
+                System.Diagnostics.Debug.WriteLine("GetCustomerInvoices: CompanyID or customerId is missing");
+                return result;
             }
+
+            search = (search ?? "").Trim();
+            status = (status ?? "all").Trim().ToLowerInvariant();
+            type = (type ?? "all").Trim().ToLowerInvariant();
+            sortDirection = string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
+
+            // "Due" is Total minus what has been collected, and "Paid" is that reaching zero --
+            // the same rule the row mapping below uses for the status badge, so the filter and
+            // the badge can never disagree.
+            const string dueExpr = "(inv.Total - ISNULL(inv.AmountCollect, 0.00))";
+            const string dateExpr = "COALESCE(inv.InvoiceDate, inv.CreatedDate, inv.ExpirationDate)";
+
+            // The Appointment ID column shows the appointment's UId -- the CEC-facing identifier
+            // ("Pro 17489-1"), the same value the Appointments and Notes tabs already display.
+            // tbl_Invoice.AppointmentId holds the FSM/TPM primary key instead, so it has to be
+            // looked up. OUTER APPLY ... TOP 1 rather than a JOIN: 123 (CompanyID, ApptID) pairs
+            // are duplicated on Live, so a plain join would silently multiply invoice rows -- the
+            // same way the Equipment grid drew 22 rows for a site that has 2. The customer join
+            // below had the identical hazard (this was previously a LEFT JOIN with no scope
+            // beyond CustomerID/CompanyID, which still isn't guaranteed unique), so it moves to
+            // OUTER APPLY too.
+            const string apptUidExpr = "appt.AppoinmentUId";
+            const string apptApply = @"
+            OUTER APPLY (
+                SELECT TOP 1 a.AppoinmentUId
+                  FROM tbl_Appointment a
+                 WHERE a.ApptID = TRY_CAST(inv.AppointmentId AS INT) AND a.CompanyID = inv.CompnyID
+            ) appt";
+            const string custApply = @"
+            OUTER APPLY (
+                SELECT TOP 1 c.CustomerGuid
+                  FROM tbl_Customer c
+                 WHERE c.CustomerID = inv.CustomerID AND c.CompanyID = inv.CompnyID
+            ) cust";
+
+            // Whitelist: the sort key arrives from a clickable column header, so it is never
+            // concatenated into SQL without passing through this map first.
+            var sortMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "AppointmentId",  "COALESCE(NULLIF(" + apptUidExpr + ", ''), inv.AppointmentId)" },
+                { "InvoiceNumber",  "inv.Number" },
+                { "InvoiceType",    "inv.Type" },
+                { "InvoiceDate",    dateExpr },
+                { "Subtotal",       "inv.Subtotal" },
+                { "Discount",       "inv.Discount" },
+                { "Tax",            "inv.Tax" },
+                { "Total",          "inv.Total" },
+                { "Due",            dueExpr },
+                { "DepositAmount",  "ISNULL(inv.DepositAmount, 0.00)" },
+                { "InvoiceStatus",  "CASE WHEN " + dueExpr + " <= 0 THEN 'Paid' ELSE 'Unpaid' END" }
+            };
+            string orderExpr = sortMap.ContainsKey(sortColumn ?? "") ? sortMap[sortColumn] : dateExpr;
+
+            var where = new StringBuilder(" WHERE inv.CustomerID = @CustomerID AND inv.CompnyID = @CompanyID");
+            if (!string.IsNullOrEmpty(search))
+            {
+                // The column shows the UId ("Pro 17489-1"), so that is what someone will type;
+                // the raw id stays searchable because it is what the fallback renders.
+                where.Append(" AND (ISNULL(inv.Number,'') LIKE @Search OR ISNULL(inv.AppointmentId,'') LIKE @Search"
+                           + " OR ISNULL(" + apptUidExpr + ",'') LIKE @Search)");
+            }
+            if (status == "paid") where.Append(" AND " + dueExpr + " <= 0");
+            else if (status == "unpaid" || status == "due") where.Append(" AND " + dueExpr + " > 0");
+
+            if (type == "invoice") where.Append(" AND inv.Type = 'Invoice'");
+            else if (type == "estimate") where.Append(" AND inv.Type IN ('Proposal','Estimate')");
+
+            DateTime parsedStart, parsedEnd;
+            bool hasStart = DateTime.TryParse(startDate, out parsedStart);
+            bool hasEnd = DateTime.TryParse(endDate, out parsedEnd);
+            if (hasStart) where.Append(" AND " + dateExpr + " >= @StartDate");
+            // Compared against the day AFTER the end date so an invoice stamped later in that day
+            // is still inside the range.
+            if (hasEnd) where.Append(" AND " + dateExpr + " < @EndDate");
+
+            int offset = (result.Page - 1) * result.PageSize;
             Database db = new Database();
             try
             {
                 db.Open();
-                DataTable dt = new DataTable();
+
+                Action addFilterParams = () =>
+                {
+                    db.Command.Parameters.Clear();
+                    db.AddParameter("@CustomerID", customerId, SqlDbType.NVarChar);
+                    db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+                    if (!string.IsNullOrEmpty(search)) db.AddParameter("@Search", "%" + search + "%", SqlDbType.NVarChar);
+                    if (hasStart) db.AddParameter("@StartDate", parsedStart.Date, SqlDbType.DateTime);
+                    if (hasEnd) db.AddParameter("@EndDate", parsedEnd.Date.AddDays(1), SqlDbType.DateTime);
+                };
+
+                DataTable countDt = new DataTable();
+                addFilterParams();
+                // The apply is in the count query too: the search clause references appt.
+                db.ExecuteParam("SELECT COUNT(*) AS Total FROM tbl_Invoice AS inv" + apptApply + where.ToString() + ";", out countDt);
+                result.Total = countDt.Rows.Count > 0 ? Convert.ToInt32(countDt.Rows[0]["Total"]) : 0;
 
                 // InvoiceDate now falls back to CreatedDate/ExpirationDate if null.
-                //
-                // The Appointment ID column is meant to show the appointment's UId (the
-                // CEC-facing identifier, e.g. "Pro 17489-1") -- the same value the Appointments
-                // and Notes tabs already display. tbl_Invoice.AppointmentId instead holds the
-                // FSM/TPM primary key, so it has to be looked up. OUTER APPLY ... TOP 1 rather
-                // than a JOIN: 123 (CompanyID, ApptID) pairs are duplicated on Live, so a plain
-                // join would silently multiply invoice rows.
-                string sql = @"
+                string sql = $@"
             SELECT
                 inv.ID,
                 inv.Number,
@@ -767,120 +861,118 @@ namespace TPM
                 ISNULL(inv.DepositAmount, 0.00) as DepositAmount,
                 inv.Discount,
                 inv.Tax,
-                (inv.Total - ISNULL(inv.AmountCollect, 0.00)) as Due,
+                {dueExpr} as Due,
                 inv.Type,
-                CONVERT(VARCHAR(10), COALESCE(inv.InvoiceDate, inv.CreatedDate, inv.ExpirationDate), 101) as InvoiceDate,
+                CONVERT(VARCHAR(10), {dateExpr}, 101) as InvoiceDate,
                 inv.Total,
                 inv.AppointmentId,
                 cust.CustomerGuid,
                 appt.AppoinmentUId,
                 gen.AppointmentPrefix
             FROM tbl_Invoice as inv
-            LEFT JOIN tbl_Customer as cust
-              ON inv.CustomerID = cust.CustomerID AND inv.CompnyID = cust.CompanyID
+            {custApply}
+            {apptApply}
             LEFT JOIN tbl_AppointmentAutoGenerate gen
               ON inv.CompnyID = gen.CompanyID
-            OUTER APPLY (
-                SELECT TOP 1 a.AppoinmentUId FROM tbl_Appointment a
-                 WHERE a.ApptID = TRY_CAST(inv.AppointmentId AS INT) AND a.CompanyID = inv.CompnyID
-            ) appt
-            WHERE inv.CustomerID = @CustomerID AND inv.CompnyID = @CompanyID;";
+            {where}
+            ORDER BY {orderExpr} {sortDirection}, inv.ID {sortDirection}
+            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
 
-                db.AddParameter("@CustomerID", customerId, SqlDbType.NVarChar);
-                db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
-
+                DataTable dt = new DataTable();
+                addFilterParams();
+                db.AddParameter("@Offset", offset, SqlDbType.Int);
+                db.AddParameter("@PageSize", result.PageSize, SqlDbType.Int);
                 db.ExecuteParam(sql, out dt);
-                db.Close();
 
-                if (dt.Rows.Count > 0)
+                foreach (DataRow row in dt.Rows)
                 {
-                    foreach (DataRow row in dt.Rows)
+                    var invoice = new CustomerInvoice();
+
+                    // mappings
+                    invoice.ID = row.Field<string>("ID") ?? "";
+                    invoice.InvoiceNumber = row.Field<string>("Number") ?? "";
+                    invoice.InvoiceType = row.Field<string>("Type") ?? "";
+
+                    // rawApptId stays the FSM/TPM primary key: the CEC invoice link below is
+                    // built from it, because CEC looks the appointment up by that, not by UId.
+                    string rawApptId = row.Field<string>("AppointmentId");
+
+                    // "0" is the not-linked-to-an-appointment sentinel -- composing it produces
+                    // an id that does not exist ("APPT-14628-0"), so treat it as blank up front.
+                    if (rawApptId == "0") rawApptId = "";
+
+                    string apptUid = row.Table.Columns.Contains("AppoinmentUId") ? (row["AppoinmentUId"]?.ToString() ?? "") : "";
+
+                    if (!string.IsNullOrEmpty(apptUid))
                     {
-                        var invoice = new CustomerInvoice();
-
-                        // mappings
-                        invoice.ID = row.Field<string>("ID") ?? "";
-                        invoice.InvoiceNumber = row.Field<string>("Number") ?? "";
-                        invoice.InvoiceType = row.Field<string>("Type") ?? "";
-
-                        // rawApptId stays the FSM/TPM primary key: the CEC invoice link below is
-                        // built from it, because CEC looks the appointment up by that, not by UId.
-                        string rawApptId = row.Field<string>("AppointmentId");
-
-                        // "0" is the not-linked-to-an-appointment sentinel -- composing it produces
-                        // an id that does not exist ("APPT-14628-0"), so treat it as blank up front.
-                        if (rawApptId == "0") rawApptId = "";
-
-                        string apptUid = row.Table.Columns.Contains("AppoinmentUId") ? (row["AppoinmentUId"]?.ToString() ?? "") : "";
-
-                        if (!string.IsNullOrEmpty(apptUid))
-                        {
-                            // What the column is for, and what the Appointments/Notes tabs already show.
-                            invoice.AppointmentId = apptUid;
-                        }
-                        else if (!string.IsNullOrEmpty(rawApptId))
-                        {
-                            // No appointment row to read a UId from (deleted appointment, or an
-                            // imported invoice) -- fall back to the old composed identifier.
-                            //
-                            // AppointmentPrefix is read through IsNullOrEmpty, not a bare ?? : the
-                            // column comes from a LEFT JOIN, and a company with no
-                            // tbl_AppointmentAutoGenerate row yields DBNull, whose ToString() is ""
-                            // rather than null -- so ?? never fired and the cell rendered with a
-                            // leading dash ("-14628-79").
-                            string prefix = row.Table.Columns.Contains("AppointmentPrefix")
-                                && !string.IsNullOrEmpty(row["AppointmentPrefix"]?.ToString())
-                                ? row["AppointmentPrefix"].ToString() : "APPT";
-                            invoice.AppointmentId = $"{prefix}-{companyid}-{rawApptId}";
-                        }
-                        else
-                        {
-                            invoice.AppointmentId = "";
-                        }
-
-                        invoice.CustomerGuid = row.Field<string>("CustomerGuid") ?? "";
-                        invoice.Total = row["Total"].ToString() ?? "0.0";
-                        invoice.Subtotal = row["Subtotal"].ToString() ?? "0.0";
-                        invoice.Due = row["Due"].ToString() ?? "0.0";
-                        invoice.Discount = row["Discount"].ToString() ?? "0.0";
-                        invoice.Tax = row["Tax"].ToString() ?? "0.0";
-                        invoice.DepositAmount = row["DepositAmount"].ToString() ?? "0.0";
-
-                        // map the computed date
-                        invoice.InvoiceDate = row.Field<string>("InvoiceDate") ?? "";
-
-                        // existing status logic
-                        if ((Convert.ToDouble(row["Total"].ToString()) - Convert.ToDouble(row["AmountCollect"].ToString())) <= 0)
-                            invoice.InvoiceStatus = "Paid";
-                        else
-                            invoice.InvoiceStatus = "Unpaid";
-
-                        // existing external link logic
-                        if (!string.IsNullOrEmpty(invoice.ID) && !string.IsNullOrEmpty(invoice.CustomerGuid))
-                        {
-                            string inTypeForUrl = (invoice.InvoiceType == "Proposal") ? "Estimate" : invoice.InvoiceType;
-                            // AppID= deliberately stays the raw primary key, not the UId now shown
-                            // in the column: CEC looks appointments up by that key.
-                            invoice.ExternalLink =
-                                $"https://testsite.myserviceforce.com/cec/Invoice.aspx?InvNum={invoice.ID}&cId={invoice.CustomerGuid}&InType={inTypeForUrl}&AppID={rawApptId}&FromInvoices=1";
-                        }
-                        else
-                        {
-                            invoice.ExternalLink = "";
-                        }
-
-                        invoices.Add(invoice);
+                        // What the column is for, and what the Appointments/Notes tabs already show.
+                        invoice.AppointmentId = apptUid;
                     }
+                    else if (!string.IsNullOrEmpty(rawApptId))
+                    {
+                        // No appointment row to read a UId from (deleted appointment, or an
+                        // imported invoice) -- fall back to the old composed identifier.
+                        //
+                        // AppointmentPrefix is read through IsNullOrEmpty, not a bare ?? : the
+                        // column comes from a LEFT JOIN, and a company with no
+                        // tbl_AppointmentAutoGenerate row yields DBNull, whose ToString() is ""
+                        // rather than null -- so ?? never fired and the cell rendered with a
+                        // leading dash ("-14628-79").
+                        string prefix = row.Table.Columns.Contains("AppointmentPrefix")
+                            && !string.IsNullOrEmpty(row["AppointmentPrefix"]?.ToString())
+                            ? row["AppointmentPrefix"].ToString() : "APPT";
+                        invoice.AppointmentId = $"{prefix}-{companyid}-{rawApptId}";
+                    }
+                    else
+                    {
+                        invoice.AppointmentId = "";
+                    }
+
+                    invoice.CustomerGuid = row.Field<string>("CustomerGuid") ?? "";
+                    invoice.Total = row["Total"].ToString() ?? "0.0";
+                    invoice.Subtotal = row["Subtotal"].ToString() ?? "0.0";
+                    invoice.Due = row["Due"].ToString() ?? "0.0";
+                    invoice.Discount = row["Discount"].ToString() ?? "0.0";
+                    invoice.Tax = row["Tax"].ToString() ?? "0.0";
+                    invoice.DepositAmount = row["DepositAmount"].ToString() ?? "0.0";
+
+                    // map the computed date
+                    invoice.InvoiceDate = row.Field<string>("InvoiceDate") ?? "";
+
+                    // existing status logic
+                    if ((Convert.ToDouble(row["Total"].ToString()) - Convert.ToDouble(row["AmountCollect"].ToString())) <= 0)
+                        invoice.InvoiceStatus = "Paid";
+                    else
+                        invoice.InvoiceStatus = "Unpaid";
+
+                    // existing external link logic -- TPM's own hardcoded URL, kept byte-for-byte
+                    // apart from the AppID= value (see the rawApptId comment above).
+                    if (!string.IsNullOrEmpty(invoice.ID) && !string.IsNullOrEmpty(invoice.CustomerGuid))
+                    {
+                        string inTypeForUrl = (invoice.InvoiceType == "Proposal") ? "Estimate" : invoice.InvoiceType;
+                        invoice.ExternalLink =
+                            $"https://testsite.myserviceforce.com/cec/Invoice.aspx?InvNum={invoice.ID}&cId={invoice.CustomerGuid}&InType={inTypeForUrl}&AppID={rawApptId}&FromInvoices=1";
+                    }
+                    else
+                    {
+                        invoice.ExternalLink = "";
+                    }
+
+                    result.Invoices.Add(invoice);
                 }
+
+                result.HasMore = offset + dt.Rows.Count < result.Total;
             }
             catch (Exception ex)
             {
                 // Log the exception for debugging
                 System.Diagnostics.Debug.WriteLine($"Error in GetCustomerInvoices: {ex.Message}");
-                return null;
             }
-            finally { db.Close(); }
-            return invoices;
+            finally
+            {
+                try { db.Close(); } catch { }
+            }
+            return result;
         }
 
 
@@ -1990,7 +2082,10 @@ namespace TPM
                 }
 
                 data.Appointments = GetCustomerAppoinmets(customerId, siteId);
-                data.Invoices = GetCustomerInvoices(customerId);
+                // GetCustomerInvoices is paged now; the Invoices tab fetches its own page, so the
+                // drawer no longer loads every invoice on every CSL tab open (up to 35,171 for
+                // one customer on Live).
+                data.Invoices = new List<CustomerInvoice>();
                 data.Notes = GetCustomerNotes(customerId, siteId);
 
                 // GetSiteEquipmentData is paged now; the Equipment tab fetches its own page,

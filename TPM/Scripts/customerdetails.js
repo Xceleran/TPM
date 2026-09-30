@@ -27,6 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let apptEndDate = null;
     let eqpTotal = 0;
     let eqpRequestSeq = 0;
+    let invTotal = 0;
+    let invRequestSeq = 0;
 
     // Global event listener for picture deletion
     $(document).on('click', '.delete-picture-btn', function () {
@@ -94,9 +96,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initializeEventListeners() {
-        $('#invFilterType').on('change', function () {
-            applyFiltersInv();
-        });
+        // #invFilterType's change handler is bound once, alongside #invFilter, further down
+        // (both now trigger a server-side reload rather than a client-side re-filter).
 
         // Handle clicks on CSL links in the appointments table to switch tabs
         $(document).on('click', '#apptTableBody .csl-link', function (e) {
@@ -264,9 +265,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Sortable header click handler for Appointments table
         $(document).on('click', '.sortable-header', function () {
-            // Equipment sorts server-side and has its own handler below -- this one otherwise
-            // fires (and wrongly re-sorts Appointments) for every tab's headers.
-            if ($(this).closest('#equipment').length) return;
+            // Equipment and Invoices sort server-side and have their own handlers below -- this
+            // one otherwise fires (and wrongly re-sorts Appointments) for every tab's headers.
+            if ($(this).closest('#equipment, #invoices').length) return;
             const sortColumn = $(this).data('sort');
             if (apptSortColumn === sortColumn) {
                 apptSortDirection = apptSortDirection === 'asc' ? 'desc' : 'asc';
@@ -316,6 +317,59 @@ document.addEventListener('DOMContentLoaded', () => {
             clearTimeout(eqpSearchTimer);
             eqpSearchTimer = setTimeout(reloadEquipmentFromFirstPage, 400);
         });
+
+        // Sortable header click handler for the Invoices table (server-side sort/paging).
+        $(document).on('click', '#invoices .sortable-header', function () {
+            const sortColumn = $(this).data('sort');
+            if (invSortColumn === sortColumn) {
+                invSortDirection = invSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                invSortColumn = sortColumn;
+                invSortDirection = 'asc';
+            }
+            $('#invoices .sortable-header i').removeClass('fa-sort-up fa-sort-down').addClass('fa-sort');
+            const icon = $(this).find('i');
+            icon.removeClass('fa-sort').addClass(invSortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+            reloadInvoicesFromFirstPage();
+        });
+
+        // Invoices pager, search, status/type filters and date range (server-side).
+        $('#invPrev').on('click', function () {
+            if (currentPageInv > 1) {
+                currentPageInv--;
+                loadInvoices();
+            }
+        });
+        $('#invNext').on('click', function () {
+            if (currentPageInv < invPageCount()) {
+                currentPageInv++;
+                loadInvoices();
+            }
+        });
+        let invSearchTimer;
+        $('#invSearch').on('keyup input', function () {
+            clearTimeout(invSearchTimer);
+            invSearchTimer = setTimeout(reloadInvoicesFromFirstPage, 400);
+        });
+        $('#invFilter, #invFilterType').on('change', reloadInvoicesFromFirstPage);
+
+        if ($.fn.daterangepicker) {
+            $('#invDateRangePicker').daterangepicker({
+                autoUpdateInput: false,
+                locale: { cancelLabel: 'Clear', format: 'MM/DD/YYYY' }
+            }, function (start, end) {
+                invStartDate = start.format('MM/DD/YYYY');
+                invEndDate = end.format('MM/DD/YYYY');
+                $('#invDateRangePicker span').first().text(invStartDate + ' - ' + invEndDate);
+                reloadInvoicesFromFirstPage();
+            });
+            $('#invDateRangePicker').on('cancel.daterangepicker', function () {
+                invStartDate = null;
+                invEndDate = null;
+                $('#invDateRangePicker span').first().text('Date Range');
+                reloadInvoicesFromFirstPage();
+            });
+        }
 
         function getRedirectionURL() {
             const customerId = $('#MainContent_lblCustomerId').text() || $('[id$="lblCustomerId"]').text();
@@ -1161,6 +1215,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // location.reload() after every save. Expose it for a targeted refresh instead.
     window.reloadCustomerAppointments = loadAppointments;
 
+    // Invoices are scoped to the customer, not the site, so a customer with many locations
+    // accumulates every invoice into one list (35,171 for the largest on Live) -- paged, searched
+    // and sorted server-side (GetCustomerInvoices) rather than loaded whole and filtered here.
     function loadInvoices() {
         if (!customerId) {
             console.error('Cannot load invoices: customerId is missing');
@@ -1168,44 +1225,77 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        console.log('Loading invoices for customerId:', customerId);
+        // Typing in the search box (or changing a filter) fires one of these per burst; only the
+        // newest response is allowed to paint, since they can otherwise resolve out of order.
+        const seq = ++invRequestSeq;
 
         $.ajax({
             url: 'CustomerDetails.aspx/GetCustomerInvoices',
             type: "POST",
             contentType: "application/json; charset=utf-8",
-            data: JSON.stringify({ customerId: customerId }),
+            data: JSON.stringify({
+                customerId: customerId,
+                page: currentPageInv,
+                pageSize: pageSizeInv,
+                search: ($('#invSearch').val() || '').trim(),
+                status: $('#invFilter').val() || 'all',
+                type: $('#invFilterType').val() || 'all',
+                startDate: invStartDate || '',
+                endDate: invEndDate || '',
+                sortColumn: invSortColumn,
+                sortDirection: invSortDirection
+            }),
             dataType: 'json',
             success: (rs) => {
-                console.log('Invoices response:', rs);
-
-                // Handle both direct array and wrapped response
-                if (rs && rs.d !== undefined) {
-                    invoiceData = rs.d || [];
-                } else if (Array.isArray(rs)) {
-                    invoiceData = rs;
-                } else {
-                    invoiceData = [];
-                }
-
-                console.log('Invoices data:', invoiceData);
-                console.log('Invoices count:', invoiceData.length);
+                if (seq !== invRequestSeq) return;
+                const pageResult = (rs && rs.d) ? rs.d : {};
+                invoiceData = pageResult.Invoices || [];
+                invTotal = pageResult.Total || 0;
+                currentPageInv = pageResult.Page || currentPageInv;
 
                 if (invoiceData.length === 0) {
-                    $('#invTableBody').html('<tr><td colspan="11" class="text-center text-muted">No invoices found for this customer.</td></tr>');
+                    const filtered = ($('#invSearch').val() || '').trim()
+                        || ($('#invFilter').val() || 'all') !== 'all'
+                        || ($('#invFilterType').val() || 'all') !== 'all'
+                        || invStartDate;
+                    $('#invTableBody').html('<tr><td colspan="11" class="text-center text-muted">'
+                        + (filtered ? 'No invoices match these filters.' : 'No invoices found for this customer.')
+                        + '</td></tr>');
                 } else {
-                    console.log('Rendering invoices...');
-                    applyFiltersInv();
+                    renderInvoicesTable(invoiceData);
                 }
+                renderInvPager();
             },
             error: (xhr, status, error) => {
+                if (seq !== invRequestSeq) return;
                 console.error('Error loading invoices:', error);
-                console.error('XHR Status:', xhr.status);
-                console.error('XHR Response:', xhr.responseText);
                 invoiceData = [];
+                invTotal = 0;
                 $('#invTableBody').html('<tr><td colspan="11" class="text-center text-danger">Error loading invoices. Please check console for details.</td></tr>');
+                renderInvPager();
             }
         });
+    }
+
+    function invPageCount() {
+        return Math.max(1, Math.ceil(invTotal / pageSizeInv));
+    }
+
+    function renderInvPager() {
+        const pageCount = invPageCount();
+        if (currentPageInv > pageCount) currentPageInv = pageCount;
+        $('#invPageInfo').text(invTotal
+            ? `Page ${currentPageInv} of ${pageCount} (${invTotal} invoice${invTotal === 1 ? '' : 's'})`
+            : 'No invoices');
+        $('#invPrev').prop('disabled', currentPageInv <= 1);
+        $('#invNext').prop('disabled', currentPageInv >= pageCount);
+    }
+
+    // Any change to a filter sends you back to page 1 -- staying on page 40 of a result set that
+    // just shrank to three pages would show an empty table.
+    function reloadInvoicesFromFirstPage() {
+        currentPageInv = 1;
+        loadInvoices();
     }
 
     // Equipment is paged, searched and sorted server-side (GetSiteEquipmentData). A table with
@@ -1401,9 +1491,9 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAppointmentsTable(filtered);
     }
 
+    // Filtering and sorting happen in SQL now, so "apply filters" means "ask for page 1 again".
     function applyFiltersInv() {
-        let filtered = getFilteredInvoices();
-        renderInvoicesTable(filtered);
+        reloadInvoicesFromFirstPage();
     }
 
     function applyFiltersNotes() {
@@ -1447,58 +1537,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (apptSortDirection === 'asc') {
-                return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-            } else {
-                return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-            }
-        });
-
-        return filtered;
-    }
-
-    function getFilteredInvoices() {
-        let filtered = [...invoiceData];
-
-        const typeFilter = ($('#invFilterType').val() || 'all').toLowerCase();
-        if (typeFilter === 'invoice') {
-            filtered = filtered.filter(inv => (inv.InvoiceType || '').toLowerCase() === 'invoice');
-        } else if (typeFilter === 'estimate') {
-            filtered = filtered.filter(inv => (inv.InvoiceType || '').toLowerCase() === 'proposal');
-        }
-
-        // Apply date filter if set
-        if (invStartDate && invEndDate) {
-            filtered = filtered.filter(inv => {
-                const invDate = parseMDY(inv.InvoiceDate);
-                if (!invDate) return false;
-                const start = parseMDY(invStartDate);
-                const end = parseMDY(invEndDate);
-                return invDate.isSameOrAfter(start, 'day') && invDate.isSameOrBefore(end, 'day');
-            });
-        }
-
-        // Apply sorting
-        filtered.sort((a, b) => {
-            let aVal, bVal;
-            switch (invSortColumn) {
-                case 'InvoiceDate':
-                    aVal = parseMDY(a.InvoiceDate) || moment(0);
-                    bVal = parseMDY(b.InvoiceDate) || moment(0);
-                    break;
-                case 'InvoiceNumber':
-                    aVal = (a.InvoiceNumber || '').toLowerCase();
-                    bVal = (b.InvoiceNumber || '').toLowerCase();
-                    break;
-                case 'Total':
-                    aVal = parseFloat(a.Total || 0);
-                    bVal = parseFloat(b.Total || 0);
-                    break;
-                default:
-                    aVal = a[invSortColumn] || '';
-                    bVal = b[invSortColumn] || '';
-            }
-
-            if (invSortDirection === 'asc') {
                 return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
             } else {
                 return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;

@@ -109,6 +109,19 @@ namespace FSM.Entity.Customer
         public string CustomerGuid { get; set; }
         public string ExternalLink { get; set; }
     }
+
+    // One page of a customer's invoices. Invoices are scoped to the customer, not the site, so
+    // a customer with many locations accumulates every invoice in one list (6,804 for one
+    // company on Live, 35,171 for the largest) -- too many to load unpaged.
+    public class CustomerInvoicePage
+    {
+        public List<CustomerInvoice> Invoices { get; set; }
+        public int Total { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public bool HasMore { get; set; }
+    }
+
     public class CustomerBillingAddress
     {
         public Guid ID { get; set; }
