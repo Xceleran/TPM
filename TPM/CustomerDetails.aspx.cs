@@ -735,195 +735,399 @@ namespace TPM
 
         [WebMethod(EnableSession = true)]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
-        public static List<CustomerInvoice> GetCustomerInvoices(string customerId)
+        public static CustomerInvoicePage GetCustomerInvoices(string customerId, int page, int pageSize,
+            string search, string status, string type, string startDate, string endDate,
+            string sortColumn, string sortDirection)
         {
-            var invoices = new List<CustomerInvoice>();
-            string companyid = HttpContext.Current.Session["CompanyID"]?.ToString();
-            if (string.IsNullOrEmpty(companyid))
+            var result = new CustomerInvoicePage
             {
-                System.Diagnostics.Debug.WriteLine("GetCustomerInvoices: CompanyID is missing from session");
-                return invoices;
+                Invoices = new List<CustomerInvoice>(),
+                Total = 0,
+                Page = page < 1 ? 1 : page,
+                PageSize = (pageSize < 1 || pageSize > 200) ? 25 : pageSize,
+                HasMore = false
+            };
+
+            string companyid = HttpContext.Current.Session["CompanyID"]?.ToString();
+            if (string.IsNullOrEmpty(companyid) || string.IsNullOrEmpty(customerId))
+            {
+                System.Diagnostics.Debug.WriteLine("GetCustomerInvoices: CompanyID or customerId is missing");
+                return result;
             }
+
+            search = (search ?? "").Trim();
+            status = (status ?? "all").Trim().ToLowerInvariant();
+            type = (type ?? "all").Trim().ToLowerInvariant();
+            sortDirection = string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
+
+            // "Due" is Total minus what has been collected, and "Paid" is that reaching zero --
+            // the same rule the row mapping below uses for the status badge, so the filter and
+            // the badge can never disagree.
+            const string dueExpr = "(inv.Total - ISNULL(inv.AmountCollect, 0.00))";
+            const string dateExpr = "COALESCE(inv.InvoiceDate, inv.CreatedDate, inv.ExpirationDate)";
+
+            // The Appointment ID column shows the appointment's UId -- the CEC-facing identifier
+            // ("Pro 17489-1"), the same value the Appointments and Notes tabs already display.
+            // tbl_Invoice.AppointmentId holds the FSM/TPM primary key instead, so it has to be
+            // looked up. OUTER APPLY ... TOP 1 rather than a JOIN: 123 (CompanyID, ApptID) pairs
+            // are duplicated on Live, so a plain join would silently multiply invoice rows -- the
+            // same way the Equipment grid drew 22 rows for a site that has 2. The customer join
+            // below had the identical hazard (this was previously a LEFT JOIN with no scope
+            // beyond CustomerID/CompanyID, which still isn't guaranteed unique), so it moves to
+            // OUTER APPLY too.
+            const string apptUidExpr = "appt.AppoinmentUId";
+            const string apptApply = @"
+            OUTER APPLY (
+                SELECT TOP 1 a.AppoinmentUId
+                  FROM tbl_Appointment a
+                 WHERE a.ApptID = TRY_CAST(inv.AppointmentId AS INT) AND a.CompanyID = inv.CompnyID
+            ) appt";
+            const string custApply = @"
+            OUTER APPLY (
+                SELECT TOP 1 c.CustomerGuid
+                  FROM tbl_Customer c
+                 WHERE c.CustomerID = inv.CustomerID AND c.CompanyID = inv.CompnyID
+            ) cust";
+
+            // Whitelist: the sort key arrives from a clickable column header, so it is never
+            // concatenated into SQL without passing through this map first.
+            var sortMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "AppointmentId",  "COALESCE(NULLIF(" + apptUidExpr + ", ''), inv.AppointmentId)" },
+                { "InvoiceNumber",  "inv.Number" },
+                { "InvoiceType",    "inv.Type" },
+                { "InvoiceDate",    dateExpr },
+                { "Subtotal",       "inv.Subtotal" },
+                { "Discount",       "inv.Discount" },
+                { "Tax",            "inv.Tax" },
+                { "Total",          "inv.Total" },
+                { "Due",            dueExpr },
+                { "DepositAmount",  "ISNULL(inv.DepositAmount, 0.00)" },
+                { "InvoiceStatus",  "CASE WHEN " + dueExpr + " <= 0 THEN 'Paid' ELSE 'Unpaid' END" }
+            };
+            string orderExpr = sortMap.ContainsKey(sortColumn ?? "") ? sortMap[sortColumn] : dateExpr;
+
+            var where = new StringBuilder(" WHERE inv.CustomerID = @CustomerID AND inv.CompnyID = @CompanyID");
+            if (!string.IsNullOrEmpty(search))
+            {
+                // The column shows the UId ("Pro 17489-1"), so that is what someone will type;
+                // the raw id stays searchable because it is what the fallback renders.
+                where.Append(" AND (ISNULL(inv.Number,'') LIKE @Search OR ISNULL(inv.AppointmentId,'') LIKE @Search"
+                           + " OR ISNULL(" + apptUidExpr + ",'') LIKE @Search)");
+            }
+            if (status == "paid") where.Append(" AND " + dueExpr + " <= 0");
+            else if (status == "unpaid" || status == "due") where.Append(" AND " + dueExpr + " > 0");
+
+            if (type == "invoice") where.Append(" AND inv.Type = 'Invoice'");
+            else if (type == "estimate") where.Append(" AND inv.Type IN ('Proposal','Estimate')");
+
+            DateTime parsedStart, parsedEnd;
+            bool hasStart = DateTime.TryParse(startDate, out parsedStart);
+            bool hasEnd = DateTime.TryParse(endDate, out parsedEnd);
+            if (hasStart) where.Append(" AND " + dateExpr + " >= @StartDate");
+            // Compared against the day AFTER the end date so an invoice stamped later in that day
+            // is still inside the range.
+            if (hasEnd) where.Append(" AND " + dateExpr + " < @EndDate");
+
+            int offset = (result.Page - 1) * result.PageSize;
             Database db = new Database();
             try
             {
                 db.Open();
-                DataTable dt = new DataTable();
 
-                // InvoiceDate now falls back to CreatedDate/ExpirationDate if null
-                string sql = @"
-            SELECT 
-                inv.ID, 
+                Action addFilterParams = () =>
+                {
+                    db.Command.Parameters.Clear();
+                    db.AddParameter("@CustomerID", customerId, SqlDbType.NVarChar);
+                    db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+                    if (!string.IsNullOrEmpty(search)) db.AddParameter("@Search", "%" + search + "%", SqlDbType.NVarChar);
+                    if (hasStart) db.AddParameter("@StartDate", parsedStart.Date, SqlDbType.DateTime);
+                    if (hasEnd) db.AddParameter("@EndDate", parsedEnd.Date.AddDays(1), SqlDbType.DateTime);
+                };
+
+                DataTable countDt = new DataTable();
+                addFilterParams();
+                // The apply is in the count query too: the search clause references appt.
+                db.ExecuteParam("SELECT COUNT(*) AS Total FROM tbl_Invoice AS inv" + apptApply + where.ToString() + ";", out countDt);
+                result.Total = countDt.Rows.Count > 0 ? Convert.ToInt32(countDt.Rows[0]["Total"]) : 0;
+
+                // InvoiceDate now falls back to CreatedDate/ExpirationDate if null.
+                string sql = $@"
+            SELECT
+                inv.ID,
                 inv.Number,
                 inv.Subtotal,
                 ISNULL(inv.AmountCollect, 0.00) as AmountCollect,
                 ISNULL(inv.DepositAmount, 0.00) as DepositAmount,
-                inv.Discount, 
-                inv.Tax, 
-                (inv.Total - ISNULL(inv.AmountCollect, 0.00)) as Due, 
-                inv.Type, 
-                CONVERT(VARCHAR(10), COALESCE(inv.InvoiceDate, inv.CreatedDate, inv.ExpirationDate), 101) as InvoiceDate, 
-                inv.Total, 
+                inv.Discount,
+                inv.Tax,
+                {dueExpr} as Due,
+                inv.Type,
+                CONVERT(VARCHAR(10), {dateExpr}, 101) as InvoiceDate,
+                inv.Total,
                 inv.AppointmentId,
                 cust.CustomerGuid,
+                appt.AppoinmentUId,
                 gen.AppointmentPrefix
             FROM tbl_Invoice as inv
-            LEFT JOIN tbl_Customer as cust 
-              ON inv.CustomerID = cust.CustomerID AND inv.CompnyID = cust.CompanyID
+            {custApply}
+            {apptApply}
             LEFT JOIN tbl_AppointmentAutoGenerate gen
               ON inv.CompnyID = gen.CompanyID
-            WHERE inv.CustomerID = @CustomerID AND inv.CompnyID = @CompanyID;";
+            {where}
+            ORDER BY {orderExpr} {sortDirection}, inv.ID {sortDirection}
+            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
 
-                db.AddParameter("@CustomerID", customerId, SqlDbType.NVarChar);
-                db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
-
+                DataTable dt = new DataTable();
+                addFilterParams();
+                db.AddParameter("@Offset", offset, SqlDbType.Int);
+                db.AddParameter("@PageSize", result.PageSize, SqlDbType.Int);
                 db.ExecuteParam(sql, out dt);
-                db.Close();
 
-                if (dt.Rows.Count > 0)
+                foreach (DataRow row in dt.Rows)
                 {
-                    foreach (DataRow row in dt.Rows)
+                    var invoice = new CustomerInvoice();
+
+                    // mappings
+                    invoice.ID = row.Field<string>("ID") ?? "";
+                    invoice.InvoiceNumber = row.Field<string>("Number") ?? "";
+                    invoice.InvoiceType = row.Field<string>("Type") ?? "";
+
+                    // rawApptId stays the FSM/TPM primary key: the CEC invoice link below is
+                    // built from it, because CEC looks the appointment up by that, not by UId.
+                    string rawApptId = row.Field<string>("AppointmentId");
+
+                    // "0" is the not-linked-to-an-appointment sentinel -- composing it produces
+                    // an id that does not exist ("APPT-14628-0"), so treat it as blank up front.
+                    if (rawApptId == "0") rawApptId = "";
+
+                    string apptUid = row.Table.Columns.Contains("AppoinmentUId") ? (row["AppoinmentUId"]?.ToString() ?? "") : "";
+
+                    if (!string.IsNullOrEmpty(apptUid))
                     {
-                        var invoice = new CustomerInvoice();
-
-                        // mappings
-                        invoice.ID = row.Field<string>("ID") ?? "";
-                        invoice.InvoiceNumber = row.Field<string>("Number") ?? "";
-                        invoice.InvoiceType = row.Field<string>("Type") ?? "";
-
-                        // Format Appointment ID: Prefix-CompanyID-SeedNumber
-                        string rawApptId = row.Field<string>("AppointmentId");
-                        if (!string.IsNullOrEmpty(rawApptId))
-                        {
-                            string prefix = row.Table.Columns.Contains("AppointmentPrefix") ? (row["AppointmentPrefix"]?.ToString() ?? "APPT") : "APPT";
-                            invoice.AppointmentId = $"{prefix}-{companyid}-{rawApptId}";
-                        }
-                        else
-                        {
-                            invoice.AppointmentId = "";
-                        }
-
-                        invoice.CustomerGuid = row.Field<string>("CustomerGuid") ?? "";
-                        invoice.Total = row["Total"].ToString() ?? "0.0";
-                        invoice.Subtotal = row["Subtotal"].ToString() ?? "0.0";
-                        invoice.Due = row["Due"].ToString() ?? "0.0";
-                        invoice.Discount = row["Discount"].ToString() ?? "0.0";
-                        invoice.Tax = row["Tax"].ToString() ?? "0.0";
-                        invoice.DepositAmount = row["DepositAmount"].ToString() ?? "0.0";
-
-                        // map the computed date
-                        invoice.InvoiceDate = row.Field<string>("InvoiceDate") ?? "";
-
-                        // existing status logic
-                        if ((Convert.ToDouble(row["Total"].ToString()) - Convert.ToDouble(row["AmountCollect"].ToString())) <= 0)
-                            invoice.InvoiceStatus = "Paid";
-                        else
-                            invoice.InvoiceStatus = "Unpaid";
-
-                        // existing external link logic
-                        if (!string.IsNullOrEmpty(invoice.ID) && !string.IsNullOrEmpty(invoice.CustomerGuid))
-                        {
-                            string inTypeForUrl = (invoice.InvoiceType == "Proposal") ? "Estimate" : invoice.InvoiceType;
-                            invoice.ExternalLink =
-                                $"https://testsite.myserviceforce.com/cec/Invoice.aspx?InvNum={invoice.ID}&cId={invoice.CustomerGuid}&InType={inTypeForUrl}&AppID={invoice.AppointmentId}&FromInvoices=1";
-                        }
-                        else
-                        {
-                            invoice.ExternalLink = "";
-                        }
-
-                        invoices.Add(invoice);
+                        // What the column is for, and what the Appointments/Notes tabs already show.
+                        invoice.AppointmentId = apptUid;
                     }
+                    else if (!string.IsNullOrEmpty(rawApptId))
+                    {
+                        // No appointment row to read a UId from (deleted appointment, or an
+                        // imported invoice) -- fall back to the old composed identifier.
+                        //
+                        // AppointmentPrefix is read through IsNullOrEmpty, not a bare ?? : the
+                        // column comes from a LEFT JOIN, and a company with no
+                        // tbl_AppointmentAutoGenerate row yields DBNull, whose ToString() is ""
+                        // rather than null -- so ?? never fired and the cell rendered with a
+                        // leading dash ("-14628-79").
+                        string prefix = row.Table.Columns.Contains("AppointmentPrefix")
+                            && !string.IsNullOrEmpty(row["AppointmentPrefix"]?.ToString())
+                            ? row["AppointmentPrefix"].ToString() : "APPT";
+                        invoice.AppointmentId = $"{prefix}-{companyid}-{rawApptId}";
+                    }
+                    else
+                    {
+                        invoice.AppointmentId = "";
+                    }
+
+                    invoice.CustomerGuid = row.Field<string>("CustomerGuid") ?? "";
+                    invoice.Total = row["Total"].ToString() ?? "0.0";
+                    invoice.Subtotal = row["Subtotal"].ToString() ?? "0.0";
+                    invoice.Due = row["Due"].ToString() ?? "0.0";
+                    invoice.Discount = row["Discount"].ToString() ?? "0.0";
+                    invoice.Tax = row["Tax"].ToString() ?? "0.0";
+                    invoice.DepositAmount = row["DepositAmount"].ToString() ?? "0.0";
+
+                    // map the computed date
+                    invoice.InvoiceDate = row.Field<string>("InvoiceDate") ?? "";
+
+                    // existing status logic
+                    if ((Convert.ToDouble(row["Total"].ToString()) - Convert.ToDouble(row["AmountCollect"].ToString())) <= 0)
+                        invoice.InvoiceStatus = "Paid";
+                    else
+                        invoice.InvoiceStatus = "Unpaid";
+
+                    // existing external link logic -- TPM's own hardcoded URL, kept byte-for-byte
+                    // apart from the AppID= value (see the rawApptId comment above).
+                    if (!string.IsNullOrEmpty(invoice.ID) && !string.IsNullOrEmpty(invoice.CustomerGuid))
+                    {
+                        string inTypeForUrl = (invoice.InvoiceType == "Proposal") ? "Estimate" : invoice.InvoiceType;
+                        invoice.ExternalLink =
+                            $"https://testsite.myserviceforce.com/cec/Invoice.aspx?InvNum={invoice.ID}&cId={invoice.CustomerGuid}&InType={inTypeForUrl}&AppID={rawApptId}&FromInvoices=1";
+                    }
+                    else
+                    {
+                        invoice.ExternalLink = "";
+                    }
+
+                    result.Invoices.Add(invoice);
                 }
+
+                result.HasMore = offset + dt.Rows.Count < result.Total;
             }
             catch (Exception ex)
             {
                 // Log the exception for debugging
                 System.Diagnostics.Debug.WriteLine($"Error in GetCustomerInvoices: {ex.Message}");
-                return null;
             }
-            finally { db.Close(); }
-            return invoices;
+            finally
+            {
+                try { db.Close(); } catch { }
+            }
+            return result;
         }
 
 
 
         [WebMethod(EnableSession = true)]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
-        public static List<Equipment> GetSiteEquipmentData(int siteId, string customerGuid)
+        public static EquipmentPage GetSiteEquipmentData(int siteId, string customerGuid, int page, int pageSize,
+            string search, string sortColumn, string sortDirection)
         {
+            var result = new EquipmentPage
+            {
+                Equipment = new List<Equipment>(),
+                Total = 0,
+                Page = page < 1 ? 1 : page,
+                PageSize = (pageSize < 1 || pageSize > 200) ? 25 : pageSize,
+                HasMore = false
+            };
+
             string companyid = HttpContext.Current.Session["CompanyID"]?.ToString();
             if (string.IsNullOrEmpty(companyid))
             {
                 System.Diagnostics.Debug.WriteLine("GetSiteEquipmentData: CompanyID is missing from session");
-                return new List<Equipment>();
+                return result;
             }
-            var equipments = new List<Equipment>();
+
+            search = (search ?? "").Trim();
+            sortDirection = string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
+
+            // tbl_EquipmentType.equipmentTypeID is unique only WITHIN a company -- id 2 is
+            // "Refrigeration" for one company and "Furnace - Gas" for another -- so the plain
+            // join this used to be matched on equipmentTypeID alone, with no CompanyID. On Live
+            // that multiplied a 17-row site's equipment grid to 175 rows and leaked other
+            // companies' type names into the Type column. TOP 1 is kept even with CompanyID
+            // added, since nothing in the schema guarantees (companyID, equipmentTypeID) is
+            // unique within a company either. The customer join had the identical
+            // missing-CompanyID hazard and gets the same fix.
+            const string typeApply = @"
+                OUTER APPLY (
+                    SELECT TOP 1 t.equipmentTypeDesc
+                      FROM [msSchedulerV3].dbo.tbl_EquipmentType t
+                     WHERE t.equipmentTypeID = eqp.EquipmentTypeID AND t.companyID = eqp.CompanyID
+                ) et";
+            const string custApply = @"
+                OUTER APPLY (
+                    SELECT TOP 1 c.CustomerID, c.FirstName, c.LastName
+                      FROM [msSchedulerV3].dbo.tbl_Customer c
+                     WHERE c.CustomerGuid = eqp.CustomerGuid AND c.CompanyID = eqp.CompanyID
+                ) cus";
+
+            var sortMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "EquipmentType",      "et.equipmentTypeDesc" },
+                { "SerialNumber",       "eqp.SerialNumber" },
+                { "Make",               "eqp.Make" },
+                { "Model",              "eqp.Model" },
+                { "Barcode",            "eqp.Barcode" },
+                { "WarrantyStart",      "eqp.WarrantyStart" },
+                { "WarrantyEnd",        "eqp.WarrantyEnd" },
+                { "LaborWarrantyStart", "eqp.LaborWarrantyStart" },
+                { "LaborWarrantyEnd",   "eqp.LaborWarrantyEnd" },
+                { "InstallDate",        "eqp.InstallDate" }
+            };
+            string orderExpr = sortMap.ContainsKey(sortColumn ?? "") ? sortMap[sortColumn] : "eqp.CreatedDateTime";
+
+            string whereClause = " WHERE eqp.CustomerGuid = @CustomerGuid AND eqp.CompanyID = @CompanyID AND eqp.SiteId = @SiteId";
+            if (!string.IsNullOrEmpty(search))
+            {
+                whereClause += @" AND (ISNULL(et.equipmentTypeDesc,'') LIKE @Search OR ISNULL(eqp.SerialNumber,'') LIKE @Search
+                                       OR ISNULL(eqp.Make,'') LIKE @Search OR ISNULL(eqp.Model,'') LIKE @Search
+                                       OR ISNULL(eqp.Barcode,'') LIKE @Search)";
+            }
+
+            int offset = (result.Page - 1) * result.PageSize;
             Database db = new Database();
             DataTable dt = new DataTable();
             try
             {
                 db.Open();
-                // Show equipment for the specific site only, join with EquipmentType to get the description
-                string strSQL = @"SELECT eqp.*, cus.CustomerID, cus.FirstName, cus.LastName, et.equipmentTypeDesc
-                                FROM [msSchedulerV3].dbo.tbl_Equipment eqp 
-                                LEFT JOIN [msSchedulerV3].dbo.tbl_Customer cus ON eqp.CustomerGuid = cus.CustomerGuid
-                                LEFT JOIN [msSchedulerV3].dbo.tbl_EquipmentType et ON eqp.EquipmentTypeID = et.equipmentTypeID
-                                WHERE eqp.CustomerGuid=@CustomerGuid AND eqp.CompanyID = @CompanyID AND eqp.SiteId = @SiteId order by eqp.CreatedDateTime desc;";
 
-                db.AddParameter("@CustomerGuid", customerGuid, SqlDbType.NVarChar);
-                db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
-                db.AddParameter("@SiteId", siteId, SqlDbType.Int);
+                Action addParams = () =>
+                {
+                    db.Command.Parameters.Clear();
+                    db.AddParameter("@CustomerGuid", customerGuid, SqlDbType.NVarChar);
+                    db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+                    db.AddParameter("@SiteId", siteId, SqlDbType.Int);
+                    if (!string.IsNullOrEmpty(search)) db.AddParameter("@Search", "%" + search + "%", SqlDbType.NVarChar);
+                };
 
+                DataTable countDt = new DataTable();
+                addParams();
+                db.ExecuteParam(
+                    "SELECT COUNT(*) AS Total FROM [msSchedulerV3].dbo.tbl_Equipment eqp" + typeApply + whereClause + ";",
+                    out countDt);
+                result.Total = countDt.Rows.Count > 0 ? Convert.ToInt32(countDt.Rows[0]["Total"]) : 0;
+
+                string strSQL = $@"SELECT eqp.*, cus.CustomerID, cus.FirstName, cus.LastName, et.equipmentTypeDesc
+                                FROM [msSchedulerV3].dbo.tbl_Equipment eqp
+                                {custApply}
+                                {typeApply}
+                                {whereClause}
+                                ORDER BY {orderExpr} {sortDirection}, eqp.Id {sortDirection}
+                                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
+
+                addParams();
+                db.AddParameter("@Offset", offset, SqlDbType.Int);
+                db.AddParameter("@PageSize", result.PageSize, SqlDbType.Int);
                 db.ExecuteParam(strSQL, out dt);
 
                 System.Diagnostics.Debug.WriteLine($"GetSiteEquipmentData: Found {dt?.Rows?.Count ?? 0} equipment items for CustomerGuid={customerGuid}, SiteId={siteId}");
 
-                db.Close();
-                if (dt.Rows.Count > 0)
+                foreach (DataRow dr in dt.Rows)
                 {
-                    foreach (DataRow dr in dt.Rows)
+                    result.Equipment.Add(new Equipment
                     {
-                        equipments.Add(new Equipment
-                        {
-                            Id = Convert.ToInt32(dr["Id"]),
-                            SiteId = dr["SiteId"] != DBNull.Value ? Convert.ToInt32(dr["SiteId"]) : 0,
-                            CustomerGuid = customerGuid,
-                            CustomerName = dr.Field<string>("FirstName") + " " + dr.Field<string>("LastName"),
-                            CustomerID = dr["CustomerID"].ToString() ?? "",
-                            Make = dr["Make"].ToString() ?? "",
-                            Barcode = dr["Barcode"].ToString() ?? "",
-                            SerialNumber = dr["SerialNumber"].ToString() ?? "",
-                            Model = dr["Model"].ToString() ?? "",
-                            Notes = dr["Notes"].ToString() ?? "",
-                            EquipmentTypeID = dr["EquipmentTypeID"] != DBNull.Value ? Convert.ToInt32(dr["EquipmentTypeID"]) : 0,
-                            EquipmentType = dr["equipmentTypeDesc"].ToString() ?? "",
-                            CreatedDateTime = Convert.ToDateTime(dr["CreatedDateTime"]),
-                            WarrantyStart = dr["WarrantyStart"] != DBNull.Value && !string.IsNullOrEmpty(dr["WarrantyStart"].ToString())
-                                   ? Convert.ToDateTime(dr["WarrantyStart"]).ToString("yyyy-MM-dd") : string.Empty,
-                            WarrantyEnd = dr["WarrantyEnd"] != DBNull.Value && !string.IsNullOrEmpty(dr["WarrantyEnd"].ToString())
-                                   ? Convert.ToDateTime(dr["WarrantyEnd"]).ToString("yyyy-MM-dd") : string.Empty,
-                            LaborWarrantyStart = dr["LaborWarrantyStart"] != DBNull.Value && !string.IsNullOrEmpty(dr["LaborWarrantyStart"].ToString())
-                                   ? Convert.ToDateTime(dr["LaborWarrantyStart"]).ToString("yyyy-MM-dd") : string.Empty,
-                            LaborWarrantyEnd = dr["LaborWarrantyEnd"] != DBNull.Value && !string.IsNullOrEmpty(dr["LaborWarrantyEnd"].ToString())
-                                   ? Convert.ToDateTime(dr["LaborWarrantyEnd"]).ToString("yyyy-MM-dd") : string.Empty,
-                            InstallDate = dr["InstallDate"] != DBNull.Value && !string.IsNullOrEmpty(dr["InstallDate"].ToString())
-                                   ? Convert.ToDateTime(dr["InstallDate"]).ToString("yyyy-MM-dd") : string.Empty,
-                        });
-                    }
+                        Id = Convert.ToInt32(dr["Id"]),
+                        SiteId = dr["SiteId"] != DBNull.Value ? Convert.ToInt32(dr["SiteId"]) : 0,
+                        CustomerGuid = customerGuid,
+                        CustomerName = dr.Field<string>("FirstName") + " " + dr.Field<string>("LastName"),
+                        CustomerID = dr["CustomerID"].ToString() ?? "",
+                        Make = dr["Make"].ToString() ?? "",
+                        Barcode = dr["Barcode"].ToString() ?? "",
+                        SerialNumber = dr["SerialNumber"].ToString() ?? "",
+                        Model = dr["Model"].ToString() ?? "",
+                        Notes = dr["Notes"].ToString() ?? "",
+                        // EquipmentTypeID is nvarchar on the table but int on the entity;
+                        // int.TryParse rather than Convert.ToInt32 so a non-numeric value in the
+                        // column doesn't throw and take the whole page down with it.
+                        EquipmentTypeID = dr["EquipmentTypeID"] != DBNull.Value && int.TryParse(dr["EquipmentTypeID"].ToString(), out int etid) ? etid : 0,
+                        EquipmentType = dr["equipmentTypeDesc"].ToString() ?? "",
+                        CreatedDateTime = Convert.ToDateTime(dr["CreatedDateTime"]),
+                        WarrantyStart = dr["WarrantyStart"] != DBNull.Value && !string.IsNullOrEmpty(dr["WarrantyStart"].ToString())
+                               ? Convert.ToDateTime(dr["WarrantyStart"]).ToString("yyyy-MM-dd") : string.Empty,
+                        WarrantyEnd = dr["WarrantyEnd"] != DBNull.Value && !string.IsNullOrEmpty(dr["WarrantyEnd"].ToString())
+                               ? Convert.ToDateTime(dr["WarrantyEnd"]).ToString("yyyy-MM-dd") : string.Empty,
+                        LaborWarrantyStart = dr["LaborWarrantyStart"] != DBNull.Value && !string.IsNullOrEmpty(dr["LaborWarrantyStart"].ToString())
+                               ? Convert.ToDateTime(dr["LaborWarrantyStart"]).ToString("yyyy-MM-dd") : string.Empty,
+                        LaborWarrantyEnd = dr["LaborWarrantyEnd"] != DBNull.Value && !string.IsNullOrEmpty(dr["LaborWarrantyEnd"].ToString())
+                               ? Convert.ToDateTime(dr["LaborWarrantyEnd"]).ToString("yyyy-MM-dd") : string.Empty,
+                        InstallDate = dr["InstallDate"] != DBNull.Value && !string.IsNullOrEmpty(dr["InstallDate"].ToString())
+                               ? Convert.ToDateTime(dr["InstallDate"]).ToString("yyyy-MM-dd") : string.Empty,
+                    });
                 }
+
+                result.HasMore = offset + dt.Rows.Count < result.Total;
             }
             catch (Exception ex)
             {
                 // Log the exception for debugging
                 System.Diagnostics.Debug.WriteLine($"Error in GetSiteEquipmentData: {ex.Message}");
-                return null;
             }
             finally
             {
-                db.Close();
+                try { db.Close(); } catch { }
             }
-            return equipments;
+            return result;
         }
 
 
@@ -1878,17 +2082,15 @@ namespace TPM
                 }
 
                 data.Appointments = GetCustomerAppoinmets(customerId, siteId);
-                data.Invoices = GetCustomerInvoices(customerId);
+                // GetCustomerInvoices is paged now; the Invoices tab fetches its own page, so the
+                // drawer no longer loads every invoice on every CSL tab open (up to 35,171 for
+                // one customer on Live).
+                data.Invoices = new List<CustomerInvoice>();
                 data.Notes = GetCustomerNotes(customerId, siteId);
 
-                if (!string.IsNullOrEmpty(data.CustomerInfo.CustomerGuid))
-                {
-                    data.Equipment = GetSiteEquipmentData(siteId, data.CustomerInfo.CustomerGuid);
-                }
-                else
-                {
-                    data.Equipment = new List<Equipment>();
-                }
+                // GetSiteEquipmentData is paged now; the Equipment tab fetches its own page,
+                // so the drawer no longer loads equipment eagerly on every CSL tab open.
+                data.Equipment = new List<Equipment>();
 
                 // Fetch Pictures, Files, and Maintenance Agreements
                 try

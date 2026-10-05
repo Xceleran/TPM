@@ -25,6 +25,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let invEndDate = null;
     let apptStartDate = null;
     let apptEndDate = null;
+    let eqpTotal = 0;
+    let eqpRequestSeq = 0;
+    let invTotal = 0;
+    let invRequestSeq = 0;
 
     // Global event listener for picture deletion
     $(document).on('click', '.delete-picture-btn', function () {
@@ -92,9 +96,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initializeEventListeners() {
-        $('#invFilterType').on('change', function () {
-            applyFiltersInv();
-        });
+        // #invFilterType's change handler is bound once, alongside #invFilter, further down
+        // (both now trigger a server-side reload rather than a client-side re-filter).
 
         // Handle clicks on CSL links in the appointments table to switch tabs
         $(document).on('click', '#apptTableBody .csl-link', function (e) {
@@ -262,6 +265,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Sortable header click handler for Appointments table
         $(document).on('click', '.sortable-header', function () {
+            // Equipment and Invoices sort server-side and have their own handlers below -- this
+            // one otherwise fires (and wrongly re-sorts Appointments) for every tab's headers.
+            if ($(this).closest('#equipment, #invoices').length) return;
             const sortColumn = $(this).data('sort');
             if (apptSortColumn === sortColumn) {
                 apptSortDirection = apptSortDirection === 'asc' ? 'desc' : 'asc';
@@ -275,6 +281,95 @@ document.addEventListener('DOMContentLoaded', () => {
             icon.removeClass('fa-sort').addClass(apptSortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
             applyFiltersAppt();
         });
+
+        // Sortable header click handler for the Equipment table (server-side sort/paging).
+        $(document).on('click', '#equipment .sortable-header', function () {
+            const sortColumn = $(this).data('sort');
+            if (eqpSortColumn === sortColumn) {
+                eqpSortDirection = eqpSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                eqpSortColumn = sortColumn;
+                eqpSortDirection = 'asc';
+            }
+            $('#equipment .sortable-header i').removeClass('fa-sort-up fa-sort-down').addClass('fa-sort');
+            const icon = $(this).find('i');
+            icon.removeClass('fa-sort').addClass(eqpSortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+            reloadEquipmentFromFirstPage();
+        });
+
+        // Equipment pager and search (server-side).
+        $('#eqpPrev').on('click', function () {
+            if (currentPageEqp > 1) {
+                currentPageEqp--;
+                loadEquipment();
+            }
+        });
+        $('#eqpNext').on('click', function () {
+            if (currentPageEqp < eqpPageCount()) {
+                currentPageEqp++;
+                loadEquipment();
+            }
+        });
+        // keyup alone misses paste and the browser's native clear (X) button, which fire only
+        // 'input'; debounced since both events fire for a normal keystroke too.
+        let eqpSearchTimer;
+        $('#equipSearch').on('keyup input', function () {
+            clearTimeout(eqpSearchTimer);
+            eqpSearchTimer = setTimeout(reloadEquipmentFromFirstPage, 400);
+        });
+
+        // Sortable header click handler for the Invoices table (server-side sort/paging).
+        $(document).on('click', '#invoices .sortable-header', function () {
+            const sortColumn = $(this).data('sort');
+            if (invSortColumn === sortColumn) {
+                invSortDirection = invSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                invSortColumn = sortColumn;
+                invSortDirection = 'asc';
+            }
+            $('#invoices .sortable-header i').removeClass('fa-sort-up fa-sort-down').addClass('fa-sort');
+            const icon = $(this).find('i');
+            icon.removeClass('fa-sort').addClass(invSortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+            reloadInvoicesFromFirstPage();
+        });
+
+        // Invoices pager, search, status/type filters and date range (server-side).
+        $('#invPrev').on('click', function () {
+            if (currentPageInv > 1) {
+                currentPageInv--;
+                loadInvoices();
+            }
+        });
+        $('#invNext').on('click', function () {
+            if (currentPageInv < invPageCount()) {
+                currentPageInv++;
+                loadInvoices();
+            }
+        });
+        let invSearchTimer;
+        $('#invSearch').on('keyup input', function () {
+            clearTimeout(invSearchTimer);
+            invSearchTimer = setTimeout(reloadInvoicesFromFirstPage, 400);
+        });
+        $('#invFilter, #invFilterType').on('change', reloadInvoicesFromFirstPage);
+
+        if ($.fn.daterangepicker) {
+            $('#invDateRangePicker').daterangepicker({
+                autoUpdateInput: false,
+                locale: { cancelLabel: 'Clear', format: 'MM/DD/YYYY' }
+            }, function (start, end) {
+                invStartDate = start.format('MM/DD/YYYY');
+                invEndDate = end.format('MM/DD/YYYY');
+                $('#invDateRangePicker span').first().text(invStartDate + ' - ' + invEndDate);
+                reloadInvoicesFromFirstPage();
+            });
+            $('#invDateRangePicker').on('cancel.daterangepicker', function () {
+                invStartDate = null;
+                invEndDate = null;
+                $('#invDateRangePicker span').first().text('Date Range');
+                reloadInvoicesFromFirstPage();
+            });
+        }
 
         function getRedirectionURL() {
             const customerId = $('#MainContent_lblCustomerId').text() || $('[id$="lblCustomerId"]').text();
@@ -976,12 +1071,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log('Loading notes for customerId:', customerId, 'siteId:', siteId);
 
+        // Guarded: this file still works if fsm-loading.js is missing from a publish.
+        if (window.FSMLoading) FSMLoading.showIn('#notes .custdet-container', 'Loading notes…');
+
         $.ajax({
             url: 'CustomerDetails.aspx/GetCustomerNotes',
             type: "POST",
             contentType: "application/json; charset=utf-8",
             data: JSON.stringify({ customerId: customerId, siteId: siteId }),
             dataType: 'json',
+            complete: () => {
+                if (window.FSMLoading) FSMLoading.hideIn('#notes .custdet-container');
+            },
             success: (rs) => {
                 console.log('Notes response:', rs);
 
@@ -1120,6 +1221,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // location.reload() after every save. Expose it for a targeted refresh instead.
     window.reloadCustomerAppointments = loadAppointments;
 
+    // Invoices are scoped to the customer, not the site, so a customer with many locations
+    // accumulates every invoice into one list (35,171 for the largest on Live) -- paged, searched
+    // and sorted server-side (GetCustomerInvoices) rather than loaded whole and filtered here.
     function loadInvoices() {
         if (!customerId) {
             console.error('Cannot load invoices: customerId is missing');
@@ -1127,46 +1231,87 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        console.log('Loading invoices for customerId:', customerId);
+        // Typing in the search box (or changing a filter) fires one of these per burst; only the
+        // newest response is allowed to paint, since they can otherwise resolve out of order.
+        const seq = ++invRequestSeq;
+        // Guarded: this file still works if fsm-loading.js is missing from a publish.
+        if (window.FSMLoading) FSMLoading.showIn('#invoices .custdet-container', 'Loading invoices…');
 
         $.ajax({
             url: 'CustomerDetails.aspx/GetCustomerInvoices',
             type: "POST",
             contentType: "application/json; charset=utf-8",
-            data: JSON.stringify({ customerId: customerId }),
+            data: JSON.stringify({
+                customerId: customerId,
+                page: currentPageInv,
+                pageSize: pageSizeInv,
+                search: ($('#invSearch').val() || '').trim(),
+                status: $('#invFilter').val() || 'all',
+                type: $('#invFilterType').val() || 'all',
+                startDate: invStartDate || '',
+                endDate: invEndDate || '',
+                sortColumn: invSortColumn,
+                sortDirection: invSortDirection
+            }),
+            complete: () => {
+                if (seq === invRequestSeq && window.FSMLoading) FSMLoading.hideIn('#invoices .custdet-container');
+            },
             dataType: 'json',
             success: (rs) => {
-                console.log('Invoices response:', rs);
-
-                // Handle both direct array and wrapped response
-                if (rs && rs.d !== undefined) {
-                    invoiceData = rs.d || [];
-                } else if (Array.isArray(rs)) {
-                    invoiceData = rs;
-                } else {
-                    invoiceData = [];
-                }
-
-                console.log('Invoices data:', invoiceData);
-                console.log('Invoices count:', invoiceData.length);
+                if (seq !== invRequestSeq) return;
+                const pageResult = (rs && rs.d) ? rs.d : {};
+                invoiceData = pageResult.Invoices || [];
+                invTotal = pageResult.Total || 0;
+                currentPageInv = pageResult.Page || currentPageInv;
 
                 if (invoiceData.length === 0) {
-                    $('#invTableBody').html('<tr><td colspan="11" class="text-center text-muted">No invoices found for this customer.</td></tr>');
+                    const filtered = ($('#invSearch').val() || '').trim()
+                        || ($('#invFilter').val() || 'all') !== 'all'
+                        || ($('#invFilterType').val() || 'all') !== 'all'
+                        || invStartDate;
+                    $('#invTableBody').html('<tr><td colspan="11" class="text-center text-muted">'
+                        + (filtered ? 'No invoices match these filters.' : 'No invoices found for this customer.')
+                        + '</td></tr>');
                 } else {
-                    console.log('Rendering invoices...');
-                    applyFiltersInv();
+                    renderInvoicesTable(invoiceData);
                 }
+                renderInvPager();
             },
             error: (xhr, status, error) => {
+                if (seq !== invRequestSeq) return;
                 console.error('Error loading invoices:', error);
-                console.error('XHR Status:', xhr.status);
-                console.error('XHR Response:', xhr.responseText);
                 invoiceData = [];
+                invTotal = 0;
                 $('#invTableBody').html('<tr><td colspan="11" class="text-center text-danger">Error loading invoices. Please check console for details.</td></tr>');
+                renderInvPager();
             }
         });
     }
 
+    function invPageCount() {
+        return Math.max(1, Math.ceil(invTotal / pageSizeInv));
+    }
+
+    function renderInvPager() {
+        const pageCount = invPageCount();
+        if (currentPageInv > pageCount) currentPageInv = pageCount;
+        $('#invPageInfo').text(invTotal
+            ? `Page ${currentPageInv} of ${pageCount} (${invTotal} invoice${invTotal === 1 ? '' : 's'})`
+            : 'No invoices');
+        $('#invPrev').prop('disabled', currentPageInv <= 1);
+        $('#invNext').prop('disabled', currentPageInv >= pageCount);
+    }
+
+    // Any change to a filter sends you back to page 1 -- staying on page 40 of a result set that
+    // just shrank to three pages would show an empty table.
+    function reloadInvoicesFromFirstPage() {
+        currentPageInv = 1;
+        loadInvoices();
+    }
+
+    // Equipment is paged, searched and sorted server-side (GetSiteEquipmentData). A table with
+    // 79,243 rows on Live, and up to 31,718 on a single site, can't be loaded whole and filtered
+    // in the browser the way this used to work.
     function loadEquipment() {
         if (!customerGuid) {
             console.error('Cannot load equipment: customerGuid is missing');
@@ -1174,44 +1319,74 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        console.log('Loading equipment for siteId:', siteId, 'customerGuid:', customerGuid);
+        // Typing in #equipSearch fires one request per keystroke-burst; only the most recent
+        // response is allowed to land, since they can otherwise resolve out of order.
+        const seq = ++eqpRequestSeq;
+        // Guarded: this file still works if fsm-loading.js is missing from a publish.
+        if (window.FSMLoading) FSMLoading.showIn('#equipment .custdet-container', 'Loading equipment…');
 
         $.ajax({
             url: 'CustomerDetails.aspx/GetSiteEquipmentData',
             type: "POST",
             contentType: "application/json; charset=utf-8",
-            data: JSON.stringify({ siteId: siteId, customerGuid: customerGuid }),
+            data: JSON.stringify({
+                siteId: siteId,
+                customerGuid: customerGuid,
+                page: currentPageEqp,
+                pageSize: pageSizeEqp,
+                search: ($('#equipSearch').val() || '').trim(),
+                sortColumn: eqpSortColumn,
+                sortDirection: eqpSortDirection
+            }),
             dataType: 'json',
+            complete: () => {
+                if (seq === eqpRequestSeq && window.FSMLoading) FSMLoading.hideIn('#equipment .custdet-container');
+            },
             success: (rs) => {
-                console.log('Equipment response:', rs);
-
-                // Handle both direct array and wrapped response
-                if (rs && rs.d !== undefined) {
-                    equipmentData = rs.d || [];
-                } else if (Array.isArray(rs)) {
-                    equipmentData = rs;
-                } else {
-                    equipmentData = [];
-                }
-
-                console.log('Equipment data:', equipmentData);
-                console.log('Equipment count:', equipmentData.length);
+                if (seq !== eqpRequestSeq) return;
+                const pageResult = (rs && rs.d) ? rs.d : {};
+                equipmentData = pageResult.Equipment || [];
+                eqpTotal = pageResult.Total || 0;
+                currentPageEqp = pageResult.Page || currentPageEqp;
 
                 if (equipmentData.length === 0) {
-                    $('#equipTableBody').html('<tr><td colspan="12" class="text-center text-muted">No equipment found for this customer/site.</td></tr>');
+                    const searching = ($('#equipSearch').val() || '').trim();
+                    $('#equipTableBody').html('<tr><td colspan="12" class="text-center text-muted">'
+                        + (searching ? 'No equipment matches that search.' : 'No equipment found for this customer/site.')
+                        + '</td></tr>');
                 } else {
-                    console.log('Rendering equipment...');
-                    renderEquipments();
+                    renderEquipmentTable(equipmentData);
                 }
+                renderEqpPager();
             },
             error: (xhr, status, error) => {
+                if (seq !== eqpRequestSeq) return;
                 console.error('Error loading equipment:', error);
-                console.error('XHR Status:', xhr.status);
-                console.error('XHR Response:', xhr.responseText);
                 equipmentData = [];
+                eqpTotal = 0;
                 $('#equipTableBody').html('<tr><td colspan="12" class="text-center text-danger">Error loading equipment. Please check console for details.</td></tr>');
+                renderEqpPager();
             }
         });
+    }
+
+    function eqpPageCount() {
+        return Math.max(1, Math.ceil(eqpTotal / pageSizeEqp));
+    }
+
+    function renderEqpPager() {
+        const pageCount = eqpPageCount();
+        if (currentPageEqp > pageCount) currentPageEqp = pageCount;
+        $('#eqpPageInfo').text(eqpTotal
+            ? `Page ${currentPageEqp} of ${pageCount} (${eqpTotal} item${eqpTotal === 1 ? '' : 's'})`
+            : 'No equipment');
+        $('#eqpPrev').prop('disabled', currentPageEqp <= 1);
+        $('#eqpNext').prop('disabled', currentPageEqp >= pageCount);
+    }
+
+    function reloadEquipmentFromFirstPage() {
+        currentPageEqp = 1;
+        loadEquipment();
     }
 
     // Equipment delete handler
@@ -1315,9 +1490,10 @@ document.addEventListener('DOMContentLoaded', () => {
         applyFiltersInv();
     }
 
+    // Equipment is paged/searched/sorted server-side now (see loadEquipment()), so showing the
+    // tab always refetches the current page rather than re-filtering a client-side array.
     function renderEquipments() {
-        console.log('Rendering equipment, data count:', equipmentData.length);
-        applyFiltersEqp();
+        loadEquipment();
     }
 
     function renderNotes() {
@@ -1331,14 +1507,9 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAppointmentsTable(filtered);
     }
 
+    // Filtering and sorting happen in SQL now, so "apply filters" means "ask for page 1 again".
     function applyFiltersInv() {
-        let filtered = getFilteredInvoices();
-        renderInvoicesTable(filtered);
-    }
-
-    function applyFiltersEqp() {
-        let filtered = getFilteredEquipment();
-        renderEquipmentTable(filtered);
+        reloadInvoicesFromFirstPage();
     }
 
     function applyFiltersNotes() {
@@ -1382,88 +1553,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (apptSortDirection === 'asc') {
-                return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-            } else {
-                return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-            }
-        });
-
-        return filtered;
-    }
-
-    function getFilteredInvoices() {
-        let filtered = [...invoiceData];
-
-        const typeFilter = ($('#invFilterType').val() || 'all').toLowerCase();
-        if (typeFilter === 'invoice') {
-            filtered = filtered.filter(inv => (inv.InvoiceType || '').toLowerCase() === 'invoice');
-        } else if (typeFilter === 'estimate') {
-            filtered = filtered.filter(inv => (inv.InvoiceType || '').toLowerCase() === 'proposal');
-        }
-
-        // Apply date filter if set
-        if (invStartDate && invEndDate) {
-            filtered = filtered.filter(inv => {
-                const invDate = parseMDY(inv.InvoiceDate);
-                if (!invDate) return false;
-                const start = parseMDY(invStartDate);
-                const end = parseMDY(invEndDate);
-                return invDate.isSameOrAfter(start, 'day') && invDate.isSameOrBefore(end, 'day');
-            });
-        }
-
-        // Apply sorting
-        filtered.sort((a, b) => {
-            let aVal, bVal;
-            switch (invSortColumn) {
-                case 'InvoiceDate':
-                    aVal = parseMDY(a.InvoiceDate) || moment(0);
-                    bVal = parseMDY(b.InvoiceDate) || moment(0);
-                    break;
-                case 'InvoiceNumber':
-                    aVal = (a.InvoiceNumber || '').toLowerCase();
-                    bVal = (b.InvoiceNumber || '').toLowerCase();
-                    break;
-                case 'Total':
-                    aVal = parseFloat(a.Total || 0);
-                    bVal = parseFloat(b.Total || 0);
-                    break;
-                default:
-                    aVal = a[invSortColumn] || '';
-                    bVal = b[invSortColumn] || '';
-            }
-
-            if (invSortDirection === 'asc') {
-                return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-            } else {
-                return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-            }
-        });
-
-        return filtered;
-    }
-
-    function getFilteredEquipment() {
-        let filtered = [...equipmentData];
-
-        // Apply sorting
-        filtered.sort((a, b) => {
-            let aVal, bVal;
-            switch (eqpSortColumn) {
-                case 'InstallDate':
-                    aVal = parseMDY(a.InstallDate) || moment(0);
-                    bVal = parseMDY(b.InstallDate) || moment(0);
-                    break;
-                case 'EquipmentType':
-                    aVal = (a.EquipmentType || '').toLowerCase();
-                    bVal = (b.EquipmentType || '').toLowerCase();
-                    break;
-                default:
-                    aVal = a[eqpSortColumn] || '';
-                    bVal = b[eqpSortColumn] || '';
-            }
-
-            if (eqpSortDirection === 'asc') {
                 return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
             } else {
                 return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
@@ -1625,6 +1714,10 @@ document.addEventListener('DOMContentLoaded', () => {
         $('#invTableBody').html(html);
     }
 
+    // Cell order follows the <th> order in CustomerDetails.aspx (Type, Serial Number, Make,
+    // Model, Warranty Start, Warranty End, Labor Warranty Start, Labor Warranty End, SKU,
+    // Install Date, Notes) -- 9 of these 11 cells were previously in the wrong order relative
+    // to their headers (e.g. Make rendered under the Serial Number column).
     function renderEquipmentTable(equipment) {
         if (!equipment || equipment.length === 0) {
             $('#equipTableBody').html('<tr><td colspan="12" class="text-center text-muted">No equipment found.</td></tr>');
@@ -1635,17 +1728,17 @@ document.addEventListener('DOMContentLoaded', () => {
         equipment.forEach(eq => {
             html += `
                 <tr>
-                    <td>${eq.EquipmentType || '-'}</td>
-                    <td>${eq.Make || '-'}</td>
-                    <td>${eq.Model || '-'}</td>
-                    <td>${eq.SerialNumber || '-'}</td>
-                    <td>${eq.Barcode || '-'}</td>
-                    <td>${eq.InstallDate || '-'}</td>
+                    <td>${escapeHTML(eq.EquipmentType) || '-'}</td>
+                    <td>${escapeHTML(eq.SerialNumber) || '-'}</td>
+                    <td>${escapeHTML(eq.Make) || '-'}</td>
+                    <td>${escapeHTML(eq.Model) || '-'}</td>
                     <td>${eq.WarrantyStart || '-'}</td>
                     <td>${eq.WarrantyEnd || '-'}</td>
                     <td>${eq.LaborWarrantyStart || '-'}</td>
                     <td>${eq.LaborWarrantyEnd || '-'}</td>
-                    <td>${eq.Notes || '-'}</td>
+                    <td>${escapeHTML(eq.Barcode) || '-'}</td>
+                    <td>${eq.InstallDate || '-'}</td>
+                    <td>${escapeHTML(eq.Notes) || '-'}</td>
                     <td>
                         <div class="d-flex gap-2">
                             <button class="btn btn-sm btn-outline-primary" onclick="editEquipment(${eq.Id})" title="Edit"><i class="fas fa-edit"></i></button>
@@ -1667,23 +1760,22 @@ document.addEventListener('DOMContentLoaded', () => {
         let html = '';
         notes.forEach(note => {
             const noteText = note.Description || '';
-            const truncatedNote = noteText.length > 100 ? noteText.substring(0, 100) + '...' : noteText;
-            const showReadMore = noteText.length > 100;
 
+            // The full note stays in the DOM; the two-row collapse is done in CSS
+            // (.note-text.clamped) and syncNoteReadMore() below decides whether the
+            // Read More link is needed by measuring actual overflow, not character count.
             html += `
                 <tr ${note.AppointmentId ? `data-appointment-id="${note.AppointmentId}"` : ''}>
                     <td>${note.AppointmentId ? `<a href="javascript:void(0);" onclick="showAppointmentDetailsModal('${note.AppointmentId}')">${note.AppointmentId}</a>` : '-'}</td>
                     <td class="note-content-cell">
-                        <div class="note-text truncated" data-full-text="${escapeHTML(noteText)}">
-                            ${escapeHTML(truncatedNote)}
-                        </div>
-                        ${showReadMore ? `<button class="btn btn-sm btn-link read-more-btn p-0" style="text-decoration: none;">Read More</button>` : ''}
+                        <div class="note-text clamped">${escapeHTML(noteText)}</div>
+                        <button type="button" class="btn btn-sm btn-link read-more-btn p-0 d-none" style="text-decoration: none;">Read More</button>
                     </td>
                     <td>${note.CreatedAt || '-'}</td>
                     <td>${escapeHTML(note.Reference || '-')}</td>
                     <td>${note.UserId || '-'}</td>
                     <td>
-                        <div class="d-flex gap-2">                        
+                        <div class="d-flex gap-2">
                             <button type="button" class="btn btn-sm btn-outline-primary edit-note-btn" data-note-id="${note.Id}" title="Edit"><i class="fas fa-edit"></i></button>
                               <button type="button" class="btn btn-sm btn-outline-secondary email-note-btn" data-note-id="${note.Id}" title="Email"><i class="fas fa-envelope"></i></button>
                             <button type="button" class="btn btn-sm btn-outline-danger delete-note-btn" data-note-id="${note.Id}" title="Delete"><i class="fas fa-trash-alt"></i></button>
@@ -1693,7 +1785,28 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         });
         $('#notesTableBody').html(html);
+        syncNoteReadMore();
     }
+
+    // Reveal "Read More" only on notes that actually overflow their two-line clamp.
+    // Measuring beats counting characters: this column's width changes with the viewport,
+    // so the same note wraps to two lines wide and four narrow.
+    function syncNoteReadMore() {
+        $('#notesTableBody .note-text').each(function () {
+            const $text = $(this);
+            const $btn = $text.siblings('.read-more-btn');
+            if (!$btn.length || !$text.hasClass('clamped')) return;
+            // A hidden tab measures zero; renderNotesTable() runs again when the tab is shown.
+            if (!this.clientHeight) return;
+            $btn.toggleClass('d-none', this.scrollHeight <= this.clientHeight + 1);
+        });
+    }
+
+    let noteClampResizeTimer;
+    $(window).on('resize', function () {
+        clearTimeout(noteClampResizeTimer);
+        noteClampResizeTimer = setTimeout(syncNoteReadMore, 200);
+    });
 
     // Forms, Pictures, Files, Agreements loading and rendering
     function loadForms() {
@@ -2332,17 +2445,9 @@ document.addEventListener('DOMContentLoaded', () => {
     $(document).on('click', '.read-more-btn', function (e) {
         e.preventDefault();
         const $btn = $(this);
-        const $content = $btn.siblings('.note-text');
-        const fullText = $content.data('full-text');
-
-        if ($content.hasClass('truncated')) {
-            $content.html(fullText).removeClass('truncated');
-            $btn.text('Show Less');
-        } else {
-            const truncated = fullText.substring(0, 100) + '...';
-            $content.html(truncated).addClass('truncated');
-            $btn.text('Read More');
-        }
+        // The text never leaves the DOM -- expanding just drops the CSS clamp.
+        const clamped = $btn.siblings('.note-text').toggleClass('clamped').hasClass('clamped');
+        $btn.text(clamped ? 'Read More' : 'Show Less');
     });
 
     // Clear button functionality

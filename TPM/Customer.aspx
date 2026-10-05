@@ -974,5 +974,5 @@
         </div>
     </div>
 
-      <script src="Scripts/customer.js?v=22"></script>
+      <script src="Scripts/customer.js?v=23"></script>
 </asp:Content>

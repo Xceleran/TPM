@@ -2463,7 +2463,7 @@ namespace TPM
             public List<object> MaintenanceAgreements { get; set; }
         }
 
-        [WebMethod]
+        [WebMethod(EnableSession = true)]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public static CslDrawerData GetCslDrawerData(string customerId, int siteId)
         {
@@ -2505,12 +2505,20 @@ namespace TPM
                 }
 
                 data.Appointments = CustomerDetails.GetCustomerAppoinmets(customerId, siteId);
-                data.Invoices = CustomerDetails.GetCustomerInvoices(customerId);
+                // GetCustomerInvoices is paged now; this drawer renders at most 10 plus an
+                // "...and more" marker, so ask for 11 rather than every invoice on the customer
+                // (up to 35,171 on Live).
+                data.Invoices = CustomerDetails.GetCustomerInvoices(customerId,
+                    1, 11, null, null, null, null, null, "InvoiceDate", "desc").Invoices;
                 data.Notes = CustomerDetails.GetCustomerNotes(customerId, siteId);
 
                 if (!string.IsNullOrEmpty(data.CustomerInfo.CustomerGuid))
                 {
-                    data.Equipment = CustomerDetails.GetSiteEquipmentData(siteId, data.CustomerInfo.CustomerGuid);
+                    // GetSiteEquipmentData is paged now; this drawer only ever shows a short
+                    // preview, so ask for 11 rather than every row on a site (one site on Live
+                    // holds 31,718).
+                    data.Equipment = CustomerDetails.GetSiteEquipmentData(siteId, data.CustomerInfo.CustomerGuid,
+                        1, 11, null, null, null).Equipment;
                 }
 
                 // Fetch Pictures, Files, and Maintenance Agreements
