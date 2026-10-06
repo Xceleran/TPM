@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
+using System.Text.RegularExpressions;
 using System.Web;
 using System.Web.Script.Services;
 using System.Web.Services;
@@ -33,12 +34,161 @@ namespace FSM
                 }
                 else
                 {
-                    string CompanyID = Session["CompanyID"].ToString();
-                    hdCompanyID.Value = CompanyID;
+                    hdCompanyID.Value = Session["CompanyID"].ToString();
                     LoadSMSSettings();
                 }
             }
         }
+
+        #region Announcement WebMethods (tbl_DashAnnouncement, AppSource = 'TPM')
+
+        private static object ToAnnouncementJson(FSM.Entity.DashAnnouncementEntity a)
+        {
+            return new
+            {
+                a.AnnouncementID,
+                a.Title,
+                a.Description,
+                a.IsActive,
+                a.DurationPreset,
+                StartDate = a.StartDate.HasValue ? a.StartDate.Value.ToString("yyyy-MM-dd") : "",
+                EndDate = a.EndDate.HasValue ? a.EndDate.Value.ToString("yyyy-MM-dd") : "",
+                CreatedOn = a.CreatedOn.ToString("o"),
+                CreatedOnDisplay = a.CreatedOn.ToString("MMMM d, yyyy") + " at " + a.CreatedOn.ToString("hh:mm tt"),
+                CreatedOnISO = a.CreatedOn.ToString("yyyy-MM-dd"),
+                a.CreatedBy
+            };
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object GetAnnouncements()
+        {
+            if (HttpContext.Current.Session["CompanyID"] == null)
+                return new { success = false, message = "Session expired." };
+            try
+            {
+                var list = new DashAnnouncementProcessor().GetAllAnnouncements();
+                var data = new List<object>();
+                foreach (var a in list) data.Add(ToAnnouncementJson(a));
+                return new { success = true, data = data };
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("ERROR in GetAnnouncements: " + ex);
+                return new { success = false, message = "Error loading announcements: " + ex.Message };
+            }
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object GetAnnouncementByID(int id)
+        {
+            if (HttpContext.Current.Session["CompanyID"] == null)
+                return new { success = false, message = "Session expired." };
+            try
+            {
+                var a = new DashAnnouncementProcessor().GetAnnouncementByID(id);
+                return new { success = true, data = ToAnnouncementJson(a) };
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("ERROR in GetAnnouncementByID: " + ex);
+                return new { success = false, message = ex.Message };
+            }
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object SaveAnnouncement(int id, string title, string description, bool isActive, string durationPreset, string startDate, string endDate)
+        {
+            if (HttpContext.Current.Session["CompanyID"] == null)
+                return new { success = false, message = "Session expired." };
+            if (string.IsNullOrWhiteSpace(
+                System.Text.RegularExpressions.Regex.Replace(title ?? "", "<[^>]*>", "").Trim()))
+                return new { success = false, message = "Title is required." };
+
+            try
+            {
+                var proc = new DashAnnouncementProcessor();
+                var entity = new FSM.Entity.DashAnnouncementEntity
+                {
+                    AnnouncementID = id,
+                    Title = title ?? "",
+                    Description = description ?? "",
+                    IsActive = isActive,
+                    DurationPreset = string.IsNullOrEmpty(durationPreset) ? null : durationPreset,
+                    CreatedBy = HttpContext.Current.Session["LoginUser"] != null
+                        ? HttpContext.Current.Session["LoginUser"].ToString() : ""
+                };
+
+                entity.StartDate = null;
+                entity.EndDate = null;
+                if (durationPreset == "custom")
+                {
+                    DateTime sDate, eDate;
+                    if (DateTime.TryParse(startDate, out sDate)) entity.StartDate = sDate;
+                    if (DateTime.TryParse(endDate, out eDate)) entity.EndDate = eDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
+                    if (!entity.StartDate.HasValue || !entity.EndDate.HasValue)
+                        return new { success = false, message = "Custom range needs both Start and End dates." };
+                    if (entity.EndDate <= entity.StartDate)
+                        return new { success = false, message = "End Date must be after Start Date." };
+                }
+                else if (!string.IsNullOrEmpty(durationPreset) && int.TryParse(durationPreset, out int days))
+                {
+                    entity.StartDate = DateTime.Today;
+                    entity.EndDate = DateTime.Today.AddDays(days).AddHours(23).AddMinutes(59).AddSeconds(59);
+                }
+
+                if (id > 0) proc.UpdateAnnouncement(entity);
+                else proc.AddAnnouncement(entity);
+                return new { success = true };
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("ERROR in SaveAnnouncement: " + ex);
+                return new { success = false, message = "Error saving announcement: " + ex.Message };
+            }
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object ToggleAnnouncementStatus(int id, bool isActive)
+        {
+            if (HttpContext.Current.Session["CompanyID"] == null)
+                return new { success = false, message = "Session expired." };
+            try
+            {
+                new DashAnnouncementProcessor().ToggleAnnouncementStatus(id, isActive);
+                return new { success = true };
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("ERROR in ToggleAnnouncementStatus: " + ex);
+                return new { success = false, message = ex.Message };
+            }
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object DeleteAnnouncement(int id)
+        {
+            if (HttpContext.Current.Session["CompanyID"] == null)
+                return new { success = false, message = "Session expired." };
+            try
+            {
+                new DashAnnouncementProcessor().DeleteAnnouncement(id);
+                return new { success = true };
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("ERROR in DeleteAnnouncement: " + ex);
+                return new { success = false, message = ex.Message };
+            }
+        }
+
+        #endregion
+
         [WebMethod(EnableSession = true)]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public static List<Status> GetStatuses()

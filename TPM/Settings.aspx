@@ -1,8 +1,10 @@
-﻿<%@ Page Language="C#" AutoEventWireup="true" CodeBehind="Settings.aspx.cs" Inherits="FSM.Settings" MasterPageFile="~/TPM.Master" %>
+<%@ Page Language="C#" AutoEventWireup="true" CodeBehind="Settings.aspx.cs" Inherits="FSM.Settings" MasterPageFile="~/TPM.Master" %>
 
 <asp:Content ID="BodyContent" ContentPlaceHolderID="MainContent" runat="server">
 
     <link rel="stylesheet" href="Content/settings.css">
+    <link rel="stylesheet" href="Content/announcement.css">
+    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
 
     <div class="container-fluid py-4">
 
@@ -26,6 +28,11 @@
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="optional-status-tab" data-bs-toggle="tab" data-bs-target="#optional-status-content" type="button" role="tab" aria-controls="optional-status-content" aria-selected="false">
                     <i class="bi bi-list-ol me-2"></i>Optional Status
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="announcements-tab" data-bs-toggle="tab" data-bs-target="#announcements-pane" type="button" role="tab" aria-controls="announcements-pane" aria-selected="false">
+                    <i class="bi bi-megaphone me-2"></i>Announcements
                 </button>
             </li>
         </ul>
@@ -601,8 +608,137 @@
                 </div>
             </div>
 
-        </div>
-    </div>
+            <!--Announcements (same board as FSM-OLD / JobScheduler, scoped to AppSource='TPM')-->
+            <div class="tab-pane fade" id="announcements-pane" role="tabpanel" aria-labelledby="announcements-tab">
+                <div class="tpm-ann-root">
+                    <div class="tpm-ann-page-header">
+                        <div>
+                            <h5 class="tpm-ann-page-title mb-1">Announcement Board</h5>
+                            <p class="tpm-ann-page-sub">Create, manage and publish announcements visible on your TPM dashboard.</p>
+                        </div>
+                        <button type="button" class="tpm-ann-btn-add" onclick="openTpmCreateModal()">
+                            <i class="bi bi-plus-lg"></i> Add Announcement
+                        </button>
+                    </div>
+                    <div class="tpm-ann-table-wrap">
+                        <div class="table-responsive">
+                            <table class="tpm-ann-table">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Title</th>
+                                        <th>Description</th>
+                                        <th>Created By</th>
+                                        <th>Created</th>
+                                        <th>Timeline</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tpmAnnTbody">
+                                    <tr><td colspan="7" class="text-center text-muted py-4">Select this tab to load announcements...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add / Edit Announcement Modal -->
+            <div class="modal fade" id="tpmAnnModal" tabindex="-1" aria-labelledby="tpmAnnModalTitle" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <div>
+                                <h5 class="modal-title" id="tpmAnnModalTitle">Add Announcement</h5>
+                                <p class="text-muted small mb-0">Publish to your TPM dashboard for the team to see.</p>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="hidden" id="hfTpmAnnouncementID" value="0" />
+                            <div class="tpm-ann-field">
+                                <label class="tpm-ann-label">Title</label>
+                                <div class="tpm-ann-quill-wrap" id="tpmTitleEditorWrap">
+                                    <div id="tpmTitleEditor"></div>
+                                </div>
+                            </div>
+                            <div class="tpm-ann-field">
+                                <label class="tpm-ann-label">Description</label>
+                                <div class="tpm-ann-quill-wrap" id="tpmDescEditorWrap">
+                                    <div id="tpmDescEditor"></div>
+                                </div>
+                            </div>
+                            <div class="tpm-ann-row-2col">
+                                <div class="tpm-ann-field">
+                                    <label class="tpm-ann-label">Status</label>
+                                    <select class="tpm-ann-select" id="tpmSelStatus">
+                                        <option value="1">Active</option>
+                                        <option value="0">Inactive</option>
+                                    </select>
+                                </div>
+                                <div class="tpm-ann-field">
+                                    <label class="tpm-ann-label">Creation Date</label>
+                                    <div class="tpm-ann-creation-date-box">
+                                        <i class="bi bi-calendar3"></i>
+                                        <span id="tpmSpnCreationDate" data-iso=""></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="tpm-ann-field">
+                                <label class="tpm-ann-label">Duration <span class="tpm-ann-optional">OPTIONAL</span></label>
+                                <select class="tpm-ann-select" id="tpmSelDuration" onchange="onTpmDurationChange(this.value)">
+                                    <option value="">No duration</option>
+                                    <option value="2">2 days</option>
+                                    <option value="5">5 days</option>
+                                    <option value="7">7 days</option>
+                                    <option value="custom">Custom Date Range</option>
+                                </select>
+                            </div>
+                            <div class="tpm-ann-custom-range" id="tpmCustomRangePanel" style="display:none;">
+                                <div class="tpm-ann-custom-range-title">
+                                    <i class="bi bi-calendar3"></i> Custom date range
+                                </div>
+                                <div class="tpm-ann-row-2col">
+                                    <div class="tpm-ann-field">
+                                        <label class="tpm-ann-label">Start Date</label>
+                                        <input type="date" class="tpm-ann-date-input" id="tpmTxtStartDate" />
+                                        <button type="button" class="tpm-ann-use-creation-btn" onclick="useTpmCreationDate()">
+                                            <i class="bi bi-calendar3"></i> Use creation date
+                                        </button>
+                                    </div>
+                                    <div class="tpm-ann-field">
+                                        <label class="tpm-ann-label">End Date</label>
+                                        <input type="date" class="tpm-ann-date-input" id="tpmTxtEndDate" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="tpmBtnSaveAnnouncement" onclick="saveTpmAnnouncement()">Save Announcement</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delete Announcement Modal -->
+            <div class="modal fade" id="tpmAnnDeleteModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Delete Announcement</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-0">Are you sure you want to delete this announcement? This cannot be undone.</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-danger" onclick="deleteTpmAnnouncement()">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
     <!-- Custom Fields Modal  -->
     <div class="modal fade" id="addCustomFieldModal" tabindex="-1" aria-labelledby="addCustomFieldModalLabel" aria-hidden="true">
@@ -710,6 +846,7 @@
             initializeMessageTemplates();
             initializeFaProfiles();
             initializeStatusInfoTable();
+            initializeAnnouncements();
         });
 
         function initializeStatusInfoTable() {
@@ -1576,6 +1713,10 @@
                  });
             }
     </script>
+
+    <!-- Announcement Board (Quill + board JS) -->
+    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+    <script src="Scripts/announcement.js"></script>
 
 </asp:Content>
 

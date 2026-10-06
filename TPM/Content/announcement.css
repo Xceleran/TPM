@@ -1,0 +1,62 @@
+/* ── TPM Announcement Board (Settings tab) — scoped with tpm-ann- prefix
+   so it never clashes with Content/dashboard.css (.ann-item etc.) ── */
+#announcements-pane .tpm-ann-root { padding: 4px 2px; }
+
+.tpm-ann-page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
+.tpm-ann-page-title { font-size: 1.25rem; font-weight: 700; color: #1e2336; margin: 0 0 4px; }
+.tpm-ann-page-sub { font-size: 13px; color: #7a8094; margin: 0; }
+.tpm-ann-btn-add { display: inline-flex; align-items: center; gap: 6px; background: #2563EB; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.tpm-ann-btn-add:hover { background: #1d4ed8; color: #fff; }
+
+.tpm-ann-table-wrap { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.07); overflow: hidden; border: 1px solid #eef1f6; }
+.tpm-ann-table { width: 100%; border-collapse: collapse; margin-bottom: 0; }
+.tpm-ann-table thead th { padding: 12px 16px; font-size: 11px; font-weight: 700; color: #9aa0b0; letter-spacing: .06em; text-transform: uppercase; border-bottom: 1px solid #f0f2f7; background: #fff; text-align: left; }
+.tpm-ann-table tbody td { padding: 14px 16px; font-size: 13px; color: #1e2336; border-bottom: 1px solid #f7f8fc; vertical-align: middle; }
+.tpm-ann-table tbody tr:last-child td { border-bottom: none; }
+.tpm-ann-table tbody tr:hover td { background: #f9fafc; }
+
+.tpm-ann-td-title { font-weight: 600; max-width: 200px; }
+.tpm-ann-td-desc { color: #7a8094; max-width: 260px; }
+.tpm-ann-td-user { color: #7a8094; font-size: 12px; }
+.tpm-ann-td-timeline { font-size: 12px; line-height: 1.5; }
+.tpm-ann-empty { text-align: center; padding: 40px; color: #b0b8cc; font-size: 13px; }
+.tpm-ann-empty i { font-size: 28px; margin-bottom: 8px; display: block; }
+
+.tpm-ann-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.tpm-ann-badge--active { background: #dcfce7; color: #16a34a; }
+.tpm-ann-badge--inactive { background: #f1f5f9; color: #64748b; }
+.tpm-ann-badge--expired { background: #fef9c3; color: #a16207; }
+
+.tpm-ann-td-actions { white-space: nowrap; }
+.tpm-ann-act { width: 30px; height: 30px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; margin-right: 4px; }
+.tpm-ann-act:hover { opacity: .85; }
+.tpm-ann-act--edit { background: #dbeafe; color: #2563EB; }
+.tpm-ann-act--toggle { background: #fef9c3; color: #d97706; }
+.tpm-ann-act--delete { background: #ffe4e6; color: #e11d48; }
+
+.tpm-ann-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.tpm-ann-label { font-size: 13px; font-weight: 600; color: #1e2336; }
+.tpm-ann-optional { font-size: 10px; font-weight: 700; color: #9aa0b0; letter-spacing: .06em; margin-left: 6px; }
+.tpm-ann-row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 576px) { .tpm-ann-row-2col { grid-template-columns: 1fr; } }
+
+.tpm-ann-quill-wrap { border: 1.5px solid #e8eaf0; border-radius: 8px; overflow: hidden; resize: vertical; min-height: 110px; display: flex; flex-direction: column; background: #fff; }
+.tpm-ann-quill-wrap .ql-toolbar { border: none; border-bottom: 1px solid #e8eaf0; background: #fff; padding: 8px 10px; flex-shrink: 0; }
+.tpm-ann-quill-wrap .ql-container { border: none; flex: 1; overflow-y: auto; }
+.tpm-ann-quill-wrap .ql-editor { min-height: 70px; font-size: 13px; line-height: 1.6; }
+.tpm-ann-quill-wrap--desc .ql-editor { min-height: 110px; }
+.tpm-ann-quill-wrap:focus-within { border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,.08); }
+
+.tpm-ann-select { border: 1.5px solid #e8eaf0; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #1e2336; background: #fff; width: 100%; }
+.tpm-ann-select:focus { outline: none; border-color: #2563EB; }
+.tpm-ann-creation-date-box { display: flex; align-items: center; gap: 8px; border: 1.5px solid #e8eaf0; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #64748b; background: #f9fafc; }
+.tpm-ann-custom-range { background: #eff6ff; border-radius: 10px; padding: 16px; border: 1px solid #bfdbfe; margin-bottom: 16px; }
+.tpm-ann-custom-range-title { font-size: 11px; font-weight: 700; color: #2563EB; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+.tpm-ann-date-input { border: 1.5px solid #e8eaf0; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #1e2336; background: #fff; width: 100%; }
+.tpm-ann-date-input:focus { outline: none; border-color: #2563EB; }
+.tpm-ann-use-creation-btn { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; background: #fff; border: 1.5px solid #bfdbfe; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: #2563EB; cursor: pointer; }
+.tpm-ann-use-creation-btn:hover { background: #dbeafe; }
+
+/* Quill rich HTML rendered on the TPM dashboard */
+.tpm-ann-rich p { margin: 0 0 4px; }
+.tpm-ann-rich ul, .tpm-ann-rich ol { margin: 0 0 4px; padding-left: 18px; }

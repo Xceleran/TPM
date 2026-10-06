@@ -1,4 +1,4 @@
-﻿:root {
+:root {
     --bg-gray-100: rgb(243, 244, 246);
     --text-gray-800: rgb(31, 41, 55);
     --text-gray-700: rgb(55, 65, 81);
@@ -398,11 +398,15 @@ sidebar-logo-img {
     background: transparent;
 }
 
+.content-wrapper > hr {
+    margin-top: auto;
+    margin-bottom: 0;
+}
+
 .footer {
     padding: 10px;
     text-align: center;
     flex-shrink: 0;
-  
 }
 
 [data-theme="dark"] .footer {

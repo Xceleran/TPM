@@ -1,168 +1,147 @@
-﻿<%@ Page Title="Dashboard" Language="C#" MasterPageFile="~/TPM.Master" AutoEventWireup="true" CodeBehind="Dashboard.aspx.cs" Inherits="FSM.Dashboard" %>
+<%@ Page Title="Dashboard" Language="C#" MasterPageFile="~/TPM.Master" AutoEventWireup="true" CodeBehind="Dashboard.aspx.cs" Inherits="FSM.Dashboard" %>
 
 <asp:Content ID="Content1" ContentPlaceHolderID="MainContent" runat="server">
-    <!-- Bootstrap CSS CDN -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="Content/dashboard.css?v=1">
+    <link rel="stylesheet" href="Content/announcement.css">
 
-    <style>
-        :root {
-            --shadow-lg: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-            --text-gray-700: #4b5563;
-            --text-blue-700: #1e40af;
-            --bg-light: #f3f4f6;
-            --bg-dark: #1f2937;
-        }
+    <div class="dash-wrap">
 
-        [data-theme="dark"] {
-            --shadow-lg: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
-            --text-gray-700: #d1d5db;
-            --text-blue-700: #60a5fa;
-            --bg-light: #374151;
-            --bg-dark: #111827;
-        }
-
-        body {
-            background-color: var(--bg-light);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .container-fluid-mockup {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 1rem;
-            width: 100%;
-        }
-
-        .hero-section-mockup {
-            position: relative;
-            border-radius: 8px;
-            padding: 2rem;
-            margin-top: 5rem;
-            box-shadow: var(--shadow-lg);
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-            align-items: center;
-            height: 600px;
-            overflow: hidden;
-        }
-
-        [data-theme="dark"] .hero-section-mockup {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-        }
-
-        .hero-image-mockup {
-            max-width: 100%;
-            max-height: 80%; /* Prevent image from taking full height on mobile */
-            border-radius: 8px;
-            position: absolute;
-            z-index: 1;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -40%); /* Center the image */
-        }
-
-        .hero-text-mockup {
-            position: relative;
-            z-index: 2;
-            text-align: center;
-            margin-bottom: 1rem;
-            transform: translate(40%, 50%);
-        }
-
-        [data-theme="dark"] .page-title-mockup {
-            color: rgb(94 124 253);
-        }
-
-        .page-title-mockup {
-            font-size: clamp(2rem, 5vw, 3rem);
-            font-weight: 700;
-            color: #0d6efd;
-            margin-bottom: -0.5rem;
-        }
-
-        [data-theme="dark"] .subtitle-mockup {
-            color: white;
-        }
-
-        .subtitle-mockup {
-            font-size: 40px;
-            font-weight: 400;
-            color: #305072;
-            margin-bottom: 1rem;
-        }
-
-        /* Responsive Design */
-        @media (max-width: 992px) {
-            .hero-section-mockup {
-                height: 400px;
-                padding: 1.5rem;
-                margin: 3rem auto; /* Reduce margin for medium screens */
-            }
-
-            .hero-text-mockup {
-                transform: translate(0%, 0%);
-            }
-
-            .page-title-mockup {
-                font-size: clamp(1.75rem, 4vw, 2.5rem);
-            }
-
-            .subtitle-mockup {
-                font-size: clamp(1rem, 2.5vw, 1.5rem);
-            }
-
-            .hero-image-mockup {
-                max-height: 70%; /* Slightly smaller on medium screens */
-            }
-        }
-
-        @media (max-width: 576px) {
-            .container-fluid-mockup {
-                padding: 0.5rem;
-            }
-
-            .hero-section-mockup {
-                margin: 1rem auto;
-                padding: 1rem;
-                height: 300px; /* Reduced height for mobile */
-            }
-
-            .page-title-mockup {
-                font-size: clamp(1.5rem, 3.5vw, 2rem); /* Smaller font for mobile */
-                margin-bottom: 0.5rem;
-            }
-
-            .subtitle-mockup {
-                font-size: clamp(0.875rem, 2vw, 1.25rem); /* Smaller font for mobile */
-            }
-
-            .hero-image-mockup {
-                max-height: 80%; /* Smaller image on mobile */
-                max-width: 90%; /* Ensure image fits within mobile width */
-            }
-        }
-    </style>
-
-    <main class="main-content-mockup container-fluid container-fluid-mockup">
-        <!-- Hero Section -->
-         <h1 class="page-title-mockup">Welcome to TPM</h1>
-                <p class="subtitle-mockup">3rd Party Module </p>
-        <section class="hero-section-mockup">
-            <div class="hero-text-mockup">
-               
+        <!-- Greeting -->
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mt-3 mb-1">
+            <div>
+                <div class="dash-greeting"><asp:Label ID="lblGreeting" runat="server" Text="Good evening" />, <asp:Label ID="lblUserName" runat="server" Text="Demo" /></div>
+                <div class="dash-sub">Here's what's happening right now &mdash; <asp:Label ID="lblDateLine" runat="server" Text="" /></div>
             </div>
-           
-              <%--<img src="https://central.xceleran.com/fsm/images/fsmmain.png" alt="Technician with Van" class="hero-image-mockup">--%>
-        </section>
-         <br />
-            <img src="images/TPM_IMG.png" alt="Technician with Van" class="hero-image-mockup">
-    </main>
+            <div class="d-flex align-items-center gap-2">
+                <span class="last-updated"><asp:Label ID="lblUpdated" runat="server" Text="" /></span>
+                <asp:LinkButton ID="btnRefresh" runat="server" CssClass="btn-refresh" OnClick="btnRefresh_Click">
+                    <i class="bi bi-arrow-clockwise" id="refreshIcon"></i>Refresh
+                </asp:LinkButton>
+            </div>
+        </div>
 
-    <!-- Bootstrap JS CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+        <!-- ── SECTION 1: Operational Counts ── -->
+        <div class="section-hdr mt-3"><i class="bi bi-bar-chart-fill"></i>Operational Overview</div>
+        <div class="row g-3 mb-4">
+
+            <!-- 1. Total Third Party Providers — blue -->
+            <div class="col-12 col-md-6 col-xl-3">
+                <a href="TpList.aspx" class="stat-card blue" id="card-providers">
+                    <button class="stat-info-btn" type="button" tabindex="-1" onclick="return false;"><i class="bi bi-info-circle"></i></button>
+                    <span class="stat-info-tip">Providers linked to your company (IsBusinessContact with a warranty company)</span>
+                    <div class="stat-icon">
+                        <img src="images/icons/thirdparty.svg" alt="Total Third Party Providers" />
+                    </div>
+                    <div>
+                        <div class="stat-num" id="val-providers"><asp:Label ID="lblTotalProviders" runat="server" Text="0" /></div>
+                        <div class="stat-label">Total Third Party Providers</div>
+                    </div>
+                    <span class="stat-go-link">View Providers <i class="bi bi-arrow-right"></i></span>
+                </a>
+            </div>
+
+            <!-- 2. New Work Order Requests — lime -->
+            <div class="col-12 col-md-6 col-xl-3">
+                <a href="AppoinementList.aspx" class="stat-card lime" id="card-requests">
+                    <button class="stat-info-btn" type="button" tabindex="-1" onclick="return false;"><i class="bi bi-info-circle"></i></button>
+                    <span class="stat-info-tip">TPM work-order requests waiting for approval (IsApproved = 0)</span>
+                    <div class="stat-icon">
+                        <img src="images/icons/workorder.svg" alt="New Work Order Requests" />
+                    </div>
+                    <div>
+                        <div class="stat-num" id="val-requests"><asp:Label ID="lblNewWorkOrders" runat="server" Text="0" /></div>
+                        <div class="stat-label">New Work Order Requests</div>
+                    </div>
+                    <span class="stat-go-link">View Requests <i class="bi bi-arrow-right"></i></span>
+                </a>
+            </div>
+
+            <!-- 3. Active Appointments — purple -->
+            <div class="col-12 col-md-6 col-xl-3">
+                <a href="Appointments.aspx" class="stat-card purple" id="card-active">
+                    <button class="stat-info-btn" type="button" tabindex="-1" onclick="return false;"><i class="bi bi-info-circle"></i></button>
+                    <span class="stat-info-tip">Approved appointments not closed, cancelled or deleted</span>
+                    <div class="stat-icon">
+                        <img src="images/icons/activeappointments.svg" alt="Active Appointments" />
+                    </div>
+                    <div>
+                        <div class="stat-num" id="val-active"><asp:Label ID="lblActiveAppointments" runat="server" Text="0" /></div>
+                        <div class="stat-label">Active Appointments</div>
+                    </div>
+                    <span class="stat-go-link">View Appointments <i class="bi bi-arrow-right"></i></span>
+                </a>
+            </div>
+
+            <!-- 4. Active Assignments — orange -->
+            <div class="col-12 col-md-6 col-xl-3">
+                <a href="Dispatch.aspx" class="stat-card orange" id="card-dispatched">
+                    <button class="stat-info-btn" type="button" tabindex="-1" onclick="return false;"><i class="bi bi-info-circle"></i></button>
+                    <span class="stat-info-tip">Assignments whose appointment is still open</span>
+                    <div class="stat-icon">
+                        <img src="images/icons/assignment.svg" alt="Active Assignments" />
+                    </div>
+                    <div>
+                        <div class="stat-num" id="val-dispatched"><asp:Label ID="lblActiveAssignments" runat="server" Text="0" /></div>
+                        <div class="stat-label">Active Assignments</div>
+                    </div>
+                    <span class="stat-go-link">View Dispatch <i class="bi bi-arrow-right"></i></span>
+                </a>
+            </div>
+
+        </div>
+
+        <!-- ── SECTION 2: Announcements + Recent Activity ── -->
+        <div class="row g-4 mb-4 alerts-row">
+
+            <!-- Announcements (left) -->
+            <div class="col-12 col-lg-6">
+                <div class="section-hdr"><i class="bi bi-megaphone-fill" style="color:#6366f1;"></i>Announcements</div>
+                <div class="announcements-panel" id="announcementsPanel">
+                    <asp:Repeater ID="rptAnnouncements" runat="server">
+                        <ItemTemplate>
+                            <div class="ann-item">
+                                <div class="ann-item-header">
+                                    <span class="ann-item-dot"></span>
+                                    <span class="ann-item-title"><%# Eval("Title") %></span>
+                                </div>
+                                <div class="ann-item-body tpm-ann-rich"><%# Eval("Announcement") %></div>
+                                <div class="ann-item-date"><%# Eval("WhenText") %></div>
+                            </div>
+                        </ItemTemplate>
+                    </asp:Repeater>
+                    <asp:Panel ID="pnlNoAnnouncements" runat="server" Visible="false" CssClass="ann-item ann-empty">
+                        <i class="bi bi-megaphone me-2"></i>No announcements right now.
+                    </asp:Panel>
+                </div>
+            </div>
+
+            <!-- Recent Activity (right) -->
+            <div class="col-12 col-lg-6">
+                <div class="section-hdr d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-clock-history" style="margin-right: 7px;"></i>Recent Activity</span>
+                    <a href="Appointments.aspx" class="text-decoration-none" style="font-size: .78rem; color: #6366f1; font-weight: 600; text-transform: none; letter-spacing: 0;">
+                        View all <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+                <div class="activity-feed" id="activityFeed">
+                    <asp:Repeater ID="rptRecent" runat="server">
+                        <ItemTemplate>
+                            <div class="activity-item">
+                                <div class="activity-dot" style="background:#6366f1;"></div>
+                                <div class="activity-text">
+                                    <%# Eval("Headline") %>
+                                </div>
+                                <div class="activity-time"><%# Eval("WhenText") %></div>
+                            </div>
+                        </ItemTemplate>
+                    </asp:Repeater>
+                    <asp:Panel ID="pnlNoRecent" runat="server" Visible="false" CssClass="activity-empty">
+                        <i class="bi bi-calendar2-x me-2"></i>No recent activity today.
+                    </asp:Panel>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
 </asp:Content>

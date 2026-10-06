@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.2.0.0\build\net46\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.props" Condition="Exists('..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.2.0.0\build\net46\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -204,6 +204,7 @@
     <Content Include="Content\form-response.css" />
     <Content Include="Content\GearLoder.gif" />
     <Content Include="Content\settings.css" />
+    <Content Include="Content\announcement.css" />
     <Content Include="CustomerChatHistory.aspx" />
     <Content Include="CustomerDetails.aspx" />
     <Content Include="images\backgrounddark.jpg" />
@@ -232,6 +233,11 @@
     <Content Include="Content\invoice.css" />
     <Content Include="Content\inquiry-portal.css" />
     <Content Include="Content\Site.css" />
+    <Content Include="Content\dashboard.css" />
+    <Content Include="images\icons\thirdparty.svg" />
+    <Content Include="images\icons\workorder.svg" />
+    <Content Include="images\icons\activeappointments.svg" />
+    <Content Include="images\icons\assignment.svg" />
     <Content Include="Content\forms.css" />
     <Content Include="Customer.aspx" />
     <Content Include="Forms.aspx" />
@@ -253,6 +259,7 @@
     <Content Include="Scripts\customer.js" />
     <Content Include="Scripts\customerdetails.js" />
     <Content Include="Scripts\fsm-loading.js" />
+	<Content Include="Scripts\announcement.js" />
     <Content Include="Scripts\forms.js" />
     <Content Include="Scripts\form-response.js" />
     <Content Include="Scripts\jquery\jquery-3.5.1.js" />
@@ -336,6 +343,7 @@
     </Compile>
     <Compile Include="Entity\Common.cs" />
     <Compile Include="Entity\CommonClass.cs" />
+    <Compile Include="Entity\DashAnnouncementEntity.cs" />
     <Compile Include="Entity\EmailCommunicationAndContent.cs" />
     <Compile Include="Entity\Notes\Note.cs" />
     <Compile Include="logout.aspx.cs">
@@ -468,6 +476,7 @@
     <Compile Include="Models\UserModels\UserPrivilege.cs" />
     <Compile Include="Processors\BusinessContactProcessor.cs" />
     <Compile Include="Processors\CustomerProcessor.cs" />
+    <Compile Include="Processors\DashAnnouncementProcessor.cs" />
     <Compile Include="Processors\FormProcessor.cs" />
     <Compile Include="Processors\LoginProcessor.cs" />
     <Compile Include="Processors\QBOManager.cs" />
