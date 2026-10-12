@@ -19,10 +19,10 @@ namespace FSM.Processors
         private static void EnsureColumns(SqlConnection con)
         {
             const string sql = @"
-IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('[msSchedulerV3].[dbo].[tbl_DashAnnouncement]') AND name = 'CreatedBy')
-    ALTER TABLE [msSchedulerV3].[dbo].[tbl_DashAnnouncement] ADD CreatedBy NVARCHAR(200) NULL;
-IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('[msSchedulerV3].[dbo].[tbl_DashAnnouncement]') AND name = 'AppSource')
-    ALTER TABLE [msSchedulerV3].[dbo].[tbl_DashAnnouncement] ADD AppSource NVARCHAR(20) NULL;";
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('[XinatorCentral].[dbo].[tbl_DashAnnouncement]') AND name = 'CreatedBy')
+    ALTER TABLE [XinatorCentral].[dbo].[tbl_DashAnnouncement] ADD CreatedBy NVARCHAR(200) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('[XinatorCentral].[dbo].[tbl_DashAnnouncement]') AND name = 'AppSource')
+    ALTER TABLE [XinatorCentral].[dbo].[tbl_DashAnnouncement] ADD AppSource NVARCHAR(20) NULL;";
             using (var cmd = new SqlCommand(sql, con))
             {
                 cmd.CommandType = CommandType.Text;
@@ -54,7 +54,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('[msSchedul
 SELECT AnnouncementID, Title, Description, IsActive, DurationPreset,
        StartDate, EndDate, CreatedOn,
        ISNULL(CreatedBy,'') AS CreatedBy, AppSource
-FROM [msSchedulerV3].[dbo].[tbl_DashAnnouncement]
+FROM [XinatorCentral].[dbo].[tbl_DashAnnouncement]
 WHERE (AppSource IS NULL OR AppSource = @AppSource OR CHARINDEX(@AppSource, AppSource) > 0)
 ORDER BY CreatedOn DESC";
             using (var con = new SqlConnection(ConnStr))
@@ -80,7 +80,7 @@ ORDER BY CreatedOn DESC";
 SELECT AnnouncementID, Title, Description, IsActive, DurationPreset,
        StartDate, EndDate, CreatedOn,
        ISNULL(CreatedBy,'') AS CreatedBy, AppSource
-FROM [msSchedulerV3].[dbo].[tbl_DashAnnouncement]
+FROM [XinatorCentral].[dbo].[tbl_DashAnnouncement]
 WHERE IsActive = 1
   AND (AppSource IS NULL OR AppSource = @AppSource OR CHARINDEX(@AppSource, AppSource) > 0)
   AND (StartDate IS NULL OR CAST(StartDate AS DATE) <= @Today)
@@ -109,7 +109,7 @@ ORDER BY AnnouncementID DESC";
 SELECT AnnouncementID, Title, Description, IsActive, DurationPreset,
        StartDate, EndDate, CreatedOn,
        ISNULL(CreatedBy,'') AS CreatedBy, AppSource
-FROM [msSchedulerV3].[dbo].[tbl_DashAnnouncement]
+FROM [XinatorCentral].[dbo].[tbl_DashAnnouncement]
 WHERE AnnouncementID = @AnnouncementID";
             using (var con = new SqlConnection(ConnStr))
             using (var cmd = new SqlCommand(sql, con))
@@ -129,7 +129,7 @@ WHERE AnnouncementID = @AnnouncementID";
         public int AddAnnouncement(DashAnnouncementEntity entity)
         {
             const string sql = @"
-INSERT INTO [msSchedulerV3].[dbo].[tbl_DashAnnouncement]
+INSERT INTO [XinatorCentral].[dbo].[tbl_DashAnnouncement]
     (Title, Description, IsActive, DurationPreset, StartDate, EndDate, CreatedBy, AppSource, CreatedOn)
 VALUES
     (@Title, @Description, @IsActive, @DurationPreset, @StartDate, @EndDate, @CreatedBy, @AppSource, GETDATE());
@@ -155,7 +155,7 @@ SELECT CAST(SCOPE_IDENTITY() AS INT);";
         public bool UpdateAnnouncement(DashAnnouncementEntity entity)
         {
             const string sql = @"
-UPDATE [msSchedulerV3].[dbo].[tbl_DashAnnouncement]
+UPDATE [XinatorCentral].[dbo].[tbl_DashAnnouncement]
 SET Title = @Title, Description = @Description, IsActive = @IsActive,
     DurationPreset = @DurationPreset, StartDate = @StartDate, EndDate = @EndDate
 WHERE AnnouncementID = @AnnouncementID";
@@ -176,7 +176,7 @@ WHERE AnnouncementID = @AnnouncementID";
 
         public bool DeleteAnnouncement(int id)
         {
-            const string sql = @"DELETE FROM [msSchedulerV3].[dbo].[tbl_DashAnnouncement] WHERE AnnouncementID = @AnnouncementID";
+            const string sql = @"DELETE FROM [XinatorCentral].[dbo].[tbl_DashAnnouncement] WHERE AnnouncementID = @AnnouncementID";
             using (var con = new SqlConnection(ConnStr))
             using (var cmd = new SqlCommand(sql, con))
             {
@@ -188,7 +188,7 @@ WHERE AnnouncementID = @AnnouncementID";
 
         public bool ToggleAnnouncementStatus(int id, bool isActive)
         {
-            const string sql = @"UPDATE [msSchedulerV3].[dbo].[tbl_DashAnnouncement] SET IsActive = @IsActive WHERE AnnouncementID = @AnnouncementID";
+            const string sql = @"UPDATE [XinatorCentral].[dbo].[tbl_DashAnnouncement] SET IsActive = @IsActive WHERE AnnouncementID = @AnnouncementID";
             using (var con = new SqlConnection(ConnStr))
             using (var cmd = new SqlCommand(sql, con))
             {
