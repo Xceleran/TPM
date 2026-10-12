@@ -55,7 +55,7 @@ SELECT AnnouncementID, Title, Description, IsActive, DurationPreset,
        StartDate, EndDate, CreatedOn,
        ISNULL(CreatedBy,'') AS CreatedBy, AppSource
 FROM [msSchedulerV3].[dbo].[tbl_DashAnnouncement]
-WHERE (AppSource IS NULL OR AppSource = @AppSource)
+WHERE (AppSource IS NULL OR AppSource = @AppSource OR CHARINDEX(@AppSource, AppSource) > 0)
 ORDER BY CreatedOn DESC";
             using (var con = new SqlConnection(ConnStr))
             using (var cmd = new SqlCommand(sql, con))
@@ -82,7 +82,7 @@ SELECT AnnouncementID, Title, Description, IsActive, DurationPreset,
        ISNULL(CreatedBy,'') AS CreatedBy, AppSource
 FROM [msSchedulerV3].[dbo].[tbl_DashAnnouncement]
 WHERE IsActive = 1
-  AND (AppSource IS NULL OR AppSource = @AppSource)
+  AND (AppSource IS NULL OR AppSource = @AppSource OR CHARINDEX(@AppSource, AppSource) > 0)
   AND (StartDate IS NULL OR CAST(StartDate AS DATE) <= @Today)
   AND (EndDate IS NULL OR CAST(EndDate AS DATE) >= @Today)
 ORDER BY AnnouncementID DESC";
