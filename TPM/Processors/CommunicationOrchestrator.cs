@@ -186,7 +186,7 @@ namespace FSM.Processors
             try
             {
                 var ep = new EmailProcessor();
-                ep.SendHtmlFormattedEmail(ctx.CompanyId, ctx.CustomerId ?? "", subject, body, "", toEmail, "", "", new List<EmailContent>());
+                //ep.SendHtmlFormattedEmail(ctx.CompanyId, ctx.CustomerId ?? "", subject, body, "", toEmail, "", "", new List<EmailContent>());
                 LogCommunication(ctx, commType, "Outbound", subject, body, toEmail, null, recipientType);
             }
             catch { }

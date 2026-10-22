@@ -76,6 +76,15 @@ namespace TPM {
         protected global::System.Web.UI.WebControls.HiddenField hf_CurrentPdfType;
         
         /// <summary>
+        /// hf_ContinueWithoutLink control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.HiddenField hf_ContinueWithoutLink;
+        
+        /// <summary>
         /// isLHG control.
         /// </summary>
         /// <remarks>
@@ -373,6 +382,15 @@ namespace TPM {
         protected global::System.Web.UI.WebControls.HiddenField customerPhone;
         
         /// <summary>
+        /// customerMobile control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.HiddenField customerMobile;
+        
+        /// <summary>
         /// lblmessage control.
         /// </summary>
         /// <remarks>
@@ -389,6 +407,15 @@ namespace TPM {
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
         protected global::System.Web.UI.WebControls.Label PageTitle;
+        
+        /// <summary>
+        /// lblWarranty control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Label lblWarranty;
         
         /// <summary>
         /// Date control.
@@ -427,6 +454,51 @@ namespace TPM {
         protected global::System.Web.UI.WebControls.TextBox txt_InvocieNumber;
         
         /// <summary>
+        /// btn_Clone control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.HtmlControls.HtmlButton btn_Clone;
+        
+        /// <summary>
+        /// txtFirstName control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Label txtFirstName;
+        
+        /// <summary>
+        /// Address control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Label Address;
+        
+        /// <summary>
+        /// Contact control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Label Contact;
+        
+        /// <summary>
+        /// div1 control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.HtmlControls.HtmlGenericControl div1;
+        
+        /// <summary>
         /// divLocation control.
         /// </summary>
         /// <remarks>
@@ -463,6 +535,33 @@ namespace TPM {
         protected global::System.Web.UI.HtmlControls.HtmlSelect qboClass;
         
         /// <summary>
+        /// divBillToShipTo control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.HtmlControls.HtmlGenericControl divBillToShipTo;
+        
+        /// <summary>
+        /// BillToAddress control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.TextBox BillToAddress;
+        
+        /// <summary>
+        /// ShipToAddress control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.TextBox ShipToAddress;
+        
+        /// <summary>
         /// Number control.
         /// </summary>
         /// <remarks>
@@ -470,33 +569,6 @@ namespace TPM {
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
         protected global::System.Web.UI.WebControls.TextBox Number;
-        
-        /// <summary>
-        /// txtFirstName control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::System.Web.UI.WebControls.Label txtFirstName;
-        
-        /// <summary>
-        /// Address control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::System.Web.UI.WebControls.Label Address;
-        
-        /// <summary>
-        /// Contact control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::System.Web.UI.WebControls.Label Contact;
         
         /// <summary>
         /// invSubTotal control.
@@ -589,13 +661,13 @@ namespace TPM {
         protected global::System.Web.UI.HtmlControls.HtmlInputText txt_Due;
         
         /// <summary>
-        /// lblPONO control.
+        /// txt_PONO control.
         /// </summary>
         /// <remarks>
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Label lblPONO;
+        protected global::System.Web.UI.WebControls.TextBox txt_PONO;
         
         /// <summary>
         /// Note control.
@@ -641,6 +713,15 @@ namespace TPM {
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
         protected global::System.Web.UI.HtmlControls.HtmlGenericControl invPermission;
+        
+        /// <summary>
+        /// chk_QBOSync control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.HtmlControls.HtmlInputCheckBox chk_QBOSync;
         
         /// <summary>
         /// _SubmitInvoice control.

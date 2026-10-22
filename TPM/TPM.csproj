@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.2.0.0\build\net46\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.props" Condition="Exists('..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.2.0.0\build\net46\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -242,6 +242,9 @@
     <Content Include="Customer.aspx" />
     <Content Include="Forms.aspx" />
     <Content Include="PolicyHolderInquiry.aspx" />
+    <Content Include="Scripts\BusinessContact.js" />
+    <Content Include="Scripts\invoice.js" />
+    <Content Include="Scripts\InvoiceList.js" />
     <Content Include="TPInquiry.aspx" />
     <Content Include="TwilioInbound.ashx" />
     <Content Include="Database\TPM_Efficiency_Migration.sql" />
@@ -259,7 +262,7 @@
     <Content Include="Scripts\customer.js" />
     <Content Include="Scripts\customerdetails.js" />
     <Content Include="Scripts\fsm-loading.js" />
-	<Content Include="Scripts\announcement.js" />
+    <Content Include="Scripts\announcement.js" />
     <Content Include="Scripts\forms.js" />
     <Content Include="Scripts\form-response.js" />
     <Content Include="Scripts\jquery\jquery-3.5.1.js" />
@@ -353,12 +356,15 @@
     <Compile Include="logout.aspx.designer.cs">
       <DependentUpon>logout.aspx</DependentUpon>
     </Compile>
+    <Compile Include="Processors\AppointmentResourceProcessor.cs" />
     <Compile Include="Processors\AppointmentStatusCommunicationProcessor.cs" />
     <Compile Include="Processors\AhsStatusQueueProcessor.cs" />
     <Compile Include="Processors\CommunicationOrchestrator.cs" />
     <Compile Include="Processors\CoverageItemProcessor.cs" />
     <Compile Include="Processors\CSLDataScopeProvider.cs" />
+    <Compile Include="Processors\Emailer.cs" />
     <Compile Include="Processors\EmailProcessor.cs" />
+    <Compile Include="Processors\EmailSignature.cs" />
     <Compile Include="Processors\InboundEmailProcessor.cs" />
     <Compile Include="Processors\InquiryChatService.cs" />
     <Compile Include="Processors\PortalAdapters\ApiPortalAdapter.cs" />

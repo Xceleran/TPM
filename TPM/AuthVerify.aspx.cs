@@ -48,6 +48,10 @@ namespace FSM
                 userID = "admin@mxptest.com";
                 companyID = "14590";
 
+                userID = "Admin@Total_Tech.com";
+                companyID = "14624";
+
+
             }
             if (!string.IsNullOrEmpty(companyID) && !string.IsNullOrEmpty(userID))
             {

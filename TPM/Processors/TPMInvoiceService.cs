@@ -70,24 +70,7 @@ namespace FSM.Processors
 
         public bool SyncToQbo(string companyId, string invoiceId, string customerQboId, decimal total, string invoiceNumber)
         {
-            QBOSettins settings = new QBOSettins();
-            if (!_qboManager.VerifyCompanySetting(companyId, ref settings)) return false;
-            var ctx = _qboManager.GetServiceContext(settings, companyId);
-            string qboId = _qboManager.CreateInvoiceQbo(ctx, companyId, customerQboId, invoiceNumber, total, "TPM Invoice " + invoiceNumber);
-            if (qboId != "0")
-            {
-                using (var con = new SqlConnection(_connStr))
-                {
-                    con.Open();
-                    var cmd = new SqlCommand(
-                        "UPDATE [msSchedulerV3].[dbo].[tbl_Invoice] SET QboId = @QboId WHERE ID = @Id AND CompnyID = @CompanyID", con);
-                    cmd.Parameters.AddWithValue("@QboId", qboId);
-                    cmd.Parameters.AddWithValue("@Id", invoiceId);
-                    cmd.Parameters.AddWithValue("@CompanyID", companyId);
-                    cmd.ExecuteNonQuery();
-                }
-                return true;
-            }
+           
             return false;
         }
 

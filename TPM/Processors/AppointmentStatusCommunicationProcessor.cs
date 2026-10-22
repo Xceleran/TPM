@@ -490,7 +490,8 @@ namespace TPM.Processors
                                             ImageUrl = ConfigurationManager.AppSettings["baseurl"].Trim() + ImageUrl;
                                             if (!String.IsNullOrEmpty(ImageUrl))
                                             {
-                                                smsId = twilioService.SendMMS(customerDetails.Mobile, body, ImageUrl, companyId);
+                                                bool result = false;
+                                                smsId = twilioService.SendMMS(customerDetails.Mobile, body, ImageUrl , out result);
                                                 LogSMS(companyId, appointment.CustomerID, "", appointment.AppointmentID.ToString(), customerDetails.Mobile, "FSM FA-ID Customer MMS", customerSmsBody, smsId ?? "");
                                             }
                                         }
@@ -793,7 +794,8 @@ namespace TPM.Processors
                         string smsId;
                         if (!string.IsNullOrEmpty(firstFaPictureUrlForMms))
                         {
-                            smsId = twilioService.SendMMS(customerMobile, customerSmsBody, firstFaPictureUrlForMms, companyId);
+                            bool result = false;
+                            smsId = twilioService.SendMMS(customerMobile, customerSmsBody, firstFaPictureUrlForMms, out result);
                             LogSMS(companyId, appointment.CustomerID, "", appointment.AppointmentID.ToString(), customerMobile, "FSM FA-ID Customer MMS", customerSmsBody, smsId ?? "");
                             if (!string.IsNullOrEmpty(smsId))
                                 ConsoleLog($"FA-ID customer MMS sent to {customerMobile} with field agent photo (SID={smsId})");

@@ -62,13 +62,14 @@ ORDER BY CreatedOn DESC";
             {
                 cmd.Parameters.AddWithValue("@AppSource", AppSource);
                 con.Open();
-                try { EnsureColumns(con); } catch { }
+               // try { EnsureColumns(con); } catch { }
                 using (var dr = cmd.ExecuteReader())
                 {
                     var dt = new DataTable();
                     dt.Load(dr);
                     foreach (DataRow row in dt.Rows) list.Add(MapRow(row));
                 }
+                con.Close();
             }
             return list;
         }
@@ -92,13 +93,14 @@ ORDER BY AnnouncementID DESC";
                 cmd.Parameters.AddWithValue("@AppSource", AppSource);
                 cmd.Parameters.Add("@Today", SqlDbType.Date).Value = DateTime.Today;
                 con.Open();
-                try { EnsureColumns(con); } catch { }
+               // try { EnsureColumns(con); } catch { }
                 using (var dr = cmd.ExecuteReader())
                 {
                     var dt = new DataTable();
                     dt.Load(dr);
                     foreach (DataRow row in dt.Rows) list.Add(MapRow(row));
                 }
+                con.Close();
             }
             return list;
         }
@@ -146,8 +148,9 @@ SELECT CAST(SCOPE_IDENTITY() AS INT);";
                 cmd.Parameters.AddWithValue("@CreatedBy", (object)entity.CreatedBy ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@AppSource", AppSource);
                 con.Open();
-                try { EnsureColumns(con); } catch { }
+               // try { EnsureColumns(con); } catch { }
                 object result = cmd.ExecuteScalar();
+                con.Close();
                 return result == null || result == DBNull.Value ? 0 : Convert.ToInt32(result);
             }
         }

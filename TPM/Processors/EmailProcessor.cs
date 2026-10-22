@@ -56,7 +56,7 @@ namespace TPM
         public DataTable dt_Customer = null;
         public DataTable dt_Company = null;
         private DataSet dataSet = null;
-        private string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+        private string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
 
         public EmailCommunication FillEmailPopUp(string CustomerID)
         {
@@ -116,35 +116,34 @@ namespace TPM
             return emailcomm;
         }
 
-        //public static string GetCSPaymentLink(string CompanyID, string CustomerID, string InvoiceNo, string CustomerName, string email, string amount)
-        //{
-        //    string firstName = "";
-        //    string lastName = "";
-        //    string UserID = HttpContext.Current.Session["LoginUser"].ToString();
-        //    if (!string.IsNullOrEmpty(CustomerName))
-        //    {
-        //        string[] parts = CustomerName.Split(' ');
-        //        firstName = string.Join(" ", parts.Take(parts.Length - 1));
-        //        lastName = parts.Last();
-        //    }
-        //    string paymentLink = "";
-        //    //PaymentServiceSoapClient ps = new PaymentServiceSoapClient();
-        //    //try
-        //    //{
-        //    //    paymentLink = ps.GetCSLink(CompanyID, firstName, lastName, email, InvoiceNo, amount, UserID);
-        //    //}
-        //    //catch (Exception ex)
-        //    //{
-        //    //    return "";
-        //    //}
+        public static string GetCSPaymentLink(string CompanyID, string CustomerID, string InvoiceNo, string CustomerName, string email, string amount)
+        {
+            string firstName = "";
+            string lastName = "";
+            string UserID = HttpContext.Current.Session["LoginUser"].ToString();
+            if (!string.IsNullOrEmpty(CustomerName))
+            {
+                string[] parts = CustomerName.Split(' ');
+                firstName = string.Join(" ", parts.Take(parts.Length - 1));
+                lastName = parts.Last();
+            }
+            string paymentLink = "";
+           
+            if (paymentLink != null)
+            {
+                if (paymentLink.Contains("Error"))
+                {
+                    return "";
+                }
+            }
+            else
+            {
+                return "";
+            }
 
-        //    //if (paymentLink.Contains("Error"))
-        //    //{
-        //    //    return "";
-        //    }
 
-        //    return paymentLink;
-        //}
+            return paymentLink;
+        }
 
         public EmailCommunication FillEmailPopUp(string CustomerID, string InvoiceNo, int FromInvDtl = 0)
         {
@@ -235,81 +234,33 @@ namespace TPM
                 emailcomm.EmailBCC = dr["EmailBCC"].ToString();
 
 
-                //replace email body
-                string emailbody = emailcomm.ProposalMailBody;
-                string emailbodyInv = emailcomm.InvoiceMailBody;
-
-
-                string CompanyGUID = "";
-                string CustomerName = "";
-                string ApptDate = "";
-                string TimeSlotName = "";
-                string Address = "";
-                string Phone = "";
-                string Mobile = "";
-                string Email = "";
-                string CompanyName = "";
-                string CompanyEmail = "";
-                string CompanyPhone = "";
-                string CompanyWebsite = "";
-                string Sql = "";
-
-
-                Database dbReschedule = new Database(connStr);
-                DataTable dtReschedule = new DataTable();
-
-
-                Sql = "Select c.CustomerID,c.CustomerGuid,c.title,c.FirstName,c.LastName,c.Jobtitle,c.Address1,c.City,c.State,c.ZipCode,c.Phone,c.Mobile,c.Email,a.StartDateTime" +
-               " From msSchedulerV3.dbo.tbl_Customer c inner join tbl_Appointment a on a.CustomerID=c.CustomerID and c.CompanyID=a.CompanyID and a.ApptId= " + ApptId + "" +
-               " where c.CompanyID='" + companyid + "'" +
-               " and c.CustomerID = '" + CustomerID + "'";
-                // db.Open();
-                db.Execute(Sql, out dt);
-
-                if (dt.Rows.Count > 0)
+                // Body text and token substitution are delegated to Emailer: it owns the
+                // canonical token list (Emailer.ReplaceEmailText -- [Full Name], [Address],
+                // [Phone], [Website] and the rest) and it reads the appointment date/time from
+                // the formatted AppointmentDate/TimeSlot columns. The inline version that used
+                // to live here expanded only [First Name], [Date], [Time] and [Company Name],
+                // so every other token reached the popup as raw literal text, and it derived
+                // the date/time by string-splitting StartDateTime (which dropped AM/PM).
+                // Appointmentlist.FillRescheduleEmailBody already fills its popup this way.
+                try
                 {
-                    DataRow drReSchedule = dt.Rows[0];
+                    CECPro.Processor.Emailer emailer = new CECPro.Processor.Emailer();
+                    emailer.GetEmailBody(Common.EmailType.ResourceEmail, CustomerID, ApptId, "0", "0");
 
-                    CustomerName = drReSchedule["title"].ToString() + " " + drReSchedule["FirstName"].ToString() + " " + drReSchedule["LastName"].ToString();
-                    Address = drReSchedule["Address1"].ToString() + ", " + drReSchedule["City"].ToString() + ", " + drReSchedule["State"].ToString() + " " + drReSchedule["ZipCode"].ToString();
+                    // GetRescheduleEmailBody() runs the template through ReplaceEmailText in
+                    // preview mode, which keeps the newlines the admin typed on
+                    // AppointmentConfirmation.aspx. The send path converts them to <br />.
+                    emailcomm.RescheduleMailBody = emailer.GetRescheduleEmailBody();
 
-                    ApptDate = drReSchedule["StartDateTime"].ToString().Split(' ')[0];
-                    TimeSlotName = drReSchedule["StartDateTime"].ToString().Split(' ')[1];
-
-                    Mobile = drReSchedule["Mobile"].ToString();
-                    Phone = drReSchedule["Phone"].ToString();
-                    Email = drReSchedule["Email"].ToString();
-
+                    if (!string.IsNullOrEmpty(emailer.AppointmentRescheduleSubject))
+                    {
+                        emailcomm.RescheduledMailSubject = emailer.AppointmentRescheduleSubject;
+                    }
                 }
-
-
-                Mobile = Mobile.Replace("-", "");
-                Mobile = Mobile.Replace("(", "");
-                Mobile = Mobile.Replace(")", "");
-
-
-                Sql = "SELECT * From msSchedulerV3.dbo.tbl_Company Where CompanyID = '" + companyid + "'";
-                dt = new DataTable();
-                db.Execute(Sql, out dt);
-
-                if (dt.Rows.Count > 0)
+                catch
                 {
-                    DataRow drCompany = dt.Rows[0];
-                    CompanyName = drCompany["CompanyName"].ToString();
-                    CompanyEmail = drCompany["Email"].ToString();
-                    CompanyPhone = drCompany["Phone"].ToString();
-                    CompanyWebsite = drCompany["Website"].ToString();
-                    CompanyGUID = drCompany["CompanyGUID"].ToString();
-
+                    // Show the un-expanded template rather than failing the whole popup.
                 }
-
-                // Replace placeholders
-                string message = emailcomm.RescheduleMailBody.Replace("[First Name]", CustomerName)
-                                         .Replace("[Date]", ApptDate)
-                                         .Replace("[Time]", TimeSlotName)
-                                         .Replace("[Company Name]", CompanyName);
-
-                emailcomm.RescheduleMailBody = message;
             }
 
             return emailcomm;
@@ -325,6 +276,57 @@ namespace TPM
                 return PreqalLink;
             }
             return "";
+        }
+
+        public const string TuaPayLinkSessionKey = "TuaPayLink";
+
+        public static void SetTuaPayLinkForPdf(string companyId, string invoiceNo, bool includeTuaPay)
+        {
+            if (HttpContext.Current == null)
+            {
+                return;
+            }
+
+            if (!includeTuaPay)
+            {
+                HttpContext.Current.Session[TuaPayLinkSessionKey] = null;
+                return;
+            }
+
+        }
+
+        private string GetTuaPayLinkForPdf()
+        {
+            if (HttpContext.Current == null || HttpContext.Current.Session == null)
+            {
+                return null;
+            }
+
+            return HttpContext.Current.Session[TuaPayLinkSessionKey] as string;
+        }
+
+        private void AppendTuaPayLinkParagraph(Document pdfDoc)
+        {
+            string tuaPayLink = GetTuaPayLinkForPdf();
+            if (string.IsNullOrEmpty(tuaPayLink) || pdfDoc == null)
+            {
+                return;
+            }
+
+            var anchor = new Chunk("Click this link for TuaPay - Buy Now Pay Later")
+            {
+                Font = new Font(Font.FontFamily.HELVETICA, 15, Font.NORMAL, BaseColor.BLACK)
+            };
+            anchor.SetAnchor(tuaPayLink);
+
+            Paragraph paragraph = new Paragraph
+            {
+                Alignment = Element.ALIGN_RIGHT,
+                IndentationLeft = 10
+            };
+            paragraph.SetLeading(1.1f, 1.1f);
+            paragraph.Add(anchor);
+            pdfDoc.Add(paragraph);
         }
 
         //will all the string  replace implemented later.
@@ -388,6 +390,11 @@ namespace TPM
             {
                 replacedstring = replacedstring.Replace("[Prequal]", "");
             }
+
+           
+            
+                replacedstring = replacedstring.Replace("[TuaPayLink]", "");
+           
             db.Close();
             return replacedstring;
         }
@@ -578,89 +585,80 @@ namespace TPM
 
                 //   wisetackFooter = db.ExecuteScalar("Select [WisetackFooterMsg] from msSchedulerV3.dbo.tbl_CustCommunication where  CompanyID='" + CompanyID + "'");
 
-                //if (HttpContext.Current.Session["LoanInfo"] != null && (EmailType.Contains("Invoice") || (EmailType.Contains("Proposal"))))
-                //{
-                //    LoanInfo ln = (LoanInfo)HttpContext.Current.Session["LoanInfo"];
+                if (HttpContext.Current.Session["LoanInfo"] != null && (EmailType.Contains("Invoice") || (EmailType.Contains("Proposal"))))
+                {
+                  
+                    using (StreamReader reader = new StreamReader(HttpContext.Current.Server.MapPath("~/ProposalEmailTemplateBody.html")))
+                    {
+                        Emailbody = "<body><table style='max-width:800px; font-family:Arial;font-size:13px;'>" +
+                        "<tr><td align='left'><table width='100%'><tr><td>" +
+                        "<img src=\"cid:photo\"  id='img' alt='' style='max-height:60px;' height='60' /></td>" +
+                        "<td align='center' style='color:#2980b9; vertical-align:bottom;'>" +
+                        "</td></tr></table></td></tr>" +
+                        "<tr><td align='left' style='padding-left:5px;'>" +
+                        Emailbody +
+                               "</td></tr>";
+                        Emailbody += reader.ReadToEnd();
 
-                //    using (StreamReader reader = new StreamReader(HttpContext.Current.Server.MapPath("~/ProposalEmailTemplateBody.html")))
-                //    {
-                //        Emailbody = "<body><table style='max-width:800px; font-family:Arial;font-size:13px;'>" +
-                //        "<tr><td align='left'><table width='100%'><tr><td>" +
-                //        "<img src=\"cid:photo\"  id='img' alt='' style='max-height:60px;' height='60' /></td>" +
-                //        "<td align='center' style='color:#2980b9; vertical-align:bottom;'>" +
-                //        "</td></tr></table></td></tr>" +
-                //        "<tr><td align='left' style='padding-left:5px;'>" +
-                //        Emailbody +
-                //               "</td></tr>";
-                //        Emailbody += reader.ReadToEnd();
+                        string query = @"SELECT concat (c.FirstName,' ',c.LastName)as FullName,c.Address1,c.Email,c.Phone,CONVERT(VARCHAR(10), i.InvoiceDate, 101)as IssueDate,i.CompanyId, i.CustomerId, i.Subtotal, i.Number, i.UserId, i.Discount, i.Tax, i.Total, i.Status, i.InvoiceType, i.AmountCollect, i.AppointmentId, i.Note,
+                                         i.CreatedDate, i.CreatedBy, i.InvoiceDate, i.TaxType, i.Type, i.QboId, i.DiscountRate, i.DiscountOption, i.QboEstimateId, i.ExpirationDate, i.DepositAmount,
+                                         id.InvoiceNumber, id.RefId, id.InvoiceId, id.ItemId, id.Quantity, id.uPrice, id.ItemName, id.Description, id.TotalPrice,
+                                         id.ModifiedDate, id.ModifiedBy, id.ItemTyId, id.IsTaxable, id.ServiceDate
+                            FROM   tbl_Customer c INNER JOIN
+                                         tbl_Invoice i ON c.CompanyID = i.CompnyID AND c.CustomerID = i.CustomerId INNER JOIN
+                                         tbl_InvoiceDetails id ON i.id = id.RefId
+                            WHERE (i.CompnyID = N'" + HttpContext.Current.Session["CompanyID"].ToString() + "') AND (i.CustomerId = N'" + CustomerID + "') AND (i.id = N'" +  "')";
 
-                //        string query = @"SELECT concat (c.FirstName,' ',c.LastName)as FullName,c.Address1,c.Email,c.Phone,CONVERT(VARCHAR(10), i.InvoiceDate, 101)as IssueDate,i.CompanyId, i.CustomerId, i.Subtotal, i.Number, i.UserId, i.Discount, i.Tax, i.Total, i.Status, i.InvoiceType, i.AmountCollect, i.AppointmentId, i.Note,
-                //                         i.CreatedDate, i.CreatedBy, i.InvoiceDate, i.TaxType, i.Type, i.QboId, i.DiscountRate, i.DiscountOption, i.QboEstimateId, i.ExpirationDate, i.DepositAmount,
-                //                         id.InvoiceNumber, id.RefId, id.InvoiceId, id.ItemId, id.Quantity, id.uPrice, id.ItemName, id.Description, id.TotalPrice,
-                //                         id.ModifiedDate, id.ModifiedBy, id.ItemTyId, id.IsTaxable, id.ServiceDate
-                //            FROM   tbl_Customer c INNER JOIN
-                //                         tbl_Invoice i ON c.CompanyID = i.CompnyID AND c.CustomerID = i.CustomerId INNER JOIN
-                //                         tbl_InvoiceDetails id ON i.id = id.RefId
-                //            WHERE (i.CompnyID = N'" + HttpContext.Current.Session["CompanyID"].ToString() + "') AND (i.CustomerId = N'" + CustomerID + "') AND (i.id = N'" + ln.SalesID + "')";
+                        //  db.Open();
+                        DataTable dt_invocie = new DataTable();
 
-                //        //  db.Open();
-                //        DataTable dt_invocie = new DataTable();
+                        db.Execute(query, out dt_invocie);
+                        db.Close();
+                        if (dt_invocie.Rows.Count > 0)
+                        {
+                            DataRow dr = dt_invocie.Rows[0];
 
-                //        db.Execute(query, out dt_invocie);
-                //        db.Close();
-                //        if (dt_invocie.Rows.Count > 0)
-                //        {
-                //            DataRow dr = dt_invocie.Rows[0];
+                            Emailbody = Emailbody.Replace("{customerName}", dr["FullName"].ToString());
+                            Emailbody = Emailbody.Replace("{address}", dr["Address1"].ToString());
+                            Emailbody = Emailbody.Replace("{phone}", dr["Phone"].ToString());
+                            Emailbody = Emailbody.Replace("{email}", dr["Email"].ToString());
+                            Emailbody = Emailbody.Replace("{IssueDate}", dr["IssueDate"].ToString());
+                            Emailbody = Emailbody.Replace("{InvoiceNo}", dr["Number"].ToString());
+                            Emailbody = Emailbody.Replace("{InvoiceTotal}", dr["Total"].ToString());
+                            Emailbody = Emailbody.Replace("{SubTotal}", dr["Subtotal"].ToString());
+                            Emailbody = Emailbody.Replace("{Discount}", dr["Discount"].ToString());
+                            Emailbody = Emailbody.Replace("{Total}", dr["Total"].ToString());
+                            Emailbody = Emailbody.Replace("{Tax}", dr["Tax"].ToString());
 
-                //            Emailbody = Emailbody.Replace("{customerName}", dr["FullName"].ToString());
-                //            Emailbody = Emailbody.Replace("{address}", dr["Address1"].ToString());
-                //            Emailbody = Emailbody.Replace("{phone}", dr["Phone"].ToString());
-                //            Emailbody = Emailbody.Replace("{email}", dr["Email"].ToString());
-                //            Emailbody = Emailbody.Replace("{IssueDate}", dr["IssueDate"].ToString());
-                //            Emailbody = Emailbody.Replace("{InvoiceNo}", dr["Number"].ToString());
-                //            Emailbody = Emailbody.Replace("{InvoiceTotal}", dr["Total"].ToString());
-                //            Emailbody = Emailbody.Replace("{SubTotal}", dr["Subtotal"].ToString());
-                //            Emailbody = Emailbody.Replace("{Discount}", dr["Discount"].ToString());
-                //            Emailbody = Emailbody.Replace("{Total}", dr["Total"].ToString());
-                //            Emailbody = Emailbody.Replace("{Tax}", dr["Tax"].ToString());
+                            Emailbody = Emailbody.Replace("{DocType}", dr["Type"].ToString());
+                            Emailbody = Emailbody.Replace("[Discliemer]", "*All financing is subject to credit approval. Your terms may vary. Payment options through Wisetack are provided by our <a href='https://www.wisetack.com/lenders' style='color:blue'>lending partners</a>. For example, a $1,200 purchase could cost $104.89 a month for 12 months, based on an 8.9% APR, or $400 a month for 3 months, based on a 0% APR. Offers range from 0-35.9% APR based on creditworthiness. No other financing charges or participation fees. See additional terms at <a href='http://wisetack.com/faqs' style='color:blue'>http://wisetack.com/faqs</a>.");
 
-                //            Emailbody = Emailbody.Replace("{DocType}", dr["Type"].ToString());
-                //            Emailbody = Emailbody.Replace("[Discliemer]", "*All financing is subject to credit approval. Your terms may vary. Payment options through Wisetack are provided by our <a href='https://www.wisetack.com/lenders' style='color:blue'>lending partners</a>. For example, a $1,200 purchase could cost $104.89 a month for 12 months, based on an 8.9% APR, or $400 a month for 3 months, based on a 0% APR. Offers range from 0-35.9% APR based on creditworthiness. No other financing charges or participation fees. See additional terms at <a href='http://wisetack.com/faqs' style='color:blue'>http://wisetack.com/faqs</a>.");
+                            string itemDetails = "";
+                            foreach (DataRow d in dt_invocie.Rows)
+                            {
+                                itemDetails += "<tr style='border:1px solid #ddd; padding:.35em;'>" +
+                                   "<th colspan='3' style='padding: .625em; text-align: center; scope='row'>" + d["ItemName"] + "</th>" +
+                                   "<td colspan='4' style='padding: .625em; text-align: center;'>" + d["Description"] + "</td>" +
+                                   "<td colspan='2' style='padding: .625em; text-align: center;'>$ " + d["uPrice"] + "</td>" +
+                                   "<td colspan='1' style='padding: .625em; text-align: center;'>" + d["Quantity"] + "</td>" +
+                                   "<td colspan='2' style='padding: .625em; text-align: center;'>$ " + d["TotalPrice"] + "</td>" +
+                                   "</tr>";
+                            }
+                            Emailbody = Emailbody.Replace("{itemRow}", itemDetails);
+                        }
+                    }
 
-                //            string itemDetails = "";
-                //            foreach (DataRow d in dt_invocie.Rows)
-                //            {
-                //                itemDetails += "<tr style='border:1px solid #ddd; padding:.35em;'>" +
-                //                   "<th colspan='3' style='padding: .625em; text-align: center; scope='row'>" + d["ItemName"] + "</th>" +
-                //                   "<td colspan='4' style='padding: .625em; text-align: center;'>" + d["Description"] + "</td>" +
-                //                   "<td colspan='2' style='padding: .625em; text-align: center;'>$ " + d["uPrice"] + "</td>" +
-                //                   "<td colspan='1' style='padding: .625em; text-align: center;'>" + d["Quantity"] + "</td>" +
-                //                   "<td colspan='2' style='padding: .625em; text-align: center;'>$ " + d["TotalPrice"] + "</td>" +
-                //                   "</tr>";
-                //            }
-                //            Emailbody = Emailbody.Replace("{itemRow}", itemDetails);
-                //        }
-                //    }
+                  
+                   
+                        Emailbody = Emailbody.Replace("{isdisable}", "");
+                        Emailbody = Emailbody.Replace("{Status}", "");
+                   
+                    BodyText = "<br/><br/>" + Emailbody;
 
-                //    //Emailbody += body;
-                //    Emailbody = Emailbody.Replace("{AsLowAsAmount}", ln.AsLowAsAmount);
-                //    Emailbody = Emailbody.Replace("{paymentLink}", ln.PaymentLink);
-                //    if (ln.Status == "LOAN CONFIRMED")
-                //    {
-                //        Emailbody = Emailbody.Replace("{isdisable}", "pointer-events: none;opacity: 0.5; ");
-                //        Emailbody = Emailbody.Replace("{Status}", ln.Status);
-                //    }
-                //    else
-                //    {
-                //        Emailbody = Emailbody.Replace("{isdisable}", "");
-                //        Emailbody = Emailbody.Replace("{Status}", "");
-                //    }
-                //    BodyText = "<br/><br/>" + Emailbody;
-
-                //    // HttpContext.Current.Session["LoanInfo"] = null;
-                //}
-                //else
-                //{
+                    // HttpContext.Current.Session["LoanInfo"] = null;
+                }
+                else
+                {
                     BodyText = "<body><table style='max-width:800px; font-family:Arial;font-size:13px;'>" +
                  "<tr><td align='left'><table width='100%'><tr><td>" +
                  "<img src=\"cid:photo\"  id='img' alt='' style='max-height:60px;' height='60' /></td>" +
@@ -669,18 +667,37 @@ namespace TPM
                  "<tr><td align='left' style='padding-left:5px;'>" +
                  Emailbody +
                         "</td></tr>";
-                //}
-
-                if (EmailType == "Survey")
-                {
-                    string surveyUrl = HttpContext.Current.Session["SurveyUrl"].ToString();
-                    //string url = ConfigurationManager.AppSettings["SurveyResponse"].ToString() + CompanyGUID + "&CustomerID=" + CustomerID + "&CompanyID=" + CompanyID + "&Email=" + recepientEmail + "&SurveyID=" + SurveyID + "";
-                    BodyText = BodyText + "<tr><td> <br/><br/>Would you like to participate in a quick rating ?<br/> <br/> <a href='" + surveyUrl + "'><button  onMouseOver=\"this.style.cursor = 'pointer'\" style='display: inline-block; padding: 6px 12px; margin-bottom: 0; font-size: 14px;  font-weight: normal; " +
-                        "line-height: 1.42857143; text-align: center; white-space: nowrap;vertical-align: middle; cursor: pointer; background-color: #6c757d;color:white; border: 1px solid transparent;" +
-                        " border-radius: 4px; padding: 10px 16px; '> Start Rating </button></a></td></tr>";
-
-                    HttpContext.Current.Session["SurveyUrl"] = "";
                 }
+
+                // "Rating" is what CustomerList.aspx (manual "Send Rating Email") passes;
+                // "Survey" is kept for any caller still using the older type name. Without
+                // both, the Start Rating button was silently dropped and the customer
+                // received a rating email with no link.
+                if (EmailType == "Survey" || EmailType == "Rating")
+                {
+                    string surveyUrl = "";
+                    if (HttpContext.Current != null && HttpContext.Current.Session != null)
+                    {
+                        surveyUrl = Convert.ToString(HttpContext.Current.Session["SurveyUrl"]);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(surveyUrl))
+                    {
+                        BodyText = BodyText + "<tr><td> <br/><br/>Would you like to participate in a quick rating ?<br/> <br/> <a href='" + surveyUrl + "'><button  onMouseOver=\"this.style.cursor = 'pointer'\" style='display: inline-block; padding: 6px 12px; margin-bottom: 0; font-size: 14px;  font-weight: normal; " +
+                            "line-height: 1.42857143; text-align: center; white-space: nowrap;vertical-align: middle; cursor: pointer; background-color: #6c757d;color:white; border: 1px solid transparent;" +
+                            " border-radius: 4px; padding: 10px 16px; '> Start Rating </button></a></td></tr>";
+
+                        HttpContext.Current.Session["SurveyUrl"] = "";
+                    }
+                }
+
+                // Company email signature image (uploaded on Company.aspx), embedded as cid:signature.
+                string signaturePath = CECPro.Processor.EmailSignature.GetFilePath(CompanyID);
+                if (signaturePath != "")
+                {
+                    BodyText = BodyText + CECPro.Processor.EmailSignature.HtmlRow();
+                }
+
                 if (!string.IsNullOrEmpty(wisetackFooter) && wisetackFooter != "0")
                 {
                     BodyText = BodyText + "<tr><td> <br/><br/><hr/>" + wisetackFooter + "<br/> <br/></td></tr>";
@@ -690,24 +707,13 @@ namespace TPM
                 string attachedfileNames = "";
                 using (MailMessage mailMessage = new MailMessage())
                 {
-
-                    if (string.IsNullOrEmpty(EmailFrom) || EmailFrom == "0")
-                    {
-                        EmailFrom = "noreply@" + CompanyID + ".com";
-                    }
-
                     if (!string.IsNullOrEmpty(recepientToEmail))
                     {
                         string[] recepientToList = recepientToEmail.Split(',');
                         foreach (string multiple_email in recepientToList)
                         {
-
                             mailMessage.To.Add(new MailAddress(multiple_email));
                         }
-                    }
-                    if (string.IsNullOrEmpty(recepientToEmail))
-                    {
-                        mailMessage.To.Add(new MailAddress(EmailFrom));
                     }
                     if (!string.IsNullOrEmpty(recepientCCEmail))
                     {
@@ -715,7 +721,6 @@ namespace TPM
                         foreach (string multiple_email in recepientCCList)
                         {
                             mailMessage.CC.Add(new MailAddress(multiple_email));
-
                         }
                     }
 
@@ -728,7 +733,10 @@ namespace TPM
                         }
                     }
 
-
+                    if (string.IsNullOrEmpty(EmailFrom) || EmailFrom == "0")
+                    {
+                        EmailFrom = "support@" + CompanyID + ".com";
+                    }
 
                     if (!string.IsNullOrEmpty(prequalLink))
                     {
@@ -753,29 +761,21 @@ namespace TPM
                     mailMessage.Subject = subject;
                     mailMessage.Body = BodyText;
 
-                    if (!string.IsNullOrEmpty(CompanyLogoFile))
+                    // The logo (cid:photo) and the signature (cid:signature) are embedded in one
+                    // HTML view; without either image the plain Body above is enough.
+                    bool hasLogo = !string.IsNullOrEmpty(CompanyLogoFile) && File.Exists(LogoPath);
+                    if (hasLogo || signaturePath != "")
                     {
-                        if (File.Exists(LogoPath))
+                        AlternateView htmlview = AlternateView.CreateAlternateViewFromString(BodyText, null, "text/html");
+                        if (hasLogo)
                         {
-                            AlternateView htmlview = default(AlternateView);
-                            htmlview = AlternateView.CreateAlternateViewFromString(BodyText, null, "text/html");
-                            LinkedResource imageResourceEs = new LinkedResource(LogoPath, MediaTypeNames.Image.Jpeg)
-                            {
-                                ContentId = "photo"
-                            };
-                            //imageResourceEs.ContentId = "photo";
-                            //imageResourceEs.TransferEncoding = System.Net.Mime.TransferEncoding.Base64;
-                            htmlview.LinkedResources.Add(imageResourceEs);
-                            mailMessage.AlternateViews.Add(htmlview);
+                            htmlview.LinkedResources.Add(new LinkedResource(LogoPath, MediaTypeNames.Image.Jpeg) { ContentId = "photo" });
                         }
-                        else
+                        if (signaturePath != "")
                         {
-                            mailMessage.Body = BodyText;
+                            htmlview.LinkedResources.Add(CECPro.Processor.EmailSignature.CreateResource(signaturePath));
                         }
-                    }
-                    else
-                    {
-                        mailMessage.Body = BodyText;
+                        mailMessage.AlternateViews.Add(htmlview);
                     }
                     //Attaching uploded  document
                     // List<HttpPostedFile> tempAttachments = attachments;
@@ -847,16 +847,18 @@ namespace TPM
 
                     smtp.Send(mailMessage);
 
+                    // Quotes are escaped so a subject like "Don't miss..." cannot break the history
+                    // INSERT after the email has already gone out (which reported a sent email as failed).
                     string emailhistory = "INSERT INTO tbl_EmailHistory(id,CompanyID, CustomerID, Subject, EmailBody, EmailTo, EmailCC, EmailBCC, EmailType, SendBy)VALUES" +
                          "(" +
                          "'" + historyid + "'," +
                          "'" + CompanyID + "'," +
                          "'" + CustomerID + "'," +
-                         "'" + subject + "'," +
+                         "'" + (subject ?? "").Replace("'", "''") + "'," +
                          "'" + body.Replace("'", string.Empty) + "'," +
-                         "'" + recepientToEmail + "'," +
-                         "'" + recepientCCEmail + "'," +
-                         "'" + recepientBCCEmail + "'," +
+                         "'" + (recepientToEmail ?? "").Replace("'", "''") + "'," +
+                         "'" + (recepientCCEmail ?? "").Replace("'", "''") + "'," +
+                         "'" + (recepientBCCEmail ?? "").Replace("'", "''") + "'," +
                          "'" + EmailType + "'," +
                          "'" + SendBy + "'" +
 
@@ -970,7 +972,7 @@ namespace TPM
 
                     if (string.IsNullOrEmpty(EmailFrom) || EmailFrom == "0")
                     {
-                        EmailFrom = "noreply@" + CompanyID + ".com";
+                        EmailFrom = "support@" + CompanyID + ".com";
                     }
 
                     mailMessage.From = new MailAddress(EmailFrom);
@@ -1037,16 +1039,18 @@ namespace TPM
                     //  smtp.Port = int.Parse(ConfigurationManager.AppSettings["Port"]);
                     smtp.Send(mailMessage);
 
+                    // Quotes are escaped so a subject like "Don't miss..." cannot break the history
+                    // INSERT after the email has already gone out (which reported a sent email as failed).
                     string emailhistory = "INSERT INTO tbl_EmailHistory(id,CompanyID, CustomerID, Subject, EmailBody, EmailTo, EmailCC, EmailBCC, EmailType, SendBy)VALUES" +
                          "(" +
                          "'" + historyid + "'," +
                          "'" + CompanyID + "'," +
                          "'" + CustomerID + "'," +
-                         "'" + subject + "'," +
+                         "'" + (subject ?? "").Replace("'", "''") + "'," +
                          "'" + body.Replace("'", string.Empty) + "'," +
-                         "'" + recepientToEmail + "'," +
-                         "'" + recepientCCEmail + "'," +
-                         "'" + recepientBCCEmail + "'," +
+                         "'" + (recepientToEmail ?? "").Replace("'", "''") + "'," +
+                         "'" + (recepientCCEmail ?? "").Replace("'", "''") + "'," +
+                         "'" + (recepientBCCEmail ?? "").Replace("'", "''") + "'," +
                          "'" + EmailType + "'," +
                          "'" + SendBy + "'" +
 
@@ -1109,13 +1113,94 @@ namespace TPM
             }
         }
 
+        /// <summary>
+        /// Adds the appointments <paramref name="resourceId"/> is on as additional crew to a
+        /// schedule that Get_DateForPdfResource returned for them as lead.
+        ///
+        /// Returns the table sorted by start time, or the original table untouched if anything
+        /// at all goes wrong - a schedule listing only the jobs someone leads is worth far more
+        /// than a failed PDF.
+        /// </summary>
+        private DataTable AppendCrewAppointments(
+            DataTable appointments, string resourceId, string companyID, DateTime startDate, DateTime endDate)
+        {
+            try
+            {
+                if (appointments == null || !appointments.Columns.Contains("ApptID")) return appointments;
+
+                List<int> crewApptIds = new CECPro.AppointmentResourceProcessor()
+                    .GetApptIdsForResource(companyID, resourceId, startDate.Date, endDate.Date.AddDays(1));
+
+                if (crewApptIds.Count == 0) return appointments;
+
+                HashSet<string> alreadyListed = new HashSet<string>();
+                foreach (DataRow row in appointments.Rows)
+                {
+                    alreadyListed.Add(row["ApptID"].ToString().Trim());
+                }
+
+                List<string> missing = new List<string>();
+                foreach (int id in crewApptIds)
+                {
+                    if (!alreadyListed.Contains(id.ToString())) missing.Add(id.ToString());
+                }
+
+                if (missing.Count == 0) return appointments;
+
+                // "0" is this family of procedures' "every resource" - the dispatch board calls
+                // its sibling the same way. Only the rows for jobs already known to be this
+                // person's crew jobs are taken from it, so a procedure that ignored the token
+                // and filtered anyway can add nothing wrong, only nothing at all.
+                DataSet dsAll = new DataSet();
+                string crewConnStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
+
+                using (SqlConnection con = new SqlConnection(crewConnStr))
+                using (SqlCommand cmd = new SqlCommand("Get_DateForPdfResource", con))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.Add("@companyId", SqlDbType.VarChar).Value = companyID;
+                    cmd.Parameters.Add("@ResourceID", SqlDbType.VarChar).Value = "0";
+                    cmd.Parameters.Add("@StartDate", SqlDbType.VarChar).Value = startDate.ToString("yyyy-MM-dd");
+                    cmd.Parameters.Add("@EndDate", SqlDbType.VarChar).Value = endDate.ToString("yyyy-MM-dd");
+
+                    using (SqlDataAdapter dataAdapter = new SqlDataAdapter(cmd))
+                    {
+                        dataAdapter.Fill(dsAll);
+                    }
+                }
+
+                if (dsAll.Tables.Count < 2) return appointments;
+
+                foreach (DataRow row in dsAll.Tables[1].Rows)
+                {
+                    if (missing.Contains(row["ApptID"].ToString().Trim()))
+                    {
+                        appointments.ImportRow(row);
+                    }
+                }
+
+                // Merged rows land at the end, which would print the day out of order.
+                if (appointments.Columns.Contains("StartDateTime") && appointments.Rows.Count > 0)
+                {
+                    return appointments.Select("", "StartDateTime asc").CopyToDataTable();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    "Resource PDF: crew jobs not merged, showing led jobs only - " + ex.Message);
+            }
+
+            return appointments;
+        }
+
         public byte[] CreatePdfForResource(string ResourceID, string CompanyID, DateTime _StartDate, DateTime _EndDate)
         {
             string Host = "";
 
             string body = string.Empty;
 
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
 
             DateTime EndDate = Convert.ToDateTime(_EndDate).AddDays(-1);
             if (_StartDate > EndDate)
@@ -1162,6 +1247,14 @@ namespace TPM
                 {
                     DataTable Resources = ds.Tables[0];
                     DataTable Appointment = ds.Tables[1];
+
+                    // Get_DateForPdfResource filters on tbl_Appointment.ResourceID - the LEAD -
+                    // so a resource's schedule left out every job they are on as additional
+                    // crew. For someone who is mostly a helper that is a blank page. The
+                    // procedure is not in this repo to change, so the jobs it missed are pulled
+                    // with the same procedure unfiltered and merged in.
+                    Appointment = AppendCrewAppointments(
+                        Appointment, ResourceID, CompanyID, _StartDate, EndDate);
                     DataTable ServiceType = ds.Tables[2];
                     DataTable TimeBlocks = ds.Tables[3];
 
@@ -1490,6 +1583,7 @@ namespace TPM
                 initialYPosition = pdfDoc.PageSize.Height * 0.16f - totalHeight;
             }
 
+            AppendTuaPayLinkParagraph(pdfDoc);
             pdfDoc.Close();
             byte[] bytes = memoryStream.ToArray();
             memoryStream.Close();
@@ -1519,7 +1613,7 @@ namespace TPM
             string CompanyTwitter = "";
             string CompanyFullName = "";
 
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database db = new Database(connStr);
 
             string sSQL = @"SELECT concat (FirstName,' ',LastName)as FullName,CASE WHEN dbo.tbl_Customer.BusinessID = 0 THEN 1 ELSE 2 END as ctype,ISNULL(dbo.tbl_Customer.QboId, N'0') as qboCustID,* FROM[msSchedulerV3].[dbo].[tbl_Customer] Where CustomerId='" + CustomerID + "' and  CompanyID =@CompanyID  ;";
@@ -1623,6 +1717,7 @@ namespace TPM
                 initialYPosition = pdfDoc.PageSize.Height * 0.16f - totalHeight;
             }
 
+            AppendTuaPayLinkParagraph(pdfDoc);
             pdfDoc.Close();
             byte[] bytes = memoryStream.ToArray();
             memoryStream.Close();
@@ -1694,7 +1789,7 @@ namespace TPM
                 var wtEstimate = InvoiceWT(CustomerID, InvoiceNo, doctype, CSPaymentLink, false, depoReqAmt);
                 return wtEstimate;
             }
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database db = new Database(connStr);
 
             string sSQL = @"SELECT concat (FirstName,' ',LastName)as FullName,CASE WHEN dbo.tbl_Customer.BusinessID = 0 THEN 1 ELSE 2 END as ctype,ISNULL(dbo.tbl_Customer.QboId, N'0') as qboCustID,* FROM[msSchedulerV3].[dbo].[tbl_Customer] Where CustomerId='" + CustomerID + "' and  CompanyID =@CompanyID  ;";
@@ -1849,27 +1944,15 @@ namespace TPM
             }
             //add wisetack Loan Info  into pdf start
             string paylink = "";
-            //if (HttpContext.Current.Session["LoanInfo"] != null)
-            //{
-            //    LoanInfo ln = (LoanInfo)HttpContext.Current.Session["LoanInfo"];
-            //    if (!string.IsNullOrEmpty(ln.AsLowAsAmount))
-            //    {
-            //        body = body.Replace("{AsLowAsAmount}", ln.AsLowAsAmount);
-            //    }
-            //    else
-            //    {
-            //        body = body.Replace("{AsLowAsAmount}", "");
-            //    }
-            //    paylink = ln.PaymentLink;
-            //    body = body.Replace("{PaymentLink}", ln.PaymentLink);
-
-            //    body = body.Replace("{wisetackclicktext}", "Click this link to see your financing options");
-            //}
-            //else
-            //{
+            if (HttpContext.Current.Session["LoanInfo"] != null)
+            {
+               
+            }
+            else
+            {
                 body = body.Replace("{AsLowAsAmount}", "");
                 body = body.Replace("{wisetackclicktext}", "");
-         //   }
+            }
             //add wisetack Loan Info  into pdf end
             if (!string.IsNullOrEmpty(CSPaymentLink))
             {
@@ -1989,6 +2072,7 @@ namespace TPM
                 initialYPosition = pdfDoc.PageSize.Height * 0.18f - totalHeight;
             }
 
+            AppendTuaPayLinkParagraph(pdfDoc);
             pdfDoc.Close();
             byte[] bytes = memoryStream.ToArray();
             memoryStream.Close();
@@ -2033,7 +2117,7 @@ namespace TPM
                 var pgEstimate = EstimateWT(CustomerID, InvoiceNo, doctype, CSPaymentLink, false, depoReqAmt);
                 return pgEstimate;
             }
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database db = new Database(connStr);
 
             string sSQL = @"SELECT concat (FirstName,' ',LastName)as FullName,CASE WHEN dbo.tbl_Customer.BusinessID = 0 THEN 1 ELSE 2 END as ctype,ISNULL(dbo.tbl_Customer.QboId, N'0') as qboCustID,* FROM[msSchedulerV3].[dbo].[tbl_Customer] Where CustomerId='" + CustomerID + "' and  CompanyID =@CompanyID  ;";
@@ -2178,10 +2262,15 @@ namespace TPM
 
             //add wisetack Loan Info  into pdf start
             string paylink = "";
-          
+            if (HttpContext.Current.Session["LoanInfo"] != null)
+            {
+               
+            }
+            else
+            {
                 body = body.Replace("{AsLowAsAmount}", "");
                 body = body.Replace("{wisetackclicktext}", "");
-           
+            }
             //add wisetack Loan Info  into pdf end
             if (!string.IsNullOrEmpty(CSPaymentLink))
             {
@@ -2304,6 +2393,7 @@ namespace TPM
                 initialYPosition = pdfDoc.PageSize.Height * 0.18f - totalHeight;
             }
 
+            AppendTuaPayLinkParagraph(pdfDoc);
             pdfDoc.Close();
             byte[] bytes = memoryStream.ToArray();
             memoryStream.Close();
@@ -2319,7 +2409,7 @@ namespace TPM
             string SignaturePath = "";
             string paylink = "";
 
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database db = new Database(connStr);
 
             string sSQL = "";
@@ -2453,7 +2543,7 @@ namespace TPM
 
             if (HttpContext.Current.Session["LoanInfo"] != null)
             {
-               
+              
             }
             else
             {
@@ -2620,6 +2710,7 @@ namespace TPM
                     pdfDoc.Add(table);
                 }
 
+                AppendTuaPayLinkParagraph(pdfDoc);
                 pdfDoc.Close();
                 return ms.ToArray();
             }
@@ -2633,7 +2724,7 @@ namespace TPM
             string SignaturePath = "";
             string paylink = "";
 
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database db = new Database(connStr);
 
             string sSQL = "";
@@ -2937,67 +3028,65 @@ namespace TPM
                     pdfDoc.Add(table);
                 }
 
+                AppendTuaPayLinkParagraph(pdfDoc);
                 pdfDoc.Close();
                 return ms.ToArray();
             }
         }
 
-        public void SendText(string sMobile, string customerID, string sSMSText, string sSMSType, string CompanyID, Database db)
+        public void SendText(string sMobile, string sSMSText, string sSMSType, string CompanyID, Database db)
         {
             string response = "";
             string strSQL = "";
 
             try
             {
-                TwilioSMSService twilioSMSService = new TwilioSMSService();
-                string smsSid = twilioSMSService.SendSMS(sMobile, sSMSText, CompanyID);
-               // twilioSMSService.LogSMS(CompanyID, customerID, "", "", sMobile, sSMSType, sSMSText, smsSid);
                 // WriteLog("Sending call, PhoneNumber: " + PhoneNumber + " Company: " + CompanyID + " WO: " + WorkOrder);
 
-                //ASCIIEncoding encoding = new ASCIIEncoding();
+                ASCIIEncoding encoding = new ASCIIEncoding();
 
-                //string JPUserID = ConfigurationManager.AppSettings["JPUser"].ToString();
-                //string JPPassword = ConfigurationManager.AppSettings["JPPassword"].ToString();
-                //string SMSID = "sms" + Guid.NewGuid().ToString().Substring(0, 8);
+                string JPUserID = ConfigurationManager.AppSettings["JPUser"].ToString();
+                string JPPassword = ConfigurationManager.AppSettings["JPPassword"].ToString();
+                string SMSID = "sms" + Guid.NewGuid().ToString().Substring(0, 8);
 
-                //string postData = "USER=" + JPUserID;
-                //postData += "&PASSWORD=" + JPPassword;
-                //postData += "&PHONE=" + sMobile;
-                //postData += "&MESSAGE=" + sSMSText;
-                //postData += "&UniID=" + SMSID;
+                string postData = "USER=" + JPUserID;
+                postData += "&PASSWORD=" + JPPassword;
+                postData += "&PHONE=" + sMobile;
+                postData += "&MESSAGE=" + sSMSText;
+                postData += "&UniID=" + SMSID;
 
-                //byte[] data = encoding.GetBytes(postData);
+                byte[] data = encoding.GetBytes(postData);
 
-                //// Prepare web request...
-                //HttpWebRequest request = (HttpWebRequest)WebRequest.Create("http://cportal.justpressone.com/WebService/SendText/index.cfm");
-                //request.Method = "POST";
-                //request.ContentType = "application/x-www-form-urlencoded";
-                //request.ContentLength = data.Length;
+                // Prepare web request...
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create("http://cportal.justpressone.com/WebService/SendText/index.cfm");
+                request.Method = "POST";
+                request.ContentType = "application/x-www-form-urlencoded";
+                request.ContentLength = data.Length;
 
-                //Stream newStream = request.GetRequestStream();
-                //// Send the data.
-                //newStream.Write(data, 0, data.Length);
-                //newStream.Close();
+                Stream newStream = request.GetRequestStream();
+                // Send the data.
+                newStream.Write(data, 0, data.Length);
+                newStream.Close();
 
-                //HttpWebResponse httpWebResponse = (HttpWebResponse)request.GetResponse();
-                //Stream responseStream = httpWebResponse.GetResponseStream();
-                //StreamReader reader = new StreamReader(responseStream, System.Text.Encoding.UTF8);
-                //response = reader.ReadToEnd();
+                HttpWebResponse httpWebResponse = (HttpWebResponse)request.GetResponse();
+                Stream responseStream = httpWebResponse.GetResponseStream();
+                StreamReader reader = new StreamReader(responseStream, System.Text.Encoding.UTF8);
+                response = reader.ReadToEnd();
 
-                //responseStream.Close();
-                //reader.Close();
+                responseStream.Close();
+                reader.Close();
 
-                //strSQL = "INSERT INTO tbl_SMSLog " +
-                //      "(CompanyID,SMSID,MobileNumber,SMSType,Message,Response) " +
-                //      " VALUES (" +
-                //     "'" + CompanyID + "'," +
-                //     "'" + SMSID + "'," +
-                //     "'" + sMobile + "'," +
-                //     "'" + sSMSType + "'," +
-                //     "'" + sSMSText + "'," +
-                //     "'" + response + "')";
+                strSQL = "INSERT INTO tbl_SMSLog " +
+                      "(CompanyID,SMSID,MobileNumber,SMSType,Message,Response) " +
+                      " VALUES (" +
+                     "'" + CompanyID + "'," +
+                     "'" + SMSID + "'," +
+                     "'" + sMobile + "'," +
+                     "'" + sSMSType + "'," +
+                     "'" + sSMSText + "'," +
+                     "'" + response + "')";
 
-                //db.Execute(strSQL);
+                db.Execute(strSQL);
             }
             catch (Exception ex)
             {
@@ -3005,7 +3094,79 @@ namespace TPM
             }
         }
 
-    
+        public void GetWiseTackPaymentLink(string InvoiceNo, string CustomerID)
+        {
+            if (HttpContext.Current.Session["IsWisetackEnabled"] == null)
+            {
+                return;
+            }
+            if (HttpContext.Current.Session["isShowWisetack"] == null)
+            {
+                return;
+            }
+            HttpContext.Current.Session["LoanInfo"] = null;
+            string jsonString = "";
+          
+            string companyid = HttpContext.Current.Session["CompanyID"].ToString();
+            bool bWisetack = false;
+           
+            if (bWisetack)
+            {
+                //wisetackDiv.Visible = true;
+
+                DataTable custData;
+                DataTable invData;
+                DataSet dataset = GetInvoiceData(InvoiceNo, CustomerID);
+                custData = dataset.Tables[0];
+                invData = dataset.Tables[1];
+
+                if (custData.Rows.Count > 0)
+                {
+                    DataRow dr1 = custData.Rows[0];
+                    DataRow dr2 = invData.Rows[0];
+                    if (dr1["ctype"].ToString() == "2")
+                    {
+                        return;
+                    }
+                    string Fname = dr1["FullName"].ToString();
+                    string Email = dr1["Email"].ToString();
+                    string InvoiceNumber = dr2["Number"].ToString();
+
+                    string invoiceAmount = "0.00";
+                    DateTime invoiceDate = DateTime.Now;
+                    string mobileNo = "";
+                    if (dr2["amountCollect"] != null)
+                    {
+                        invoiceAmount = (Convert.ToDecimal(dr2["Total"].ToString()) - Convert.ToDecimal(dr2["amountCollect"].ToString())).ToString($"F{2}");
+                        if (invoiceAmount == "0.00")
+                        {
+                            invoiceAmount = dr2["Total"].ToString();
+                        }
+                    }
+                    else
+                    {
+                        invoiceAmount = dr2["Total"].ToString();
+                    }
+                    if (dr2["InvoiceDate"] != null)
+                    {
+                        try
+                        {
+                            invoiceDate = Convert.ToDateTime(dr2["InvoiceDate"].ToString());
+                        }
+                        catch { }
+                    }
+                    if (dr1["Mobile"] != null)
+                    {
+                        mobileNo = dr1["Mobile"].ToString();
+                    }
+                    else
+                    {
+                        mobileNo = dr1["Phone"].ToString();
+                    }
+                   
+                }
+            }
+        }
         private static DataSet GetInvoiceData(string InvoiceNo, string CustomerID)
         {
             // InvoiceNo = Common.CleanInput(InvoiceNo);
@@ -3013,7 +3174,7 @@ namespace TPM
 
             StringBuilder table2 = new StringBuilder();
 
-            Database db = new Database(ConfigurationManager.AppSettings["ConnString"].ToString());
+            Database db = new Database(ConfigurationManager.AppSettings["ConnStrSch"].ToString());
 
             string sSQL = @"SELECT concat (FirstName,' ',LastName)as FullName,CASE WHEN dbo.tbl_Customer.BusinessID = 0 THEN 1 ELSE 2 END as ctype,ISNULL(dbo.tbl_Customer.QboId, N'0') as qboCustID,* FROM[msSchedulerV3].[dbo].[tbl_Customer] Where CustomerId='" + CustomerID + "' and  CompanyID =@CompanyID  ;";
 
@@ -3037,7 +3198,7 @@ namespace TPM
             string body = string.Empty;
             string paylink = "";
 
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database db = new Database(connStr);
 
             string sSQL = "";
@@ -3146,10 +3307,15 @@ namespace TPM
             body = body.Replace("${itemRow}", itemRows);
 
 
-           
+            if (HttpContext.Current.Session["LoanInfo"] != null)
+            {
+              
+            }
+            else
+            {
                 body = body.Replace("{AsLowAsAmount}", "");
                 body = body.Replace("{wisetackclicktext}", "");
-           
+            }
             //add wisetack Loan Info  into pdf end
             if (!string.IsNullOrEmpty(CSPaymentLink))
             {
@@ -3243,6 +3409,7 @@ namespace TPM
                     pdfDoc.Add(table);
                 }
 
+                AppendTuaPayLinkParagraph(pdfDoc);
                 pdfDoc.Close();
                 return ms.ToArray();
             }
@@ -3257,7 +3424,7 @@ namespace TPM
             string body = string.Empty;
             string paylink = "";
 
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database db = new Database(connStr);
 
             string sSQL = "";
@@ -3366,7 +3533,15 @@ namespace TPM
             body = body.Replace("${itemRow}", itemRows);
 
 
-        
+            if (HttpContext.Current.Session["LoanInfo"] != null)
+            {
+               
+            }
+            else
+            {
+                body = body.Replace("{AsLowAsAmount}", "");
+                body = body.Replace("{wisetackclicktext}", "");
+            }
             //add wisetack Loan Info  into pdf end
             if (!string.IsNullOrEmpty(CSPaymentLink))
             {
@@ -3460,6 +3635,7 @@ namespace TPM
                     pdfDoc.Add(table);
                 }
 
+                AppendTuaPayLinkParagraph(pdfDoc);
                 pdfDoc.Close();
                 return ms.ToArray();
             }
@@ -3473,7 +3649,7 @@ namespace TPM
             string body = string.Empty;
             string paylink = "";
 
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database db = new Database(connStr);
 
             string sSQL = "";
@@ -3489,7 +3665,7 @@ namespace TPM
             sSQL += "SELECT inv.TotalPrice, inv.Description, inv.Quantity, inv.uPrice,inv.servicedate, " +
                     "i.Name AS ItemName FROM msSchedulerV3.dbo.Items i " +
                     "INNER JOIN msSchedulerV3.dbo.tbl_InvoiceDetails inv ON i.Id = inv.ItemId AND i.CompanyID = inv.CompanyID " +
-                    "WHERE inv.RefId='" + InvoiceNo + "' AND inv.CompanyID = @CompanyID;";
+                    "WHERE inv.RefId='" + InvoiceNo + "' AND inv.CompanyID = @CompanyID order by  CAST(NULLIF(inv.LineNum,'') AS INT) asc;";
 
             sSQL += "SELECT * FROM msSchedulerV3.dbo.tbl_Company WHERE CompanyID = @CompanyID;";
             sSQL += "SELECT * FROM msSchedulerV3.dbo.tbl_DisclaimerSettings WHERE CompanyID = @CompanyID;";
@@ -3583,7 +3759,15 @@ namespace TPM
             body = body.Replace("${itemRow}", itemRows);
 
 
-          
+            if (HttpContext.Current.Session["LoanInfo"] != null)
+            {
+               
+            }
+            else
+            {
+                body = body.Replace("{AsLowAsAmount}", "");
+                body = body.Replace("{wisetackclicktext}", "");
+            }
             //add wisetack Loan Info  into pdf end
             if (!string.IsNullOrEmpty(CSPaymentLink))
             {
@@ -3677,6 +3861,7 @@ namespace TPM
                     pdfDoc.Add(table);
                 }
 
+                AppendTuaPayLinkParagraph(pdfDoc);
                 pdfDoc.Close();
                 return ms.ToArray();
             }
@@ -3690,7 +3875,7 @@ namespace TPM
             string body = string.Empty;
             string paylink = "";
 
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database db = new Database(connStr);
 
             string sSQL = "";
@@ -3706,7 +3891,7 @@ namespace TPM
             sSQL += "SELECT inv.TotalPrice, inv.Description, inv.Quantity, inv.uPrice,inv.servicedate, " +
                     "i.Name AS ItemName FROM msSchedulerV3.dbo.Items i " +
                     "INNER JOIN msSchedulerV3.dbo.tbl_InvoiceDetails inv ON i.Id = inv.ItemId AND i.CompanyID = inv.CompanyID " +
-                    "WHERE inv.RefId='" + InvoiceNo + "' AND inv.CompanyID = @CompanyID;";
+                    "WHERE inv.RefId='" + InvoiceNo + "' AND inv.CompanyID = @CompanyID order by  CAST(NULLIF(inv.LineNum,'') AS INT) asc;";
 
             sSQL += "SELECT * FROM msSchedulerV3.dbo.tbl_Company WHERE CompanyID = @CompanyID;";
             sSQL += "SELECT * FROM msSchedulerV3.dbo.tbl_DisclaimerSettings WHERE CompanyID = @CompanyID;";
@@ -3800,7 +3985,15 @@ namespace TPM
             body = body.Replace("${itemRow}", itemRows);
 
 
-          
+            if (HttpContext.Current.Session["LoanInfo"] != null)
+            {
+              
+            }
+            else
+            {
+                body = body.Replace("{AsLowAsAmount}", "");
+                body = body.Replace("{wisetackclicktext}", "");
+            }
             //add wisetack Loan Info  into pdf end
             if (!string.IsNullOrEmpty(CSPaymentLink))
             {
@@ -3894,6 +4087,1103 @@ namespace TPM
                     pdfDoc.Add(table);
                 }
 
+                AppendTuaPayLinkParagraph(pdfDoc);
+                pdfDoc.Close();
+                return ms.ToArray();
+            }
+        }
+
+        public byte[] EstimateWithoutDiscountPdf(string CustomerID, string InvoiceNo, string doctype, string CSPaymentLink, bool IsInvoiceWithoutDiscount, decimal depoReqAmt = 0)
+        {
+            CustomerID = Common.CleanInput(CustomerID);
+            string Host = "";
+            string LogoPath = "";
+            string body = string.Empty;
+            string MailTo = "";
+            string ProposalMailSubject = "";
+            string ProposalMailBody = "";
+            string CompanyLogoFile = "";
+
+            string CompanyAddress = "";
+            string CompanyCity = "";
+            string CompanyState = "";
+            string CompanyZipCode = "";
+            string CompanyPhone = "";
+            string CompanyEmail = "";
+            string CompanyWebsite = "";
+            string CompanyFacebook = "";
+            string CompanyTwitter = "";
+            string CompanyFullName = "";
+
+            //if (HttpContext.Current.Session["CompanyType"].ToString() == "LHG")
+            //{
+            //    var lhgEstimate = EstimatePdfLHG(CustomerID, InvoiceNo, doctype, CSPaymentLink, false, depoReqAmt);
+            //    return lhgEstimate;
+            //}
+            //if (HttpContext.Current.Session["CompanyID"].ToString() == "14557")
+            //{
+            //    var pgEstimate = EstimatePG(CustomerID, InvoiceNo, doctype, CSPaymentLink, false, depoReqAmt);
+            //    return pgEstimate;
+            //}
+            if (HttpContext.Current.Session["CompanyID"].ToString() == "14570")
+            {
+                var pgEstimate = EstimateWithOutDiscountWT(CustomerID, InvoiceNo, doctype, CSPaymentLink, false, depoReqAmt);
+                return pgEstimate;
+            }
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
+            Database db = new Database(connStr);
+
+            string sSQL = @"SELECT concat (FirstName,' ',LastName)as FullName,CASE WHEN dbo.tbl_Customer.BusinessID = 0 THEN 1 ELSE 2 END as ctype,ISNULL(dbo.tbl_Customer.QboId, N'0') as qboCustID,* FROM[msSchedulerV3].[dbo].[tbl_Customer] Where CustomerId='" + CustomerID + "' and  CompanyID =@CompanyID  ;";
+
+            sSQL += @"SELECT CONVERT(VARCHAR(10), InvoiceDate, 101)as IssueDate,convert(varchar, ExpirationDate, 107) as ExpDate,ISNULL(dbo.tbl_Invoice.QboId, N'0') as qboInvID,ISNULL(dbo.tbl_Invoice.QboEstimateId, 0) as qboEstID,isnull([AmountCollect],0.00) as DepositAmount,Discount,Tax,isNULL(RequestedDepoAmt,0)ReqDepo,(Total- (isnull(AmountCollect,0.00))) as Due,* FROM[msSchedulerV3].[dbo].[tbl_Invoice] Where  CustomerId='" + CustomerID + "' and id='" + InvoiceNo + "' and CompnyID =@CompanyID;";
+
+            sSQL += "SELECT inv.TotalPrice,inv.Description,inv.Quantity,inv.uPrice, inv.TotalPrice,inv.ItemId AS ID, i.Name AS ItemName FROM msSchedulerV3.dbo.Items as i INNER JOIN " +
+                 "             msSchedulerV3.dbo.tbl_InvoiceDetails as inv ON i.Id = inv.ItemId and i.CompanyID = inv.CompanyID Where inv.RefId='" + InvoiceNo + "' and  inv.CompanyID =@CompanyID order by CAST(NULLIF(inv.LineNum,'') AS INT) asc ;";
+
+            sSQL += @"select * from [msSchedulerV3].[dbo].[tbl_Company] Where CompanyID =@CompanyID;";
+
+            sSQL += @"SELECT [CompanyID]
+                            ,[QuoteDisclaimer]
+                          ,[InvoiceDisclaimer]
+                          ,[CreatedDateTime]
+                      FROM [msSchedulerV3].[dbo].[tbl_DisclaimerSettings] where CompanyID =@CompanyID";
+
+            DataSet dataSet = db.Get_DataSet(sSQL, HttpContext.Current.Session["CompanyID"].ToString());
+
+            string Disclaimer = "";
+            DataTable dt_Disclaimer = dataSet.Tables[4];
+            if (dt_Disclaimer.Rows.Count > 0)
+            {
+                DataRow Rs = dt_Disclaimer.Rows[0];
+                if (doctype == "Invoice")
+                {
+                    Disclaimer = Rs["InvoiceDisclaimer"].ToString();
+                }
+                else
+                {
+                    Disclaimer = Rs["QuoteDisclaimer"].ToString();
+                }
+            }
+
+            if (IsInvoiceWithoutDiscount)
+            {
+                using (StreamReader reader = new StreamReader(HttpContext.Current.Server.MapPath("~/ProposalEmailTemplateWithoutDiscount.html")))
+                {
+                    body = reader.ReadToEnd();
+                }
+            }
+            else
+            {
+                using (StreamReader reader = new StreamReader(HttpContext.Current.Server.MapPath("~/ProposalEmailTemplate.html")))
+                {
+                    body = reader.ReadToEnd();
+                }
+            }
+
+            DataTable dt_Company = new DataTable();
+            dt_Company = dataSet.Tables[3];
+            string companyLogo = "";
+            if (dt_Company.Rows.Count > 0)
+            {
+                DataRow Rs = dt_Company.Rows[0];
+                CompanyAddress = Rs["Address"].ToString();
+                CompanyCity = Rs["City"].ToString();
+                CompanyState = Rs["State"].ToString();
+                CompanyZipCode = Rs["ZipCode"].ToString();
+                CompanyPhone = Rs["Phone"].ToString();
+                CompanyEmail = Rs["Email"].ToString();
+                CompanyWebsite = Rs["Website"].ToString();
+                CompanyFacebook = Rs["Facebook"].ToString();
+                CompanyTwitter = Rs["Twitter"].ToString();
+                CompanyLogoFile = Rs["LogoFile"].ToString();
+                CompanyFullName = Rs["CompanyName"].ToString();
+                companyLogo = Rs["LogoFile"].ToString();
+            }
+            LogoPath = HttpContext.Current.Server.MapPath("~/CompanyLogo/" + companyLogo);
+            if (!File.Exists(LogoPath))
+            {
+                LogoPath = HttpContext.Current.Server.MapPath("~/crv_sched/img/logo/central.png");
+            }
+            string SignaturePath = HttpContext.Current.Server.MapPath("~/images/Signature.PNG");
+            if (!File.Exists(SignaturePath))
+            {
+                SignaturePath = HttpContext.Current.Server.MapPath("~/images/Signature.PNG");
+            }
+
+            DataTable customer = dataSet.Tables[0];
+            int count = 0;
+            if (customer.Rows.Count > 0)
+            {
+                DataRow dr = customer.Rows[0];
+
+                body = body.Replace("{customerName}", dr["FullName"].ToString());
+                body = body.Replace("{address}", dr["Address1"].ToString());
+                body = body.Replace("{phone}", dr["Phone"].ToString());
+                body = body.Replace("{email}", dr["Email"].ToString());
+                body = body.Replace("{image}", LogoPath);
+                body = body.Replace("{Signatureimage}", SignaturePath);
+
+                DataTable inv = dataSet.Tables[1];
+
+                if (inv.Rows.Count > 0)
+                {
+                    DataRow dr2 = inv.Rows[0];
+
+                    body = body.Replace("{IssueDate}", dr2["IssueDate"].ToString());
+                    body = body.Replace("{InvoiceNo}", dr2["Number"].ToString());
+                    body = body.Replace("{InvoiceTotal}", dr2["Total"].ToString());
+                    body = body.Replace("{SubTotal}", dr2["Subtotal"].ToString());
+                    body = body.Replace("{Discount}", dr2["Discount"].ToString());
+                    body = body.Replace("{Total}", dr2["Total"].ToString());
+                    body = body.Replace("{Tax}", dr2["Tax"].ToString());
+                    body = body.Replace("{Deposit}", dr2["DepositAmount"].ToString());
+                    body = body.Replace("{BalanceDue}", dr2["Due"].ToString());
+                    body = body.Replace("{DocType}", doctype);
+                    body = body.Replace("{ReqDepo}", depoReqAmt.ToString());
+                }
+                int rowcount = 0;
+                MailTo = dr["Email"].ToString();
+                string itemDetails = "";
+                if (dataSet.Tables[2].Rows.Count > 0)
+                {
+                    count = dataSet.Tables[2].Rows.Count;
+
+                    DataTable dt = dataSet.Tables[2];
+
+                    foreach (DataRow d in dt.Rows)
+                    {
+                        rowcount += 1;
+                        Int32 qty = 0;
+                        try
+                        {
+                            qty = Convert.ToInt32(d["Quantity"]);
+                        }
+                        catch { }
+
+                        itemDetails += "<tr>" +
+                                "<td width='28%' style='border:none; min-width:28%;max-width:28%;text-align: left;margin-left:3px;'>" + d["ItemName"] + "</td>" +
+                                "<td width='45%' style='border:none; min-width:45%;max-width:45%;text-align: left;margin-left:3px;'>" + d["Description"] + "</td>" +
+                                  "<td width='7%' style='border:none; min-width:7%;max-width:7%;text-align: center;'>" + qty + "</td>" +
+                                 "<td width='10%' style='border:none; min-width:10%;max-width:10%;text-align: center;'>$" + d["uPrice"] + "</td>" +
+                                "<td width='10%' style='border:none; min-width:10%;max-width:10%;text-align: center;'>$" + d["TotalPrice"] + "</td>" +
+                                "</tr>";
+                    }
+                }
+
+                body = body.Replace("{itemRow}", itemDetails);
+            }
+
+            //add wisetack Loan Info  into pdf start
+            string paylink = "";
+            if (HttpContext.Current.Session["LoanInfo"] != null)
+            {
+               
+            }
+            else
+            {
+                body = body.Replace("{AsLowAsAmount}", "");
+                body = body.Replace("{wisetackclicktext}", "");
+            }
+            //add wisetack Loan Info  into pdf end
+            if (!string.IsNullOrEmpty(CSPaymentLink))
+            {
+                body = body.Replace("{CSclicktext}", "");
+            }
+            else
+            {
+                body = body.Replace("{CSclicktext}", "");
+            }
+            if (!string.IsNullOrEmpty(paylink))
+            {
+                body = body.Replace("[Disclimer]", "*All financing is subject to credit approval. Your terms may vary. Payment options through Wisetack are provided by our <a href='https://www.wisetack.com/lenders' style='color:blue'>lending partners</a>. For example, a $1,200 purchase could cost $104.89 a month for 12 months, based on an 8.9% APR, or $400 a month for 3 months, based on a 0% APR. Offers range from 0-35.9% APR based on creditworthiness. No other financing charges or participation fees. See additional terms at  <a href='http://wisetack.com/faqs' style='color:blue'>http://wisetack.com/faqs</a>.");
+
+                body = body.Replace("{CSclicktext}", "Click this link to pay now");
+            }
+            else
+            {
+                body = body.Replace("[Disclimer]", Disclaimer);
+
+                body = body.Replace("{CSclicktext}", "");
+            }
+
+            StringReader sr = new StringReader(body);
+
+            Document pdfDoc = new Document(PageSize.A4, 40f, 40f, 40f, 10f);
+
+            HTMLWorker htmlparser = new HTMLWorker(pdfDoc);
+
+            MemoryStream memoryStream = new MemoryStream();
+
+            PdfWriter writer = PdfWriter.GetInstance(pdfDoc, memoryStream);
+
+            pdfDoc.Open();
+
+            htmlparser.Parse(sr);
+            PdfContentByte cb = writer.DirectContent;
+            BaseFont font = BaseFont.CreateFont();
+
+            float buttonWidth = 150; // Width of the button
+            float buttonHeight = 30; // Height of the button
+            float verticalSpacing = 5; // Vertical spacing between buttons
+
+            float initialYPosition = pdfDoc.PageSize.Height * 0.12f; // Initial position at 65% from the top
+            float totalHeight = count * (buttonHeight + verticalSpacing); // Total height needed for all buttons
+            int c = 0;
+            if (!string.IsNullOrEmpty(paylink))
+            {
+                c += 1;
+                Rectangle linkArea2 = new Rectangle(pdfDoc.PageSize.Width - buttonWidth - 30, initialYPosition - buttonHeight, pdfDoc.PageSize.Width - 30, initialYPosition);
+
+                PdfAction action2 = new PdfAction(paylink);
+
+                cb.SetColorFill(new BaseColor(7, 192, 202)); // Button color: #07c0ca
+                cb.Rectangle(linkArea2.Left, linkArea2.Bottom, linkArea2.Width, linkArea2.Height);
+                cb.Fill();
+                cb.SetColorFill(BaseColor.WHITE); // Text color: white
+                cb.BeginText();
+                cb.SetFontAndSize(font, 12);
+                cb.ShowTextAligned(Element.ALIGN_CENTER, "See Financing Options", linkArea2.Left + linkArea2.Width / 2, linkArea2.Bottom + linkArea2.Height / 2, 0);
+                cb.EndText();
+                PdfAnnotation linkAnnotation1 = PdfAnnotation.CreateLink(writer, linkArea2, PdfAnnotation.HIGHLIGHT_INVERT, action2);
+                writer.AddAnnotation(linkAnnotation1);
+            }
+
+            if (!string.IsNullOrEmpty(CSPaymentLink))
+            {
+                c += 1;
+                //Rectangle linkArea = new Rectangle(pdfDoc.PageSize.Width - buttonWidth - 30, initialYPosition - totalHeight, pdfDoc.PageSize.Width - 30, initialYPosition - totalHeight + buttonHeight);
+
+                //PdfAction action = new PdfAction(CSPaymentLink);
+
+                //cb.SetColorFill(new BaseColor(0x50, 0x78, 0xB0));
+                //cb.Rectangle(linkArea.Left, linkArea.Bottom, linkArea.Width, linkArea.Height);
+                //cb.Fill();
+                //cb.SetColorFill(BaseColor.BLACK);
+                //cb.BeginText();
+                //cb.SetFontAndSize(font, 12);
+                //cb.ShowTextAligned(Element.ALIGN_CENTER, "Pay Now", linkArea.Left + linkArea.Width / 2, linkArea.Bottom + linkArea.Height / 2, 0);
+                //cb.EndText();
+
+                //PdfAnnotation linkAnnotation2 = PdfAnnotation.CreateLink(writer, linkArea, PdfAnnotation.HIGHLIGHT_INVERT, action);
+                //writer.AddAnnotation(linkAnnotation2);
+
+                // [1] create a Chunk with font and colors you want
+                var anchor = new Chunk("Click this link to pay now")
+                {
+                    Font = new Font(
+                        Font.FontFamily.HELVETICA, 15,
+                        Font.NORMAL,
+                        BaseColor.BLACK
+                    )
+                };
+
+                // [2] set the anchor URL
+                anchor.SetAnchor(CSPaymentLink);
+
+                // [3] create a Paragraph with alignment, indentation, etc
+                Paragraph p = new Paragraph()
+                {
+                    Alignment = Element.ALIGN_RIGHT,
+                    IndentationLeft = 10
+                };
+                p.SetLeading(1.1f, 1.1f);
+
+                // [4] add chunk to Paragraph
+                p.Add(anchor);
+
+                // [5] add Paragraph to Document
+                pdfDoc.Add(p);
+            }
+
+            if (c == 1)
+            {
+                totalHeight -= buttonHeight;
+                initialYPosition = pdfDoc.PageSize.Height * 0.18f - totalHeight;
+            }
+            else
+            {
+                totalHeight -= (count - 2) * (buttonHeight + verticalSpacing);
+                initialYPosition = pdfDoc.PageSize.Height * 0.18f - totalHeight;
+            }
+
+            AppendTuaPayLinkParagraph(pdfDoc);
+            pdfDoc.Close();
+            byte[] bytes = memoryStream.ToArray();
+            memoryStream.Close();
+
+            return bytes;
+        }
+
+        public byte[] EstimateWithOutDiscountWT(string CustomerID, string InvoiceNo, string doctype,
+                      string CSPaymentLink, bool IsInvoiceWithoutDiscount,
+                      decimal depoReqAmt = 0)
+        {
+            CustomerID = Common.CleanInput(CustomerID);
+
+            string body = string.Empty;
+            string paylink = "";
+
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
+            Database db = new Database(connStr);
+
+            string sSQL = "";
+            sSQL += "SELECT CONCAT(FirstName, ' ', LastName) AS FullName, * " +
+                    "FROM msSchedulerV3.dbo.tbl_Customer WHERE CustomerId='" + CustomerID + "' AND CompanyID = @CompanyID;";
+
+            sSQL += "SELECT CONVERT(VARCHAR(10), InvoiceDate, 101) AS IssueDate, " +
+                    "ISNULL(AmountCollect,0) AS DepositAmount, " +
+                    "ISNULL(RequestedDepoAmt,0) AS ReqDepo, " +
+                    "(Total - ISNULL(AmountCollect,0)) AS Due, * " +
+                    "FROM msSchedulerV3.dbo.tbl_Invoice WHERE CustomerId='" + CustomerID + "' AND id='" + InvoiceNo + "' AND CompnyID = @CompanyID;";
+
+            sSQL += "SELECT inv.TotalPrice, inv.Description, inv.Quantity, inv.uPrice,inv.servicedate, " +
+                    "i.Name AS ItemName FROM msSchedulerV3.dbo.Items i " +
+                    "INNER JOIN msSchedulerV3.dbo.tbl_InvoiceDetails inv ON i.Id = inv.ItemId AND i.CompanyID = inv.CompanyID " +
+                    "WHERE inv.RefId='" + InvoiceNo + "' AND inv.CompanyID = @CompanyID order by  CAST(NULLIF(inv.LineNum,'') AS INT) asc;";
+
+            sSQL += "SELECT * FROM msSchedulerV3.dbo.tbl_Company WHERE CompanyID = @CompanyID;";
+            sSQL += "SELECT * FROM msSchedulerV3.dbo.tbl_DisclaimerSettings WHERE CompanyID = @CompanyID;";
+
+            DataSet ds = db.Get_DataSet(sSQL, HttpContext.Current.Session["CompanyID"].ToString());
+
+
+            using (StreamReader reader = new StreamReader(HttpContext.Current.Server.MapPath("~/EstWithoutDiscountWT.html")))
+            {
+                body = reader.ReadToEnd();
+            }
+
+            #region Company Data
+
+            DataRow company = ds.Tables[3].Rows[0];
+
+            string companyName = company["CompanyName"].ToString();
+            string companyAddress = company["Address"].ToString();
+            string companyPhone = company["Phone"].ToString();
+            string companyEmail = company["Email"].ToString();
+            string logoFile = company["LogoFile"].ToString();
+            string comapnyCitystate = company["City"].ToString() + ", " + company["State"].ToString() + ", " + company["Zipcode"].ToString();
+            string companyWebsite = company["WebSite"].ToString();
+
+
+            string LogoPath = HttpContext.Current.Server.MapPath("~/CompanyLogo/" + logoFile);
+            if (!File.Exists(LogoPath))
+            {
+                LogoPath = "crv_sched/img/logo/central.png";
+                LogoPath = HttpContext.Current.Server.MapPath("~/crv_sched/img/logo/central.png");
+            }
+
+
+            body = body.Replace("{image}", LogoPath);
+
+
+            body = body.Replace("${CompanyName}", companyName);
+            body = body.Replace("${companyAddress}", companyAddress);
+            body = body.Replace("${companyPhone}", companyPhone);
+            body = body.Replace("${companyEmail}", companyEmail);
+            body = body.Replace("${CompanyCityStateZip}", comapnyCitystate);
+            body = body.Replace("${CompanyCountry}", "USA");
+            body = body.Replace("${CompanyWebsite}", companyWebsite);
+
+            #endregion
+
+            #region Customer Data
+
+            DataRow cust = ds.Tables[0].Rows[0];
+
+            body = body.Replace("${customerName}", cust["FullName"].ToString());
+            body = body.Replace("${CustomerAddress}", cust["Address1"].ToString());
+            body = body.Replace("${phone}", cust["Phone"].ToString());
+            body = body.Replace("${email}", cust["Email"].ToString());
+            body = body.Replace("${CustomerCityStateZip}", cust["City"].ToString() + ", " + cust["State"].ToString() + ", " + cust["Zipcode"].ToString());
+            body = body.Replace("${CustomerCountry}", "USA");
+
+            #endregion
+
+            #region Invoice Data
+
+            DataRow inv = ds.Tables[1].Rows[0];
+
+            body = body.Replace("${IssueDate}", inv["IssueDate"].ToString());
+            body = body.Replace("${InvoiceNo}", inv["Number"].ToString());
+            body = body.Replace("${InvoiceTotal}", Convert.ToDecimal(inv["Total"]).ToString("N2"));
+            body = body.Replace("${SubTotal}", Convert.ToDecimal(inv["Subtotal"]).ToString("N2"));
+            body = body.Replace("${Discount}", Convert.ToDecimal(inv["Discount"]).ToString("N2"));
+            body = body.Replace("${Tax}", Convert.ToDecimal(inv["Tax"]).ToString("N2"));
+            body = body.Replace("${Deposit}", Convert.ToDecimal(inv["DepositAmount"]).ToString("N2"));
+            body = body.Replace("${BalanceDue}", Convert.ToDecimal(inv["Due"]).ToString("N2"));
+            body = body.Replace("${ReqDepo}", depoReqAmt.ToString("N2"));
+
+            #endregion
+
+
+
+            string itemRows = "";
+
+            foreach (DataRow row in ds.Tables[2].Rows)
+            {
+                itemRows += "<tr>" +
+                    "<td style='border-bottom:1px solid #ccc;'>" + row["ItemName"] + "</td>" +
+                    "<td style='border-bottom:1px solid #ccc;'>" + row["Description"] + "</td>" +
+                    "<td style='border-bottom:1px solid #ccc;' align='center'>" + row["Quantity"] + "</td>" +
+                    "<td style='border-bottom:1px solid #ccc;' align='right'>$" + Convert.ToDecimal(row["uPrice"]).ToString("N2") + "</td>" +
+                    "<td style='border-bottom:1px solid #ccc;' align='right'>$" + Convert.ToDecimal(row["TotalPrice"]).ToString("N2") + "</td>" +
+                    "</tr>";
+            }
+
+            body = body.Replace("${itemRow}", itemRows);
+
+
+            if (HttpContext.Current.Session["LoanInfo"] != null)
+            {
+               
+            }
+            else
+            {
+                body = body.Replace("{AsLowAsAmount}", "");
+                body = body.Replace("{wisetackclicktext}", "");
+            }
+            //add wisetack Loan Info  into pdf end
+            if (!string.IsNullOrEmpty(CSPaymentLink))
+            {
+                body = body.Replace("{CSclicktext}", "");
+            }
+            else
+            {
+                body = body.Replace("{CSclicktext}", "");
+            }
+
+            if (!string.IsNullOrEmpty(paylink))
+            {
+                body = body.Replace("[WisetackDisclimer]", "	*All financing is subject to credit approval. Your terms may vary. Payment options through Wisetack are provided by our lending partners. For example, a $1,200 purchase could cost $104.89 a month for 12 months, based on an 8.9% APR, or $400 a month for 3 months, based on a 0% APR. Offers range from 0-35.9% APR based on creditworthiness. No other financing charges or participation fees. See additional terms at http://wisetack.com/faqs.");
+            }
+            else
+            {
+                body = body.Replace("[WisetackDisclimer]", "");
+            }
+
+            using (MemoryStream ms = new MemoryStream())
+            {
+                Document pdfDoc = new Document(PageSize.A4, 40f, 40f, 40f, 10f);
+                PdfWriter writer = PdfWriter.GetInstance(pdfDoc, ms);
+                pdfDoc.Open();
+
+
+                // Parse the HTML content
+                using (StringReader sr = new StringReader(body))
+                {
+                    iTextSharp.tool.xml.XMLWorkerHelper.GetInstance().ParseXHtml(writer, pdfDoc, sr);
+                }
+                PdfContentByte cb = writer.DirectContent;
+
+                ;
+
+
+
+                if (!string.IsNullOrEmpty(paylink))
+                {
+                    PdfContentByte cbLink = writer.DirectContent;
+                    BaseFont font = BaseFont.CreateFont();
+                    iTextSharp.text.Rectangle linkArea = new iTextSharp.text.Rectangle(pdfDoc.PageSize.Width - 200, 720, pdfDoc.PageSize.Width - 40, 750);
+                    cbLink.SetColorFill(new BaseColor(255, 69, 0));
+                    cbLink.Rectangle(linkArea.Left, linkArea.Bottom, linkArea.Width, linkArea.Height);
+                    cbLink.Fill();
+                    cbLink.SetColorFill(BaseColor.WHITE);
+                    cbLink.BeginText();
+                    cbLink.SetFontAndSize(font, 12);
+                    cbLink.ShowTextAligned(Element.ALIGN_CENTER, "See Financing Options", linkArea.Left + linkArea.Width / 2, linkArea.Bottom + 8, 0);
+                    cbLink.EndText();
+                    PdfAnnotation annotation = PdfAnnotation.CreateLink(writer, linkArea, PdfAnnotation.HIGHLIGHT_INVERT, new PdfAction(paylink));
+                    writer.AddAnnotation(annotation);
+                }
+
+
+                if (!string.IsNullOrEmpty(CSPaymentLink))
+                {
+                    Font instructionFont = new Font(Font.FontFamily.HELVETICA, 12, Font.NORMAL, new BaseColor(138, 138, 138));
+                    Paragraph instruction = new Paragraph("To approve this invoice and pay the amount due, click the button below.", instructionFont)
+                    {
+                        Alignment = Element.ALIGN_CENTER,
+                        SpacingAfter = 5f,
+                        SpacingBefore = 15f
+                    };
+                    instruction.SetLeading(1.2f, 1.2f);
+                    pdfDoc.Add(instruction);
+
+                    PdfPTable table = new PdfPTable(1);
+                    table.TotalWidth = 120f;
+                    table.LockedWidth = true;
+                    table.HorizontalAlignment = Element.ALIGN_CENTER;
+                    table.SpacingBefore = 5f;
+                    table.SpacingAfter = 10f;
+
+                    Font linkFont = new Font(Font.FontFamily.HELVETICA, 12, Font.BOLD, BaseColor.WHITE);
+                    Chunk linkChunk = new Chunk("Pay Now", linkFont);
+                    linkChunk.SetAnchor(CSPaymentLink);
+
+                    PdfPCell cell = new PdfPCell(new Phrase(linkChunk))
+                    {
+                        BackgroundColor = new BaseColor(255, 69, 0),
+                        Border = Rectangle.NO_BORDER,
+                        HorizontalAlignment = Element.ALIGN_CENTER,
+                        VerticalAlignment = Element.ALIGN_MIDDLE,
+                        Padding = 8f,
+                        FixedHeight = 30f
+                    };
+
+                    cell.CellEvent = new RoundedCellEvent(10f);
+                    table.AddCell(cell);
+                    pdfDoc.Add(table);
+                }
+
+                AppendTuaPayLinkParagraph(pdfDoc);
+                pdfDoc.Close();
+                return ms.ToArray();
+            }
+        }
+
+        public byte[] InvoiceWithoutDiscountPdf(string CustomerID, string InvoiceNo, string doctype, string CSPaymentLink, bool IsInvoiceWithoutDiscount, decimal depoReqAmt = 0)
+        {
+            CustomerID = Common.CleanInput(CustomerID);
+            string Host = "";
+            string LogoPath = "";
+            string body = string.Empty;
+            string MailTo = "";
+            string ProposalMailSubject = "";
+            string ProposalMailBody = "";
+            string CompanyLogoFile = "";
+
+            string CompanyAddress = "";
+            string CompanyCity = "";
+            string CompanyState = "";
+            string CompanyZipCode = "";
+            string CompanyPhone = "";
+            string CompanyEmail = "";
+            string CompanyWebsite = "";
+            string CompanyFacebook = "";
+            string CompanyTwitter = "";
+            string CompanyFullName = "";
+
+            //if (HttpContext.Current.Session["CompanyType"].ToString() == "LHG")
+            //{
+            //    var lhgEstimate = EstimatePdfLHG(CustomerID, InvoiceNo, doctype, CSPaymentLink, false, depoReqAmt);
+            //    return lhgEstimate;
+            //}
+            //if (HttpContext.Current.Session["CompanyID"].ToString() == "14557")
+            //{
+            //    var pgEstimate = EstimatePG(CustomerID, InvoiceNo, doctype, CSPaymentLink, false, depoReqAmt);
+            //    return pgEstimate;
+            //}
+            if (HttpContext.Current.Session["CompanyID"].ToString() == "14570")
+            {
+                var pgEstimate = InvoiceWithOutDiscountWT(CustomerID, InvoiceNo, doctype, CSPaymentLink, false, depoReqAmt);
+                return pgEstimate;
+            }
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
+            Database db = new Database(connStr);
+
+            string sSQL = @"SELECT concat (FirstName,' ',LastName)as FullName,CASE WHEN dbo.tbl_Customer.BusinessID = 0 THEN 1 ELSE 2 END as ctype,ISNULL(dbo.tbl_Customer.QboId, N'0') as qboCustID,* FROM[msSchedulerV3].[dbo].[tbl_Customer] Where CustomerId='" + CustomerID + "' and  CompanyID =@CompanyID  ;";
+
+            sSQL += @"SELECT CONVERT(VARCHAR(10), InvoiceDate, 101)as IssueDate,convert(varchar, ExpirationDate, 107) as ExpDate,ISNULL(dbo.tbl_Invoice.QboId, N'0') as qboInvID,ISNULL(dbo.tbl_Invoice.QboEstimateId, 0) as qboEstID,isnull([AmountCollect],0.00) as DepositAmount,Discount,Tax,isNULL(RequestedDepoAmt,0)ReqDepo,(Total- (isnull(AmountCollect,0.00))) as Due,* FROM[msSchedulerV3].[dbo].[tbl_Invoice] Where  CustomerId='" + CustomerID + "' and id='" + InvoiceNo + "' and CompnyID =@CompanyID;";
+
+            sSQL += "SELECT inv.TotalPrice,inv.Description,inv.Quantity,inv.uPrice, inv.TotalPrice,inv.ItemId AS ID, i.Name AS ItemName FROM msSchedulerV3.dbo.Items as i INNER JOIN " +
+                 "             msSchedulerV3.dbo.tbl_InvoiceDetails as inv ON i.Id = inv.ItemId and i.CompanyID = inv.CompanyID Where inv.RefId='" + InvoiceNo + "' and  inv.CompanyID =@CompanyID order by CAST(NULLIF(inv.LineNum,'') AS INT) asc ;";
+
+            sSQL += @"select * from [msSchedulerV3].[dbo].[tbl_Company] Where CompanyID =@CompanyID;";
+
+            sSQL += @"SELECT [CompanyID]
+                            ,[QuoteDisclaimer]
+                          ,[InvoiceDisclaimer]
+                          ,[CreatedDateTime]
+                      FROM [msSchedulerV3].[dbo].[tbl_DisclaimerSettings] where CompanyID =@CompanyID";
+
+            DataSet dataSet = db.Get_DataSet(sSQL, HttpContext.Current.Session["CompanyID"].ToString());
+
+            string Disclaimer = "";
+            DataTable dt_Disclaimer = dataSet.Tables[4];
+            if (dt_Disclaimer.Rows.Count > 0)
+            {
+                DataRow Rs = dt_Disclaimer.Rows[0];
+                if (doctype == "Invoice")
+                {
+                    Disclaimer = Rs["InvoiceDisclaimer"].ToString();
+                }
+                else
+                {
+                    Disclaimer = Rs["QuoteDisclaimer"].ToString();
+                }
+            }
+
+            if (IsInvoiceWithoutDiscount)
+            {
+                using (StreamReader reader = new StreamReader(HttpContext.Current.Server.MapPath("~/ProposalEmailTemplateWithoutDiscount.html")))
+                {
+                    body = reader.ReadToEnd();
+                }
+            }
+            else
+            {
+                using (StreamReader reader = new StreamReader(HttpContext.Current.Server.MapPath("~/ProposalEmailTemplate.html")))
+                {
+                    body = reader.ReadToEnd();
+                }
+            }
+
+            DataTable dt_Company = new DataTable();
+            dt_Company = dataSet.Tables[3];
+            string companyLogo = "";
+            if (dt_Company.Rows.Count > 0)
+            {
+                DataRow Rs = dt_Company.Rows[0];
+                CompanyAddress = Rs["Address"].ToString();
+                CompanyCity = Rs["City"].ToString();
+                CompanyState = Rs["State"].ToString();
+                CompanyZipCode = Rs["ZipCode"].ToString();
+                CompanyPhone = Rs["Phone"].ToString();
+                CompanyEmail = Rs["Email"].ToString();
+                CompanyWebsite = Rs["Website"].ToString();
+                CompanyFacebook = Rs["Facebook"].ToString();
+                CompanyTwitter = Rs["Twitter"].ToString();
+                CompanyLogoFile = Rs["LogoFile"].ToString();
+                CompanyFullName = Rs["CompanyName"].ToString();
+                companyLogo = Rs["LogoFile"].ToString();
+            }
+            LogoPath = HttpContext.Current.Server.MapPath("~/CompanyLogo/" + companyLogo);
+            if (!File.Exists(LogoPath))
+            {
+                LogoPath = HttpContext.Current.Server.MapPath("~/crv_sched/img/logo/central.png");
+            }
+            string SignaturePath = HttpContext.Current.Server.MapPath("~/images/Signature.PNG");
+            if (!File.Exists(SignaturePath))
+            {
+                SignaturePath = HttpContext.Current.Server.MapPath("~/images/Signature.PNG");
+            }
+
+            DataTable customer = dataSet.Tables[0];
+            int count = 0;
+            if (customer.Rows.Count > 0)
+            {
+                DataRow dr = customer.Rows[0];
+
+                body = body.Replace("{customerName}", dr["FullName"].ToString());
+                body = body.Replace("{address}", dr["Address1"].ToString());
+                body = body.Replace("{phone}", dr["Phone"].ToString());
+                body = body.Replace("{email}", dr["Email"].ToString());
+                body = body.Replace("{image}", LogoPath);
+                body = body.Replace("{Signatureimage}", SignaturePath);
+
+                DataTable inv = dataSet.Tables[1];
+
+                if (inv.Rows.Count > 0)
+                {
+                    DataRow dr2 = inv.Rows[0];
+
+                    body = body.Replace("{IssueDate}", dr2["IssueDate"].ToString());
+                    body = body.Replace("{InvoiceNo}", dr2["Number"].ToString());
+                    body = body.Replace("{InvoiceTotal}", dr2["Total"].ToString());
+                    body = body.Replace("{SubTotal}", dr2["Subtotal"].ToString());
+                    body = body.Replace("{Discount}", dr2["Discount"].ToString());
+                    body = body.Replace("{Total}", dr2["Total"].ToString());
+                    body = body.Replace("{Tax}", dr2["Tax"].ToString());
+                    body = body.Replace("{Deposit}", dr2["DepositAmount"].ToString());
+                    body = body.Replace("{BalanceDue}", dr2["Due"].ToString());
+                    body = body.Replace("{DocType}", doctype);
+                    body = body.Replace("{ReqDepo}", depoReqAmt.ToString());
+                }
+                int rowcount = 0;
+                MailTo = dr["Email"].ToString();
+                string itemDetails = "";
+                if (dataSet.Tables[2].Rows.Count > 0)
+                {
+                    count = dataSet.Tables[2].Rows.Count;
+
+                    DataTable dt = dataSet.Tables[2];
+
+                    foreach (DataRow d in dt.Rows)
+                    {
+                        rowcount += 1;
+                        Int32 qty = 0;
+                        try
+                        {
+                            qty = Convert.ToInt32(d["Quantity"]);
+                        }
+                        catch { }
+
+                        itemDetails += "<tr>" +
+                                "<td width='28%' style='border:none; min-width:28%;max-width:28%;text-align: left;margin-left:3px;'>" + d["ItemName"] + "</td>" +
+                                "<td width='45%' style='border:none; min-width:45%;max-width:45%;text-align: left;margin-left:3px;'>" + d["Description"] + "</td>" +
+                                  "<td width='7%' style='border:none; min-width:7%;max-width:7%;text-align: center;'>" + qty + "</td>" +
+                                 "<td width='10%' style='border:none; min-width:10%;max-width:10%;text-align: center;'>$" + d["uPrice"] + "</td>" +
+                                "<td width='10%' style='border:none; min-width:10%;max-width:10%;text-align: center;'>$" + d["TotalPrice"] + "</td>" +
+                                "</tr>";
+                    }
+                }
+
+                body = body.Replace("{itemRow}", itemDetails);
+            }
+
+            //add wisetack Loan Info  into pdf start
+            string paylink = "";
+            if (HttpContext.Current.Session["LoanInfo"] != null)
+            {
+               
+            }
+            else
+            {
+                body = body.Replace("{AsLowAsAmount}", "");
+                body = body.Replace("{wisetackclicktext}", "");
+            }
+            //add wisetack Loan Info  into pdf end
+            if (!string.IsNullOrEmpty(CSPaymentLink))
+            {
+                body = body.Replace("{CSclicktext}", "");
+            }
+            else
+            {
+                body = body.Replace("{CSclicktext}", "");
+            }
+            if (!string.IsNullOrEmpty(paylink))
+            {
+                body = body.Replace("[Disclimer]", "*All financing is subject to credit approval. Your terms may vary. Payment options through Wisetack are provided by our <a href='https://www.wisetack.com/lenders' style='color:blue'>lending partners</a>. For example, a $1,200 purchase could cost $104.89 a month for 12 months, based on an 8.9% APR, or $400 a month for 3 months, based on a 0% APR. Offers range from 0-35.9% APR based on creditworthiness. No other financing charges or participation fees. See additional terms at  <a href='http://wisetack.com/faqs' style='color:blue'>http://wisetack.com/faqs</a>.");
+
+                body = body.Replace("{CSclicktext}", "Click this link to pay now");
+            }
+            else
+            {
+                body = body.Replace("[Disclimer]", Disclaimer);
+
+                body = body.Replace("{CSclicktext}", "");
+            }
+
+            StringReader sr = new StringReader(body);
+
+            Document pdfDoc = new Document(PageSize.A4, 40f, 40f, 40f, 10f);
+
+            HTMLWorker htmlparser = new HTMLWorker(pdfDoc);
+
+            MemoryStream memoryStream = new MemoryStream();
+
+            PdfWriter writer = PdfWriter.GetInstance(pdfDoc, memoryStream);
+
+            pdfDoc.Open();
+
+            htmlparser.Parse(sr);
+            PdfContentByte cb = writer.DirectContent;
+            BaseFont font = BaseFont.CreateFont();
+
+            float buttonWidth = 150; // Width of the button
+            float buttonHeight = 30; // Height of the button
+            float verticalSpacing = 5; // Vertical spacing between buttons
+
+            float initialYPosition = pdfDoc.PageSize.Height * 0.12f; // Initial position at 65% from the top
+            float totalHeight = count * (buttonHeight + verticalSpacing); // Total height needed for all buttons
+            int c = 0;
+            if (!string.IsNullOrEmpty(paylink))
+            {
+                c += 1;
+                Rectangle linkArea2 = new Rectangle(pdfDoc.PageSize.Width - buttonWidth - 30, initialYPosition - buttonHeight, pdfDoc.PageSize.Width - 30, initialYPosition);
+
+                PdfAction action2 = new PdfAction(paylink);
+
+                cb.SetColorFill(new BaseColor(7, 192, 202)); // Button color: #07c0ca
+                cb.Rectangle(linkArea2.Left, linkArea2.Bottom, linkArea2.Width, linkArea2.Height);
+                cb.Fill();
+                cb.SetColorFill(BaseColor.WHITE); // Text color: white
+                cb.BeginText();
+                cb.SetFontAndSize(font, 12);
+                cb.ShowTextAligned(Element.ALIGN_CENTER, "See Financing Options", linkArea2.Left + linkArea2.Width / 2, linkArea2.Bottom + linkArea2.Height / 2, 0);
+                cb.EndText();
+                PdfAnnotation linkAnnotation1 = PdfAnnotation.CreateLink(writer, linkArea2, PdfAnnotation.HIGHLIGHT_INVERT, action2);
+                writer.AddAnnotation(linkAnnotation1);
+            }
+
+            if (!string.IsNullOrEmpty(CSPaymentLink))
+            {
+                c += 1;
+                //Rectangle linkArea = new Rectangle(pdfDoc.PageSize.Width - buttonWidth - 30, initialYPosition - totalHeight, pdfDoc.PageSize.Width - 30, initialYPosition - totalHeight + buttonHeight);
+
+                //PdfAction action = new PdfAction(CSPaymentLink);
+
+                //cb.SetColorFill(new BaseColor(0x50, 0x78, 0xB0));
+                //cb.Rectangle(linkArea.Left, linkArea.Bottom, linkArea.Width, linkArea.Height);
+                //cb.Fill();
+                //cb.SetColorFill(BaseColor.BLACK);
+                //cb.BeginText();
+                //cb.SetFontAndSize(font, 12);
+                //cb.ShowTextAligned(Element.ALIGN_CENTER, "Pay Now", linkArea.Left + linkArea.Width / 2, linkArea.Bottom + linkArea.Height / 2, 0);
+                //cb.EndText();
+
+                //PdfAnnotation linkAnnotation2 = PdfAnnotation.CreateLink(writer, linkArea, PdfAnnotation.HIGHLIGHT_INVERT, action);
+                //writer.AddAnnotation(linkAnnotation2);
+
+                // [1] create a Chunk with font and colors you want
+                var anchor = new Chunk("Click this link to pay now")
+                {
+                    Font = new Font(
+                        Font.FontFamily.HELVETICA, 15,
+                        Font.NORMAL,
+                        BaseColor.BLACK
+                    )
+                };
+
+                // [2] set the anchor URL
+                anchor.SetAnchor(CSPaymentLink);
+
+                // [3] create a Paragraph with alignment, indentation, etc
+                Paragraph p = new Paragraph()
+                {
+                    Alignment = Element.ALIGN_RIGHT,
+                    IndentationLeft = 10
+                };
+                p.SetLeading(1.1f, 1.1f);
+
+                // [4] add chunk to Paragraph
+                p.Add(anchor);
+
+                // [5] add Paragraph to Document
+                pdfDoc.Add(p);
+            }
+
+            if (c == 1)
+            {
+                totalHeight -= buttonHeight;
+                initialYPosition = pdfDoc.PageSize.Height * 0.18f - totalHeight;
+            }
+            else
+            {
+                totalHeight -= (count - 2) * (buttonHeight + verticalSpacing);
+                initialYPosition = pdfDoc.PageSize.Height * 0.18f - totalHeight;
+            }
+
+            AppendTuaPayLinkParagraph(pdfDoc);
+            pdfDoc.Close();
+            byte[] bytes = memoryStream.ToArray();
+            memoryStream.Close();
+
+            return bytes;
+        }
+
+        public byte[] InvoiceWithOutDiscountWT(string CustomerID, string InvoiceNo, string doctype,
+                      string CSPaymentLink, bool IsInvoiceWithoutDiscount,
+                      decimal depoReqAmt = 0)
+        {
+            CustomerID = Common.CleanInput(CustomerID);
+
+            string body = string.Empty;
+            string paylink = "";
+
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
+            Database db = new Database(connStr);
+
+            string sSQL = "";
+            sSQL += "SELECT CONCAT(FirstName, ' ', LastName) AS FullName, * " +
+                    "FROM msSchedulerV3.dbo.tbl_Customer WHERE CustomerId='" + CustomerID + "' AND CompanyID = @CompanyID;";
+
+            sSQL += "SELECT CONVERT(VARCHAR(10), InvoiceDate, 101) AS IssueDate, " +
+                    "ISNULL(AmountCollect,0) AS DepositAmount, " +
+                    "ISNULL(RequestedDepoAmt,0) AS ReqDepo, " +
+                    "(Total - ISNULL(AmountCollect,0)) AS Due, * " +
+                    "FROM msSchedulerV3.dbo.tbl_Invoice WHERE CustomerId='" + CustomerID + "' AND id='" + InvoiceNo + "' AND CompnyID = @CompanyID;";
+
+            sSQL += "SELECT inv.TotalPrice, inv.Description, inv.Quantity, inv.uPrice,inv.servicedate, " +
+                    "i.Name AS ItemName FROM msSchedulerV3.dbo.Items i " +
+                    "INNER JOIN msSchedulerV3.dbo.tbl_InvoiceDetails inv ON i.Id = inv.ItemId AND i.CompanyID = inv.CompanyID " +
+                    "WHERE inv.RefId='" + InvoiceNo + "' AND inv.CompanyID = @CompanyID order by  CAST(NULLIF(inv.LineNum,'') AS INT) asc;";
+
+            sSQL += "SELECT * FROM msSchedulerV3.dbo.tbl_Company WHERE CompanyID = @CompanyID;";
+            sSQL += "SELECT * FROM msSchedulerV3.dbo.tbl_DisclaimerSettings WHERE CompanyID = @CompanyID;";
+
+            DataSet ds = db.Get_DataSet(sSQL, HttpContext.Current.Session["CompanyID"].ToString());
+
+
+            using (StreamReader reader = new StreamReader(HttpContext.Current.Server.MapPath("~/WTInvoiceWithOutDiscount.html")))
+            {
+                body = reader.ReadToEnd();
+            }
+
+            #region Company Data
+
+            DataRow company = ds.Tables[3].Rows[0];
+
+            string companyName = company["CompanyName"].ToString();
+            string companyAddress = company["Address"].ToString();
+            string companyPhone = company["Phone"].ToString();
+            string companyEmail = company["Email"].ToString();
+            string logoFile = company["LogoFile"].ToString();
+            string comapnyCitystate = company["City"].ToString() + ", " + company["State"].ToString() + ", " + company["Zipcode"].ToString();
+            string companyWebsite = company["WebSite"].ToString();
+
+
+            string LogoPath = HttpContext.Current.Server.MapPath("~/CompanyLogo/" + logoFile);
+            if (!File.Exists(LogoPath))
+            {
+                LogoPath = "crv_sched/img/logo/central.png";
+                LogoPath = HttpContext.Current.Server.MapPath("~/crv_sched/img/logo/central.png");
+            }
+
+
+            body = body.Replace("{image}", LogoPath);
+
+
+            body = body.Replace("${CompanyName}", companyName);
+            body = body.Replace("${companyAddress}", companyAddress);
+            body = body.Replace("${companyPhone}", companyPhone);
+            body = body.Replace("${companyEmail}", companyEmail);
+            body = body.Replace("${CompanyCityStateZip}", comapnyCitystate);
+            body = body.Replace("${CompanyCountry}", "USA");
+            body = body.Replace("${CompanyWebsite}", companyWebsite);
+
+            #endregion
+
+            #region Customer Data
+
+            DataRow cust = ds.Tables[0].Rows[0];
+
+            body = body.Replace("${customerName}", cust["FullName"].ToString());
+            body = body.Replace("${CustomerAddress}", cust["Address1"].ToString());
+            body = body.Replace("${phone}", cust["Phone"].ToString());
+            body = body.Replace("${email}", cust["Email"].ToString());
+            body = body.Replace("${CustomerCityStateZip}", cust["City"].ToString() + ", " + cust["State"].ToString() + ", " + cust["Zipcode"].ToString());
+            body = body.Replace("${CustomerCountry}", "USA");
+
+            #endregion
+
+            #region Invoice Data
+
+            DataRow inv = ds.Tables[1].Rows[0];
+
+            body = body.Replace("${IssueDate}", inv["IssueDate"].ToString());
+            body = body.Replace("${InvoiceNo}", inv["Number"].ToString());
+            body = body.Replace("${InvoiceTotal}", Convert.ToDecimal(inv["Total"]).ToString("N2"));
+            body = body.Replace("${SubTotal}", Convert.ToDecimal(inv["Subtotal"]).ToString("N2"));
+            body = body.Replace("${Discount}", Convert.ToDecimal(inv["Discount"]).ToString("N2"));
+            body = body.Replace("${Tax}", Convert.ToDecimal(inv["Tax"]).ToString("N2"));
+            body = body.Replace("${Deposit}", Convert.ToDecimal(inv["DepositAmount"]).ToString("N2"));
+            body = body.Replace("${BalanceDue}", Convert.ToDecimal(inv["Due"]).ToString("N2"));
+            body = body.Replace("${ReqDepo}", depoReqAmt.ToString("N2"));
+
+            #endregion
+
+
+
+            string itemRows = "";
+
+            foreach (DataRow row in ds.Tables[2].Rows)
+            {
+                itemRows += "<tr>" +
+                    "<td style='border-bottom:1px solid #ccc;'>" + row["ItemName"] + "</td>" +
+                    "<td style='border-bottom:1px solid #ccc;'>" + row["Description"] + "</td>" +
+                    "<td style='border-bottom:1px solid #ccc;' align='center'>" + row["Quantity"] + "</td>" +
+                    "<td style='border-bottom:1px solid #ccc;' align='right'>$" + Convert.ToDecimal(row["uPrice"]).ToString("N2") + "</td>" +
+                    "<td style='border-bottom:1px solid #ccc;' align='right'>$" + Convert.ToDecimal(row["TotalPrice"]).ToString("N2") + "</td>" +
+                    "</tr>";
+            }
+
+            body = body.Replace("${itemRow}", itemRows);
+
+
+            if (HttpContext.Current.Session["LoanInfo"] != null)
+            {
+               
+            }
+            else
+            {
+                body = body.Replace("{AsLowAsAmount}", "");
+                body = body.Replace("{wisetackclicktext}", "");
+            }
+            //add wisetack Loan Info  into pdf end
+            if (!string.IsNullOrEmpty(CSPaymentLink))
+            {
+                body = body.Replace("{CSclicktext}", "");
+            }
+            else
+            {
+                body = body.Replace("{CSclicktext}", "");
+            }
+
+            if (!string.IsNullOrEmpty(paylink))
+            {
+                body = body.Replace("[WisetackDisclimer]", "	*All financing is subject to credit approval. Your terms may vary. Payment options through Wisetack are provided by our lending partners. For example, a $1,200 purchase could cost $104.89 a month for 12 months, based on an 8.9% APR, or $400 a month for 3 months, based on a 0% APR. Offers range from 0-35.9% APR based on creditworthiness. No other financing charges or participation fees. See additional terms at http://wisetack.com/faqs.");
+            }
+            else
+            {
+                body = body.Replace("[WisetackDisclimer]", "");
+            }
+
+            using (MemoryStream ms = new MemoryStream())
+            {
+                Document pdfDoc = new Document(PageSize.A4, 40f, 40f, 40f, 10f);
+                PdfWriter writer = PdfWriter.GetInstance(pdfDoc, ms);
+                pdfDoc.Open();
+
+
+                // Parse the HTML content
+                using (StringReader sr = new StringReader(body))
+                {
+                    iTextSharp.tool.xml.XMLWorkerHelper.GetInstance().ParseXHtml(writer, pdfDoc, sr);
+                }
+                PdfContentByte cb = writer.DirectContent;
+
+                ;
+
+
+
+                if (!string.IsNullOrEmpty(paylink))
+                {
+                    PdfContentByte cbLink = writer.DirectContent;
+                    BaseFont font = BaseFont.CreateFont();
+                    iTextSharp.text.Rectangle linkArea = new iTextSharp.text.Rectangle(pdfDoc.PageSize.Width - 200, 720, pdfDoc.PageSize.Width - 40, 750);
+                    cbLink.SetColorFill(new BaseColor(255, 69, 0));
+                    cbLink.Rectangle(linkArea.Left, linkArea.Bottom, linkArea.Width, linkArea.Height);
+                    cbLink.Fill();
+                    cbLink.SetColorFill(BaseColor.WHITE);
+                    cbLink.BeginText();
+                    cbLink.SetFontAndSize(font, 12);
+                    cbLink.ShowTextAligned(Element.ALIGN_CENTER, "See Financing Options", linkArea.Left + linkArea.Width / 2, linkArea.Bottom + 8, 0);
+                    cbLink.EndText();
+                    PdfAnnotation annotation = PdfAnnotation.CreateLink(writer, linkArea, PdfAnnotation.HIGHLIGHT_INVERT, new PdfAction(paylink));
+                    writer.AddAnnotation(annotation);
+                }
+
+
+                if (!string.IsNullOrEmpty(CSPaymentLink))
+                {
+                    Font instructionFont = new Font(Font.FontFamily.HELVETICA, 12, Font.NORMAL, new BaseColor(138, 138, 138));
+                    Paragraph instruction = new Paragraph("To approve this invoice and pay the amount due, click the button below.", instructionFont)
+                    {
+                        Alignment = Element.ALIGN_CENTER,
+                        SpacingAfter = 5f,
+                        SpacingBefore = 15f
+                    };
+                    instruction.SetLeading(1.2f, 1.2f);
+                    pdfDoc.Add(instruction);
+
+                    PdfPTable table = new PdfPTable(1);
+                    table.TotalWidth = 120f;
+                    table.LockedWidth = true;
+                    table.HorizontalAlignment = Element.ALIGN_CENTER;
+                    table.SpacingBefore = 5f;
+                    table.SpacingAfter = 10f;
+
+                    Font linkFont = new Font(Font.FontFamily.HELVETICA, 12, Font.BOLD, BaseColor.WHITE);
+                    Chunk linkChunk = new Chunk("Pay Now", linkFont);
+                    linkChunk.SetAnchor(CSPaymentLink);
+
+                    PdfPCell cell = new PdfPCell(new Phrase(linkChunk))
+                    {
+                        BackgroundColor = new BaseColor(255, 69, 0),
+                        Border = Rectangle.NO_BORDER,
+                        HorizontalAlignment = Element.ALIGN_CENTER,
+                        VerticalAlignment = Element.ALIGN_MIDDLE,
+                        Padding = 8f,
+                        FixedHeight = 30f
+                    };
+
+                    cell.CellEvent = new RoundedCellEvent(10f);
+                    table.AddCell(cell);
+                    pdfDoc.Add(table);
+                }
+
+                AppendTuaPayLinkParagraph(pdfDoc);
                 pdfDoc.Close();
                 return ms.ToArray();
             }

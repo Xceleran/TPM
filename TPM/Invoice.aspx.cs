@@ -1,8 +1,9 @@
-﻿
+using FSM;
 using FSM.Entity.Customer;
 using FSM.Helper;
 using FSM.Models.LoginModels;
 using FSM.Processors;
+using FSM.SMSService;
 using Intuit.Ipp.Core;
 
 using Newtonsoft.Json;
@@ -25,7 +26,7 @@ namespace TPM
 {
     public partial class Invoice : System.Web.UI.Page
     {
-     
+        private static QBOSettins qBoStng;
         private static Random random = new Random();
         private string CompanyGUID = "";
         private string CompanyID = "";
@@ -33,21 +34,20 @@ namespace TPM
         private bool IsQuickBookEnabled = false;
         private string Qut_Number = "";
         private StringBuilder table = new StringBuilder();
-        private string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+        private string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
 
         protected void Page_Load(object sender, EventArgs e)
         {
 
-             if (Session["CompanyID"] == null)
+            if (Session["CompanyID"] == null)
                 Response.Redirect("logout.aspx");
 
             if (Page.IsPostBack == false)
             {
-
                 QBOManager qBOManager = new QBOManager();
 
-
-                hd_IsQuickBookEnabled.Value = "0";
+                IsQuickBookEnabled = qBOManager.VerifyCompanySetting(Session["CompanyID"].ToString(), ref qBoStng);
+                hd_IsQuickBookEnabled.Value = IsQuickBookEnabled.ToString();
 
 
                 LoginObject _loginObject = (LoginObject)Session["LoginObj"];
@@ -73,12 +73,12 @@ namespace TPM
                 }
                 else
                 {
-                    string exception = " Swal.fire('Invalid Customer data.', '', 'Successfully');window.location.href='Dashboard.aspx';";
+                    string exception = " Swal.fire('Invalid Customer data.', '', 'Successfully');window.location.href='Home.aspx';";
                     ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", exception, true);
                     return;
                 }
 
-                string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+                string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
                 string InvId = "0";
                 Database db = new Database(connStr);
                 if (!string.IsNullOrEmpty(InvoiceNumber))
@@ -226,14 +226,10 @@ namespace TPM
                 if (Session["IsPCS"] != null && (bool)Session["IsPCS"])
                 {
                     IsPCS.Value = "True";
-                    divLocation.Visible = true;
-                    divClass.Visible = true;
                 }
                 else
                 {
                     IsPCS.Value = "False";
-                    divLocation.Visible = false;
-                    divClass.Visible = false;
                 }
                 Database dbJob = new Database(connStr);
                 string reqDepoAmt = dbJob.ExecuteScalar("select ((isNULL(Total,0)-isNULL(AmountCollect,0)) * isNULL(ReqDepoPercent,0))/100 from tbl_invoice where id='" + _InvoiceNo.Value + "' and CompnyID='" + CompanyID + "'");
@@ -306,14 +302,13 @@ namespace TPM
             }
         }
 
-
         [WebMethod(EnableSession = false)]
         public static string ConvertInvoice(string invNo = "")
         {
             try
             {
                 string _CmpId = HttpContext.Current.Session["CompanyID"].ToString();
-                string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+                string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
                 Database db = new Database(connStr);
                 //  db.Open();
                 string sql = "";
@@ -370,7 +365,7 @@ namespace TPM
 
                 string newInvoiceNumber = getNextNumber(true);
                 // For Estimate Data
-                sql = @" Update tbl_Invoice set ConvertedInvocieNumber='" + newInvoiceNumber + "',ConvertedInvocieID ='" + InvoiceID + "', IsConverted = 1 where id = '" + invNo + "';";
+                sql = @" Update tbl_Invoice set ConvertedInvocieNumber='" + newInvoiceNumber + "',AutoSync = 1,ConvertedInvocieID ='" + InvoiceID + "', IsConverted = 1 where id = '" + invNo + "';";
 
                 // For Invoice Table DaTa
                 sql += @"Insert Into  [msSchedulerV3].[dbo].[tbl_Invoice]
@@ -429,8 +424,8 @@ namespace TPM
                                           ,[Note]
                                           ,[LoanStatus]
                                           ,GETDATE()
-                                          ,[CreatedBy]
-                                          ,[InvoiceDate]
+                                          ,'CEC'
+                                          ,GETDATE()
                                           ,[AmountCollect]
                                           ,[TaxType]
                                           ,[AppointmentId]
@@ -505,7 +500,7 @@ namespace TPM
            (drPay["IsDeposit"] != DBNull.Value ? Convert.ToBoolean(drPay["IsDeposit"]) ? "1" : "0" : "0") + ", " +
            "'" + (drPay["Source"] != DBNull.Value ? drPay["Source"].ToString().Replace("'", "''") + " From Estimate Deposit" : "From Estimate Deposit") + "', " +
            (drPay["createdDate"] != DBNull.Value ? "'" + Convert.ToDateTime(drPay["createdDate"]).ToString("yyyy-MM-dd HH:mm:ss") + "'" : "NULL") + ", " +
-           "0, " +
+           "'-111', " +
            "'" + (drPay["PaymentRefNum"] != DBNull.Value ? drPay["PaymentRefNum"].ToString().Replace("'", "''") : "") + "', " +
            (drPay["RMPaymentId"] != DBNull.Value ? Convert.ToInt32(drPay["RMPaymentId"]).ToString() : "NULL") +
            ");";
@@ -519,63 +514,62 @@ namespace TPM
 
                 string QboInvoiceId = "0";
 
-                //try
-                //{
-                //    QBOSettins qBoStngPost = new QBOSettins();
-                //    QBOManager qBOManager = new QBOManager();
-                //    if (qBOManager.VerifyCompanySetting(_CmpId, ref qBoStngPost))
-                //    {
-                //        // QBOManager.RemoveEstimate(qBoStngPost, dr["QboEstimateId"].ToString());
-                //        string SyncToken = "";
-                //        string QboPaymentID = "0";
+                try
+                {
+                    QBOSettins qBoStngPost = new QBOSettins();
+                    QBOManager qBOManager = new QBOManager();
+                    if (qBOManager.VerifyCompanySetting(_CmpId, ref qBoStngPost))
+                    {
+                        // QBOManager.RemoveEstimate(qBoStngPost, dr["QboEstimateId"].ToString());
+                        string SyncToken = "";
+                        string QboPaymentID = "0";
 
-                //        string Status = "0";
-                //        if ((Convert.ToDouble(dr["Total"].ToString()) - Convert.ToDouble(dr["AmountCollect"].ToString())) <= 0)
-                //        {
-                //            Status = "1";
-                //        }
+                        string Status = "0";
+                        if ((Convert.ToDouble(dr["Total"].ToString()) - Convert.ToDouble(dr["AmountCollect"].ToString())) <= 0)
+                        {
+                            Status = "1";
+                        }
 
-                //        ServiceContext serviceContext = null;
-                //        string qboClassId = dr["QboClassId"] != DBNull.Value ? dr["QboClassId"].ToString() : "0";
-                //        string qboLocationId = dr["QboLocationId"] != DBNull.Value ? dr["QboLocationId"].ToString() : "0";
+                        ServiceContext serviceContext = null;
+                        string qboClassId = dr["QboClassId"] != DBNull.Value ? dr["QboClassId"].ToString() : "0";
+                        string qboLocationId = dr["QboLocationId"] != DBNull.Value ? dr["QboLocationId"].ToString() : "0";
 
-                //        // Only send QboClassId and QboLocationId if IsPCS is true
-                //        string qboClassIdForQbo = "0";
-                //        string qboLocationIdForQbo = "0";
-                //        if (HttpContext.Current.Session["IsPCS"] != null && (bool)HttpContext.Current.Session["IsPCS"])
-                //        {
-                //            qboClassIdForQbo = qboClassId;
-                //            qboLocationIdForQbo = qboLocationId;
-                //        }
+                        // Only send QboClassId and QboLocationId if IsPCS is true
+                        string qboClassIdForQbo = "0";
+                        string qboLocationIdForQbo = "0";
+                       
+                            qboClassIdForQbo = qboClassId;
+                            qboLocationIdForQbo = qboLocationId;
+                       
 
-                //        QboInvoiceId = qBOManager.CreateInvoiceQbo(serviceContext, ref QboPaymentID, ref SyncToken, Status, dr["QboEstimateId"].ToString(), qBoStngPost, pId, pName, pDes, sDate, pQty, pRate, AllTaxable, dr["CustomerId"].ToString(), dr["InvoiceDate"].ToString(),
-                //            dr["Note"].ToString(), dr["DiscountOption"].ToString(), dr["DiscountRate"].ToString(), dr["Discount"].ToString(),
-                //            dr["TaxType"].ToString(), dr["Tax"].ToString(), dr["Total"].ToString(), newInvoiceNumber, "0", qboClassIdForQbo, qboLocationIdForQbo);
-                //        if (QboInvoiceId != "0")
-                //        {
-                //            sql = "update tbl_Invoice set QboId='" + QboInvoiceId + "',SyncToken='" + SyncToken + "' " +
-                //                " where id='" + InvoiceID + "'" +
-                //                " and CompnyID='" + _CmpId + "'; ";
+                        QboInvoiceId = qBOManager.CreateInvoiceQbo(serviceContext, ref QboPaymentID, ref SyncToken, Status, dr["QboEstimateId"].ToString(), qBoStngPost, pId, pName, pDes, sDate, pQty, pRate, AllTaxable, dr["CustomerId"].ToString(), dr["InvoiceDate"].ToString(),
+                            dr["Note"].ToString(), dr["DiscountOption"].ToString(), dr["DiscountRate"].ToString(), dr["Discount"].ToString(),
+                            dr["TaxType"].ToString(), dr["Tax"].ToString(), dr["Total"].ToString(), newInvoiceNumber, "0", qboClassIdForQbo, qboLocationIdForQbo, InvoiceID);
+                        if (QboInvoiceId != "0")
+                        {
+                            sql = "update tbl_Invoice set QboId='" + QboInvoiceId + "',SyncToken='" + SyncToken + "' " +
+                                " where id='" + InvoiceID + "'" +
+                                " and CompnyID='" + _CmpId + "'; ";
 
-                //            db.Execute(sql);
-                //        }
-                //    }
-                //    else
-                //    {
-                //        // sql = @" Update tbl_Invoice set Type = 'Invoice',Number = '" + InvoiceID + "' where id = '" + invNo + "';";
-                //        sql = @" Update tbl_Invoice set Type = 'Proposal' where id = '" + invNo + "';";
-                //        db.Execute(sql);
-                //    }
+                            db.Execute(sql);
+                        }
+                    }
+                    else
+                    {
+                        // sql = @" Update tbl_Invoice set Type = 'Invoice',Number = '" + InvoiceID + "' where id = '" + invNo + "';";
+                        sql = @" Update tbl_Invoice set Type = 'Proposal' where id = '" + invNo + "';";
+                        db.Execute(sql);
+                    }
 
-                //    //Mohsin
-                //    if (qBOManager.VerifyCompanySetting(_CmpId, ref qBoStngPost))
-                //    {
-                //        ServiceContext serviceContext = null;
-                //        qBOManager.SyncPaymentToQBO(serviceContext, qBoStngPost, _CmpId);
-                //    }
-                //    //end
-                //}
-                //catch (Exception ex) { }
+                    //Mohsin
+                    if (qBOManager.VerifyCompanySetting(_CmpId, ref qBoStngPost))
+                    {
+                        ServiceContext serviceContext = null;
+                        qBOManager.SyncPaymentToQBO(serviceContext, qBoStngPost, _CmpId);
+                    }
+                    //end
+                }
+                catch (Exception ex) { }
 
                 db.Close();
 
@@ -589,7 +583,7 @@ namespace TPM
         public static QboCommon GetInvoiceDetailsById(string iId = "")
         {
             string CompanyID = HttpContext.Current.Session["CompanyID"].ToString();
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             SqlConnection conn = new SqlConnection(connStr);
 
             string sql = "Select Id,Name from Items  where IsDeleted=0  and CompanyId=@CompanyID order by Name asc; ";
@@ -609,7 +603,7 @@ namespace TPM
             dt_InvoiceItems = dataSet.Tables[1];
             dt_Invoice = dataSet.Tables[2];
 
-            QboCommon iRet = new FSM.Helper.QboCommon();
+            QboCommon iRet = new QboCommon();
             var NewRow = "";
             int Cid = 1;
 
@@ -689,7 +683,7 @@ namespace TPM
 
         public static string GetJobsCustomerId(string _Id, string _CompanyID)
         {
-            Database db = new Database(ConfigurationManager.AppSettings["ConnString"].ToString());
+            Database db = new Database(ConfigurationManager.AppSettings["ConnStrSch"].ToString());
             //  db.Open();
             string Sql = "select QboId,CustomerID,FirstName,LastName from tbl_Customer where customerid='" + _Id + "' and CompanyID='" + _CompanyID + "'";
             DataTable dt;
@@ -712,7 +706,7 @@ namespace TPM
 
         public static string GetJobsProductId(string _Id, string _CompanyID)
         {
-            //Database db = new Database(ConfigurationManager.AppSettings["ConnString"].ToString());
+            //Database db = new Database(ConfigurationManager.AppSettings["ConnStrSch"].ToString());
             //db.Open();
             //string Sql = "select Id,Name,QboId from Items where Id='" + _Id + "' and CompanyID='" + _CompanyID + "'";
             //DataTable dt;
@@ -745,14 +739,19 @@ namespace TPM
 
         public static string getNextNumber(bool IsInvocie)
         {
-            DataTable table;
+
+
             string New_Number = string.Empty;
+
+
+            DataTable table;
+
 
             string CompanyID = HttpContext.Current.Session["CompanyID"].ToString();
 
             try
             {
-                string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+                string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
                 Database db = new Database(connStr);
                 //  db.Open();
 
@@ -778,7 +777,7 @@ namespace TPM
                             invoiceNumberSeed = 10001;
                         }
 
-                        New_Number = string.Format("{0}-{1}-{2}", invoicePrefix, CompanyID, invoiceNumberSeed);
+                        New_Number = string.Format("{0}-{1}-{2}", invoicePrefix, Guid.NewGuid().ToString("N").Substring(0, 5).ToUpper(), invoiceNumberSeed);
 
                         sql = @"Update [msSchedulerV3].[dbo].[tbl_Company] set InvoiceNumberSeed=" + invoiceNumberSeed + " Where CompanyID= '" + CompanyID + "'";
 
@@ -794,7 +793,7 @@ namespace TPM
                             EstimateNumberSeed = 10001;
                         }
 
-                        New_Number = string.Format("{0}-{1}-{2}", EstimatePrefix, CompanyID, EstimateNumberSeed);
+                        New_Number = string.Format("{0}-{1}-{2}", EstimatePrefix, Guid.NewGuid().ToString("N").Substring(0, 5).ToUpper(), EstimateNumberSeed);
 
                         sql = @"Update [msSchedulerV3].[dbo].[tbl_Company] set EstimateNumberSeed=" + EstimateNumberSeed + " Where CompanyID= '" + CompanyID + "'";
 
@@ -810,11 +809,247 @@ namespace TPM
                 return DateTime.Now.ToString("hmmss");
             }
         }
+        [WebMethod(EnableSession = false)]
+        public static object Clone_Invoice(string InvID, string Indicator, string CustomerID)
+        {
+            CustomerProcessor customerProcessor = new CustomerProcessor();
 
+            string CompanyID = HttpContext.Current.Session["CompanyID"].ToString();
+            string InvoiceID = Guid.NewGuid().ToString().ToUpper();
+            string newInvoiceNumber = "";
+            string Message = "";
+            bool IsSuccess = false;
+            try
+            {
+                string _CmpId = HttpContext.Current.Session["CompanyID"].ToString();
+                string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
+                Database db = new Database(connStr);
+                //  db.Open();
+                string sql = "";
+
+                sql = "select A.*,isnull(QboId,0) QboIds from tbl_Invoice A where A.CompnyID='" + _CmpId + "' and A.id = '" + InvID + "' ";
+                DataTable dtMast;
+                db.Execute(sql, out dtMast);
+
+
+                DataRow dr = null;
+
+
+
+                if (dtMast.Rows.Count > 0) dr = dtMast.Rows[0];
+
+
+
+                sql = "select * from tbl_InvoiceDetails where RefId = '" + InvID + "'  and companyid ='" + HttpContext.Current.Session["CompanyID"].ToString() + "'";
+                DataTable dtDet;
+                db.Execute(sql, out dtDet);
+                string pId = ""; string pName = ""; string pQty = ""; string AllTaxable = ""; string pRate = ""; string pDes = ""; string sDate = ""; string spTag = "";
+                int i = 0;
+
+                foreach (DataRow _DataRow in dtDet.Rows)
+                {
+                    if (i > 0)
+                        spTag = "@";
+                    i += 1;
+                    pId += spTag + _DataRow["ItemId"].ToString().Trim();
+                    pName += spTag + _DataRow["ItemName"].ToString().Trim();
+                    pQty += spTag + _DataRow["Quantity"].ToString().Trim();
+                    AllTaxable += spTag + _DataRow["IsTaxable"].ToString().Trim();
+                    pRate += spTag + _DataRow["uPrice"].ToString().Trim();
+                    var pDesc = "n/a";
+                    if (!string.IsNullOrEmpty(_DataRow["Description"].ToString()))
+                    {
+                        pDesc = _DataRow["Description"].ToString();
+                    }
+
+                    pDes += spTag + pDesc.Trim();// dr["Description"].ToString().Trim();
+                    sDate += spTag + _DataRow["ServiceDate"].ToString().Trim();
+                }
+
+                string[] _PID = pId.Split('@');
+                string[] _PName = pName.Split('@');
+                string[] _Qty = pQty.Split('@');
+                string[] _Rate = pRate.Split('@');
+                string[] _Desc = pDes.Split('@');
+                string[] _SDate = sDate.Split('@');
+                string[] _AllTaxable = AllTaxable.Split('@');
+
+
+
+
+                if (Indicator == "Invoice")
+                {
+                    newInvoiceNumber = getNextNumber(true);
+                }
+                else
+                {
+                    newInvoiceNumber = getNextNumber(false);
+                }
+
+
+                // For Invoice Table DaTa
+                sql = @"Insert Into  [msSchedulerV3].[dbo].[tbl_Invoice]
+                                    ([ID]
+                                          ,[Number]
+                                          ,[CompanyID]
+                                          ,[CompnyID]
+                                          ,[DisplayNumber]
+                                          ,[CustomerId]
+                                          ,[UserId]
+                                          ,[Subtotal]
+                                          ,[Discount]
+                                          ,[Tax]
+                                          ,[Total]
+                                          ,[Status]
+                                          ,[InvoiceType]
+                                          ,[ModifiedDate]
+                                          ,[ModifiedBy]
+                                          ,[Note]
+                                          ,[LoanStatus]
+                                          ,[CreatedDate]
+                                          ,[CreatedBy]
+                                          ,[InvoiceDate]
+                                          ,[AmountCollect]
+                                          ,[TaxType]
+                                          ,[AppointmentId]
+                                          ,[Type]
+                                          ,[IsConverted]
+                                          ,[ConvertedInvocieID]
+                                          ,[QboId]
+                                          ,[DiscountRate]
+                                          ,[DiscountOption]
+                                          ,[QboEstimateId]
+                                          ,[ExpirationDate]
+                                          ,[SyncToken]
+                                          ,[QboPaymentID]
+                                          ,[DepositAmount] 
+                                          ,RequestedDepoAmt
+                                          ,ReqDepoPercent
+                                          ,RequestedAmtType
+                                            ,QboClassId
+                                            ,QboLocationId,
+                                            OppNumber,
+                                            SalesRep,
+                                            BillTo
+                                            ,ShipTo)
+                                      SELECT '" + InvoiceID + @"'
+                                          ,'" + newInvoiceNumber + @"'
+                                          ,[CompanyID]
+                                          ,[CompnyID]
+                                          ,[DisplayNumber]
+                                          ,[CustomerId]
+                                          ,[UserId]
+                                          ,[Subtotal]
+                                          ,[Discount]
+                                          ,[Tax]
+                                          ,[Total]
+                                          ,[Status]
+                                          ,[InvoiceType]
+                                          ,GETDATE()
+                                          ,[ModifiedBy]
+                                          ,[Note]
+                                          ,[LoanStatus]
+                                          ,GETDATE()
+                                          ,'CEC'
+                                          ,GETDATE()
+                                          ,[AmountCollect]
+                                          ,[TaxType]
+                                          ,[AppointmentId]
+                                          ,'" + Indicator + @"'
+                                          ,'0'
+                                          ,''
+                                          ,'0'
+                                          ,[DiscountRate]
+                                          ,[DiscountOption]
+                                          ,'0'
+                                          ,[ExpirationDate]
+                                          ,'0'
+                                          ,'0'
+                                          ,[DepositAmount]
+                                          ,RequestedDepoAmt
+                                          ,ReqDepoPercent
+                                            ,RequestedAmtType 
+                                            ,QboClassId
+                                            ,QboLocationId
+                                            ,OppNumber
+                                            ,SalesRep
+                                            ,BillTo
+                                            ,ShipTo 
+                                      FROM [msSchedulerV3].[dbo].[tbl_Invoice] where id = '" + InvID + "';";
+
+                // For Invocie Detail Table Data
+                sql += @"Insert INTO  [msSchedulerV3].[dbo].[tbl_InvoiceDetails]
+                                        (
+                                        [RefId]
+                                        ,[companyid]
+                                        ,[InvoiceId]
+                                        ,[InvoiceNumber]
+                                        ,[ItemId]
+                                        ,[Quantity]
+                                        ,[uPrice]
+                                        ,[ItemName]
+                                        ,[Description]
+                                        ,[CreatedBy]
+                                        ,[ModifiedDate]
+                                        ,[ModifiedBy]
+                                        ,[TotalPrice]
+                                        ,[createddate]
+                                        ,[ItemTyId]
+                                        ,[IsTaxable]
+                                        ,[ServiceDate]
+                                        ,[LineNum]
+                                        )
+                                        SELECT '" + InvoiceID + @"'
+                                              ,[companyid]
+                                              ,[InvoiceId]
+                                              ,[InvoiceNumber]
+                                              ,[ItemId]
+                                              ,[Quantity]
+                                              ,[uPrice]
+                                              ,[ItemName]
+                                              ,[Description]
+                                              ,[CreatedBy]
+                                              ,GETDATE()
+                                              ,[ModifiedBy]
+                                              ,[TotalPrice]
+                                              ,GETDATE()
+                                              ,[ItemTyId]
+                                              ,[IsTaxable]
+                                              ,[ServiceDate]
+                                              ,[LineNum]
+                                          FROM [msSchedulerV3].[dbo].[tbl_InvoiceDetails] where RefId = '" + InvID + "';";
+
+                db.Execute(sql);
+
+                db.Close();
+
+                IsSuccess = true;
+
+                Message = $"Cloned {Indicator} is created.<br/>  Number: {newInvoiceNumber}.";
+
+
+            }
+            catch (Exception ex)
+            {
+
+                Message = $"Unexpected Error.";
+            }
+
+            var response = new
+            {
+                Status = IsSuccess,
+                ID = InvoiceID,
+                CID = CustomerID,
+                Message = Message,
+                Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+            };
+
+            return response;
+        }
         [WebMethod(EnableSession = false)]
         public static QboCommon GetProductById(string pId = "")
         {
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             string query = "Select * from Items  where 1=1 and IsDeleted=0 and Id = '" + pId + "' and CompanyId='" + HttpContext.Current.Session["CompanyID"].ToString() + "' order by Name asc; ";
             Database db = new Database(connStr);
             //  db.Open();
@@ -841,7 +1076,7 @@ namespace TPM
             try
             {
                 string _Cid = HttpContext.Current.Session["CompanyID"].ToString();
-                string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+                string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
                 string query = "Select * from Items  where 1=1 and IsDeleted=0 and CompanyId='" + _Cid + "' order by Name asc; ";
                 Database db = new Database(connStr);
                 //  db.Open();
@@ -864,7 +1099,7 @@ namespace TPM
             if (pId == "")
                 pId = "0";
 
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             string query = " Select Name, Rate from Taxes where Id='" + pId + "' and CompanyId='" + HttpContext.Current.Session["CompanyID"].ToString() + "'";
 
             Database db = new Database(connStr);
@@ -905,7 +1140,9 @@ namespace TPM
             string _ExpirationDate = "",
             string _Date = "", string _Note = "", string _CompanyId = "",
             float _Paid = 0, string _Indicator = "", string _AppointmentID = "",
-            string InvoiceID = "", string _QboId = "", bool isNewTotal = false, string reqDepoAmt = "", string reqDepoPercent = "", string requestedAmtType = "", string QboClassId = "0", string QboLocationId = "0")
+            string InvoiceID = "", string _QboId = "", bool isNewTotal = false, string reqDepoAmt = "",
+            string reqDepoPercent = "", string requestedAmtType = "", string QboClassId = "0", string QboLocationId = "0",
+            bool IsQBOSync = false, string _PONO = "")
         {
             CustomerProcessor customerProcessor = new CustomerProcessor();
 
@@ -936,6 +1173,7 @@ namespace TPM
             TotalAmount = Common.CleanInput(TotalAmount);
             _Date = Common.CleanInput(_Date);
             _Note = Common.CleanInput(_Note);
+            _PONO = Common.CleanInput(_PONO);
             _CompanyId = Common.CleanInput(_CompanyId);
             _Indicator = Common.CleanInput(_Indicator);
             reqDepoAmt = Common.CleanInput(reqDepoAmt);
@@ -956,13 +1194,9 @@ namespace TPM
             if (string.IsNullOrEmpty(QboLocationId)) QboLocationId = "0";
             if (isNewTotal)
             {
-                if (HttpContext.Current.Session["IsWisetackEnabled"] != null)
-                {
-                    //WiseteckServicesSoapClient ws = new WiseteckServicesSoapClient();
-                    //ws.DeleteLoanInfo(_CompanyId, InvoiceID);
-                }
+                
             }
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             DateTime expirationDate = DateTime.Now.AddDays(7);
             try
             {
@@ -1024,15 +1258,15 @@ namespace TPM
                 {
                     InvoiceID = Guid.NewGuid().ToString().ToUpper();
 
-                    sql = sql + @" Insert into tbl_Invoice (ID,CompnyID, TaxType, Number, CustomerId, Note, UserId, Subtotal,DiscountOption,DiscountRate,Discount, Tax, Total, Status, InvoiceDate,ExpirationDate, InvoiceType, CreatedDate, CreatedBy,AmountCollect, Type , AppointmentId,QboId,RequestedDepoAmt,ReqDepoPercent,RequestedAmtType,QboClassId,QboLocationId) values
+                    sql = sql + @" Insert into tbl_Invoice (ID,CompnyID, TaxType, Number, CustomerId, Note, UserId, Subtotal,DiscountOption,DiscountRate,Discount, Tax, Total, Status, InvoiceDate,ExpirationDate, InvoiceType, CreatedDate, CreatedBy,AmountCollect, Type , AppointmentId,QboId,RequestedDepoAmt,ReqDepoPercent,RequestedAmtType,QboClassId,QboLocationId,AutoSync,PONO) values
                                 ( '" + InvoiceID + "','" + _CompanyId + "' , '" + TaxTp + "', '" + qNum + "', '" + CustomerId + "', '" + _Note.Replace("'", "''") + "', '" + HttpContext.Current.Session["LoginUser"].ToString() + "', '"
                                  + subTotal + "','" + discountOpt + "', '" + disRt + "','" + disAmt + "', '" + taxAmt + "', '" + tL + "', '" + "1" + "', '" + InvoiceDate.ToString("yyyy-MM-dd h:mm:ss tt") + "', '" + expirationDate.ToString("yyyy-MM-dd h:mm:ss tt") + "', '" + "" + "', '"
-                                 + DateTime.Now.ToString("yyyy-MM-dd h:mm:ss tt") + "', 'CEC' ," + _Paid + ",'" + _Indicator + "','" + _AppointmentID + "'," + QboInvoiceId + "," + Convert.ToDecimal(reqDepoAmt) + "," + Convert.ToInt32(reqDepoPercent) + "," + Convert.ToInt32(requestedAmtType) + "," + (string.IsNullOrEmpty(QboClassId) || QboClassId == "0" ? "NULL" : QboClassId) + "," + (string.IsNullOrEmpty(QboLocationId) || QboLocationId == "0" ? "NULL" : QboLocationId) + ") ;";
+                                 + DateTime.Now.ToString("yyyy-MM-dd h:mm:ss tt") + "', 'CEC' ," + _Paid + ",'" + _Indicator + "','" + _AppointmentID + "'," + QboInvoiceId + "," + Convert.ToDecimal(reqDepoAmt) + "," + Convert.ToInt32(reqDepoPercent) + "," + Convert.ToInt32(requestedAmtType) + "," + (string.IsNullOrEmpty(QboClassId) || QboClassId == "0" ? "NULL" : QboClassId) + "," + (string.IsNullOrEmpty(QboLocationId) || QboLocationId == "0" ? "NULL" : QboLocationId) + ", "+(IsQBOSync==false ? 0:1)+",'" + _PONO.Replace("'", "''") + "') ;";
                 }
                 else
                 {
                     IsExisting = true;
-                    sql += @"  Update tbl_Invoice set Subtotal= '" + subTotal + "',TaxType= '" + TaxTp + "',Note= '" + _Note.Replace("'", "''") + "',DiscountOption='" + discountOpt + "',DiscountRate='" + disRt + "', Discount = '" + disAmt + "', Tax = '" + taxAmt + "', Total = '" + tL + "',RequestedDepoAmt=" + depoAmt + ",ReqDepoPercent=" + depoPercent + ",RequestedAmtType=" + amtType + ", InvoiceDate = '" + _Date + "',QboClassId=" + (string.IsNullOrEmpty(QboClassId) || QboClassId == "0" ? "NULL" : QboClassId) + ",QboLocationId=" + (string.IsNullOrEmpty(QboLocationId) || QboLocationId == "0" ? "NULL" : QboLocationId) + " ";
+                    sql += @"  Update tbl_Invoice set Subtotal= '" + subTotal + "',TaxType= '" + TaxTp + "',Note= '" + _Note.Replace("'", "''") + "',DiscountOption='" + discountOpt + "',DiscountRate='" + disRt + "', Discount = '" + disAmt + "', Tax = '" + taxAmt + "', Total = '" + tL + "',RequestedDepoAmt=" + depoAmt + ",ReqDepoPercent=" + depoPercent + ",RequestedAmtType=" + amtType + ", InvoiceDate = '" + _Date + "',QboClassId=" + (string.IsNullOrEmpty(QboClassId) || QboClassId == "0" ? "NULL" : QboClassId) + ",QboLocationId=" + (string.IsNullOrEmpty(QboLocationId) || QboLocationId == "0" ? "NULL" : QboLocationId) + ", Autosync = "+ (IsQBOSync == false ? 0 : 1) + ",PONO='" + _PONO.Replace("'", "''") + "' ";
                     sql = sql + @" where   CompnyID = '" + _CompanyId + "' and ID='" + InvoiceID + "';";
                     sql = sql + @" delete from tbl_InvoiceDetails  where Refid = '" + InvoiceID + "' and companyid='" + _CompanyId + "' ;";
                 }
@@ -1052,159 +1286,117 @@ namespace TPM
                 db.Close();
                 //End Scheduler DB
 
-                //Insert For Jobs DB
-                if (string.IsNullOrEmpty(InvoiceID))
-                {
-                    Database dbJobs = new Database(ConfigurationManager.AppSettings["ConnStrJobs"].ToString());
-
-                    bool isAllDataFoundJobs = true;
-                    try
-                    {
-                        string JobCustId = GetJobsCustomerId(CustomerId, _CompanyId);
-                        string JobsUserId = GetJobsUsertId(HttpContext.Current.Session["LoginUser"].ToString());
-                        if (string.IsNullOrEmpty(JobCustId))
-                            isAllDataFoundJobs = false;
-                        else
-                        {
-                            string InvoiceUID = Guid.NewGuid().ToString("n").Substring(0, 8);
-
-                            string InvStatus = "0";
-                            if (_Indicator != "Invoice")
-                            {
-                                InvStatus = "1";
-                            }
-                            sqlJobInvoice = @"INSERT INTO [myServiceJobs].[dbo].[Invoices]
-                                                            ([Number],[InvoiceUID],[CompanyId],[CustomerId],[UserId],[Subtotal],
-                                                            [Discount],[Tax],[Total],[Status],[InvoiceDate],[InvoiceType],
-                                                            [CreatedDate],[ModifiedDate]) values
-                         ('" + qNum + "' ,'" + RandomString(8) + "' , '" + _CompanyId + "', " +
-                     "(select CustomerGuid from [msSchedulerV3].[dbo].tbl_Customer where [CustomerID] = '" + CustomerId + "' and CompanyID='" + _CompanyId + "')" +
-                     ", " + JobsUserId + ", '" +
-                      subTotal + "', '" + disAmt + "', '" + taxAmt + "', '" + tL + "','0','" + InvoiceDate.ToString("yyyy-MM-dd h:mm:ss tt", CultureInfo.InvariantCulture) + "', '" + InvStatus + "', SYSDATETIMEOFFSET(),SYSDATETIMEOFFSET());";
-
-                            for (int i = 0; i < _PID.Length - 1; i++)
-                            {
-                                decimal _TLPrice = Convert.ToDecimal(_Rate[i]) * Convert.ToDecimal(_Qty[i]);
-                                string Job_PID = GetJobsProductId(_PID[i], _CompanyId);
-                                string Taxable = _AllTaxable[i].ToUpper() == "YES" ? "1" : "0";
-                                sqlJobInvoiceDet += @" insert into InvoiceItems (InvoiceNumber,ItemId, Quantity, UnitPrice, ItemName , ItemDescription,  IsTaxable, CreatedDate,ModifiedDate) values
-                                        ('" + qNum + "', '" + Job_PID + "', '" + _Qty[i] + "', '" + _Rate[i] + "' , '" + _PName[i] + "', '" + _Desc[i] + "'," +
-                                        Taxable + "," + "SYSDATETIMEOFFSET(),SYSDATETIMEOFFSET()) ; ";
-                            }
-                        }
-                    }
-                    catch { isAllDataFoundJobs = false; }
-
-                    try
-                    {
-                        dbJobs.Open();
-                        if (_CompanyId.All(char.IsNumber) && isAllDataFoundJobs)
-                        {
-                            string JobsInvoice = " begin " + sqlJobInvoice + sqlJobInvoiceDet + " return end;";
-                            dbJobs.Execute(JobsInvoice);
-                        }
-                    }
-                    catch (Exception ex) { }
-                    //---------------End Jobs DB
-                    dbJobs.Close();
-                }
-
+            
                 //Inserting Into Quickbooks
-                //try
-                //{
-                //    if (_Indicator == "Invoice")
-                //    {
-                //        QBOSettins qBoStngPost = new QBOSettins();
-                //        QBOManager qBOManager = new QBOManager();
-                //        if (qBOManager.VerifyCompanySetting(_CompanyId, ref qBoStngPost))
-                //        {
-                //            string SyncToken = "";
-                //            string QboPaymentID = "0";
-                //            ServiceContext serviceContext = null;
-                //            if (CustomerQboID == "0")
-                //            {
-                //                qBOManager.CustomerSyncToQBO(serviceContext, qBoStngPost, _CompanyId);
-                //            }
+                try
+                {
+                    if (_Indicator == "Invoice")
+                    {
+                        QBOSettins qBoStngPost = new QBOSettins();
+                        QBOManager qBOManager = new QBOManager();
+                        if (qBOManager.VerifyCompanySetting(_CompanyId, ref qBoStngPost))
+                        {
+                            string SyncToken = "";
+                            string QboPaymentID = "0";
+                            ServiceContext serviceContext = null;
+                            if (CustomerQboID == "0")
+                            {
+                                qBOManager.CustomerSyncToQBO(serviceContext, qBoStngPost, _CompanyId);
+                            }
 
-                //            // Only send QboClassId and QboLocationId if IsPCS is true
-                //            string qboClassIdForQbo = "0";
-                //            string qboLocationIdForQbo = "0";
-                //            if (HttpContext.Current.Session["IsPCS"] != null && (bool)HttpContext.Current.Session["IsPCS"])
-                //            {
-                //                qboClassIdForQbo = QboClassId;
-                //                qboLocationIdForQbo = QboLocationId;
-                //            }
+                            // Only send QboClassId and QboLocationId if IsPCS is true
+                            string qboClassIdForQbo = "0";
+                            string qboLocationIdForQbo = "0";
+                           
+                                qboClassIdForQbo = QboClassId;
+                                qboLocationIdForQbo = QboLocationId;
+                           
 
-                //            QboInvoiceId = qBOManager.CreateInvoiceQbo(serviceContext, ref QboPaymentID, ref SyncToken, "0",
-                //                "", qBoStngPost, pId, pName, pDes, sDate, pQty, pRate
-                //                , AllTaxable, CustomerId, _Date, _Note, discountOpt,
-                //                disRt, disAmt, TaxTp, taxAmt, TotalAmount, qNum, _QboId, qboClassIdForQbo, qboLocationIdForQbo);
+                            QboInvoiceId = qBOManager.CreateInvoiceQbo(serviceContext, ref QboPaymentID, ref SyncToken, "0",
+                                "", qBoStngPost, pId, pName, pDes, sDate, pQty, pRate
+                                , AllTaxable, CustomerId, _Date, _Note, discountOpt,
+                                disRt, disAmt, TaxTp, taxAmt, TotalAmount, qNum, _QboId, qboClassIdForQbo, qboLocationIdForQbo, InvoiceID);
 
-                //            if (QboInvoiceId != "0")
-                //            {
-                //                if (!IsExisting)
-                //                {
-                //                    sql = "update tbl_Invoice set QboId='" + QboInvoiceId + "',SyncToken='" + SyncToken + "' " +
-                //                   " where ID='" + InvoiceID + "'" +
-                //                   " and CompnyID='" + _CompanyId + "' ";
-                //                }
-                //                else
-                //                {
-                //                    sql = "update tbl_Invoice SyncToken='" + SyncToken + "' " +
-                //                " where ID='" + InvoiceID + "'" +
-                //             " and CompnyID='" + _CompanyId + "' ";
-                //                }
+                            if (QboInvoiceId != "0")
+                            {
+                                if (!IsExisting)
+                                {
+                                    sql = "update tbl_Invoice set QboId='" + QboInvoiceId + "',SyncToken='" + SyncToken + "' " +
+                                   " where ID='" + InvoiceID + "'" +
+                                   " and CompnyID='" + _CompanyId + "' ";
+                                }
+                                else if (Convert.ToInt32(QboInvoiceId) > 0)
+                                {
+                                    sql = "update tbl_Invoice set QboId='" + QboInvoiceId + "',SyncToken='" + SyncToken + "' " +
+                                  " where ID='" + InvoiceID + "'" +
+                                  " and CompnyID='" + _CompanyId + "' ";
+                                }
 
-                //                db.Execute(sql);
-                //                db.Close();
-                //            }
-                //        }
-                //    }
-                //    else
-                //    {
-                //        QBOSettins qBoStngPost = new QBOSettins();
+                                else
+                                {
+                                    sql = "update tbl_Invoice SyncToken='" + SyncToken + "' " +
+                                " where ID='" + InvoiceID + "'" +
+                             " and CompnyID='" + _CompanyId + "' ";
+                                }
 
-                //        string SyncToken = "";
-                //        QBOManager qBOManager = new QBOManager();
-                //        if (qBOManager.VerifyCompanySetting(_CompanyId, ref qBoStngPost))
-                //        {
-                //            ServiceContext serviceContext = null;
-                //            if (CustomerQboID == "0")
-                //            {
-                //                qBOManager.CustomerSyncToQBO(serviceContext, qBoStngPost, _CompanyId);
-                //            }
-                //            // Only send QboClassId and QboLocationId if IsPCS is true
-                //            string qboClassIdForQbo = "0";
-                //            string qboLocationIdForQbo = "0";
-                //            if (HttpContext.Current.Session["IsPCS"] != null && (bool)HttpContext.Current.Session["IsPCS"])
-                //            {
-                //                qboClassIdForQbo = QboClassId;
-                //                qboLocationIdForQbo = QboLocationId;
-                //            }
+                                db.Execute(sql);
+                                db.Close();
+                            }
+                        }
+                    }
+                    else
+                    {
+                        QBOSettins qBoStngPost = new QBOSettins();
 
-                //            QboInvoiceId = qBOManager.CreateEstimateQbo(serviceContext, ref SyncToken, qBoStngPost, expirationDate, pId, pName, pDes, sDate, pQty, pRate, AllTaxable, CustomerId, "", _Date, _Note, discountOpt, disRt, disAmt, TaxTp, "", taxAmt, TotalAmount, qNum, _QboId, qboClassIdForQbo, qboLocationIdForQbo);
-                //            if (QboInvoiceId != "0")
-                //            {
-                //                if (!IsExisting)
-                //                {
-                //                    sql = "update tbl_Invoice set QboEstimateId='" + QboInvoiceId + "',SyncToken='" + SyncToken + "' " +
-                //                 " where ID='" + InvoiceID + "'" +
-                //                  " and CompnyID='" + _CompanyId + "' ";
-                //                }
-                //                else
-                //                {
-                //                    sql = "update tbl_Invoice SyncToken='" + SyncToken + "' " +
-                //                 " where ID='" + InvoiceID + "'" +
-                //                  " and CompnyID='" + _CompanyId + "' ";
-                //                }
+                        string SyncToken = "";
+                        QBOManager qBOManager = new QBOManager();
+                        if (qBOManager.VerifyCompanySetting(_CompanyId, ref qBoStngPost))
+                        {
+                            ServiceContext serviceContext = null;
+                            if (CustomerQboID == "0")
+                            {
+                                qBOManager.CustomerSyncToQBO(serviceContext, qBoStngPost, _CompanyId);
+                            }
+                            // Only send QboClassId and QboLocationId if IsPCS is true
+                            string qboClassIdForQbo = "0";
+                            string qboLocationIdForQbo = "0";
+                            if (HttpContext.Current.Session["IsPCS"] != null && (bool)HttpContext.Current.Session["IsPCS"])
+                            {
+                                qboClassIdForQbo = QboClassId;
+                                qboLocationIdForQbo = QboLocationId;
+                            }
 
-                //                db.Execute(sql);
-                //                db.Close();
-                //            }
-                //        }
-                //    }
-                //}
-                //catch { }
+                            QboInvoiceId = qBOManager.CreateEstimateQbo(serviceContext, ref SyncToken, qBoStngPost, expirationDate,
+                                pId, pName, pDes, sDate, pQty, pRate, AllTaxable, CustomerId, "", _Date, _Note, discountOpt, disRt, disAmt,
+                                TaxTp, "", taxAmt, TotalAmount, qNum, _QboId, qboClassIdForQbo, qboLocationIdForQbo, InvoiceID);
+                            if (QboInvoiceId != "0")
+                            {
+                                if (!IsExisting)
+                                {
+                                    sql = "update tbl_Invoice set QboEstimateId='" + QboInvoiceId + "',SyncToken='" + SyncToken + "' " +
+                                 " where ID='" + InvoiceID + "'" +
+                                  " and CompnyID='" + _CompanyId + "' ";
+                                }
+                                else if (Convert.ToInt32(QboInvoiceId) > 0)
+                                {
+                                    sql = "update tbl_Invoice set QboEstimateId='" + QboInvoiceId + "',SyncToken='" + SyncToken + "' " +
+                                  " where ID='" + InvoiceID + "'" +
+                                   " and CompnyID='" + _CompanyId + "' ";
+                                }
+                                else
+                                {
+                                    sql = "update tbl_Invoice SyncToken='" + SyncToken + "' " +
+                                 " where ID='" + InvoiceID + "'" +
+                                  " and CompnyID='" + _CompanyId + "' ";
+                                }
+
+                                db.Execute(sql);
+                                db.Close();
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex){ }
 
                 return "Data saved successfully.";
             }
@@ -1226,7 +1418,7 @@ namespace TPM
             _CustomerId = Common.CleanInput(_CustomerId);
             Qut_Number = Common.CleanInput(Qut_Number);
 
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             SqlConnection conn = new SqlConnection(connStr);
 
             string sql = "  Select  ID, RefId, ItemId, ItemName, Description, IsTaxable, Quantity, uPrice, TotalPrice from tbl_InvoiceDetails" +
@@ -1266,7 +1458,7 @@ namespace TPM
                     else if (dr["IsTaxable"].ToString().Trim() == "False")
                         table.Append("<td>No</td>");
                     else table.Append("<td>" + dr["IsTaxable"].ToString().Trim() + "&nbsp;</td>");
-                    table.Append("<td><a class='fa fa-trash' href='javascript: void(0);' onclick='removeThis(this)' style='font-size:30px;color:red'></a></td>");
+                    table.Append("<td><a class='fas fa-trash' href='javascript: void(0);' onclick='removeThis(this)' style='font-size:30px;color:red'></a></td>");
                     table.Append("</tr>");
                 }
                 // table.Append("</tbody>");
@@ -1358,7 +1550,7 @@ namespace TPM
             btnBack_ClickConvertInvoice();
         }
 
-      
+       
         private string LoadPaymentButtonArea(string invId, string custId, string QboId, string QBOCustomerId, string depositAmt, decimal dueAmount, string Status, string number)
         {
             string paySec = string.Empty;
@@ -1393,7 +1585,7 @@ namespace TPM
         private void FillCustomerAndInvoiceInfo(string _CustomerId, string InvoiceId)
         {
             DataTable dt;
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database db = new Database(connStr);
             // db.Open();
 
@@ -1458,10 +1650,10 @@ namespace TPM
         private void Load_InitialData(string InvoiceID, string _CustomerId)
         {
             string CompanyID = Session["CompanyID"].ToString();
-
+           // bool isAutosync = false;
             BindQboLocations(CompanyID);
             BindQboClasses(CompanyID);
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database db = new Database(connStr);
 
             string Sql = @" Select Name, Id from Taxes where IsDeleted ='0'  and CompanyId=@CompanyID ";
@@ -1478,6 +1670,8 @@ namespace TPM
                           ,[Title]
                           ,[FirstName]
                           ,BusinessName,IsBusinessContact
+                           ,isnull([BillToAddress],'') as BillToAddress
+                          ,isnull([ShipToAddress],'') as ShipToAddress
                           ,[LastName]
                           ,[JobTitle]
                           ,[Address1]
@@ -1499,13 +1693,13 @@ namespace TPM
             {
                 Sql += @"SELECT [ID]
                           ,[Number]
-                          ,[InvoiceDate]
+                          ,[InvoiceDate],AutoSync
                           ,[QboId]
                            ,IsConverted
                           ,[DiscountRate]
                           ,[QboEstimateId]
                            ,isnull([AmountCollect],0.00) as DepositAmount,Discount,Tax,(Total- (isnull(AmountCollect,0.00))) as Due
-                          ,[ExpirationDate],isnull(PONO,'') PONO
+                          ,[ExpirationDate],isnull(PONO,'') PONO,IsWarranty
                       FROM [msSchedulerV3].[dbo].[tbl_Invoice] Where CompnyID =@CompanyID And ID='" + InvoiceID + "'";
             }
 
@@ -1538,15 +1732,38 @@ namespace TPM
                 }
                 catch { }
 
+
+                // Disabled according to discussion with Gary
+                chk_QBOSync.Checked = Convert.ToBoolean(dr["AutoSync"]);
+                //if (Convert.ToBoolean(dr["AutoSync"]))
+                //{
+                //    isAutosync = true;
+                //}
+               
                 txt_Deposit.Value = dr["DepositAmount"].ToString();
                 txt_Due.Value = dr["Due"].ToString();
 
                 Number.Text = dr["Number"].ToString();
                 txt_InvocieNumber.Text = dr["Number"].ToString(); ;
                 HdInvoiceId.Value = dr["ID"].ToString();
-                lblPONO.Text = dr["PONO"].ToString();
+                txt_PONO.Text = dr["PONO"].ToString();
                 hf_QboEstimateId.Value = dr["QboEstimateId"].ToString();
                 HdQboId.Value = dr["QboId"].ToString();
+
+                SetWarrantyIndicator(dr["IsWarranty"]);
+
+                if (dr.Table.Columns.Contains("BillTo"))
+                {
+                    string invBillTo = dr["BillTo"].ToString();
+                    if (!string.IsNullOrWhiteSpace(invBillTo))
+                        BillToAddress.Text = invBillTo;
+                }
+                if (dr.Table.Columns.Contains("ShipTo"))
+                {
+                    string invShipTo = dr["ShipTo"].ToString();
+                    if (!string.IsNullOrWhiteSpace(invShipTo))
+                        ShipToAddress.Text = invShipTo;
+                }
 
                 if (Convert.ToBoolean(dr["IsConverted"]))
                 {
@@ -1556,6 +1773,7 @@ namespace TPM
             }
             else
             {
+                btn_Clone.Visible = false;
                 if (Request.Params["InType"] == "Proposal")
                 {
                     Qut_Number = getNextNumber(false);
@@ -1570,8 +1788,69 @@ namespace TPM
 
             Date.Text = invDate;
             ExpirationDate.Text = _ExpirationDate;
+            //if (!isAutosync)
+            //{
+            //    LoadQBoSyncSetting();
+            //}
+            
+        }
+        /// <summary>
+        /// Shows the warranty badge beside the page title. tbl_Invoice.IsWarranty is BIT NULL and is
+        /// set by the mobile app; NULL means it was never set, so no badge is shown.
+        /// </summary>
+        private void SetWarrantyIndicator(object isWarranty)
+        {
+            if (isWarranty == null || isWarranty == DBNull.Value)
+            {
+                lblWarranty.Visible = false;
+                return;
+            }
+
+            lblWarranty.Visible = true;
+            if (Convert.ToBoolean(isWarranty))
+            {
+                lblWarranty.Text = "<i class='fas fa-shield-alt'></i> Under Warranty";
+                lblWarranty.CssClass = "badge bg-success align-middle ms-2";
+            }
+            else
+            {
+                lblWarranty.Text = "Not Under Warranty";
+                lblWarranty.CssClass = "badge bg-secondary align-middle ms-2";
+            }
         }
 
+        private void LoadQBoSyncSetting()
+        {
+            Database db = new Database(ConfigurationManager.AppSettings["ConnString"].ToString());
+            try
+            {
+                string Sql = "";
+                DataTable dt;
+
+
+
+                Sql = "SELECT [IsSyncQBOInvoice],[IsSyncQBOEstimate]  FROM msSchedulerV3.dbo.tbl_Company where CompanyID = '" + CompanyID + "'";
+                db.Execute(Sql, out dt);
+
+                if (dt.Rows.Count > 0)
+                {
+                    DataRow dr = dt.Rows[0];
+                    if (Request.Params["InType"] == "Proposal")
+                    {
+                        chk_QBOSync.Checked = Convert.ToBoolean(dr["IsSyncQBOEstimate"]);
+                    }
+                    else
+                    {
+                        chk_QBOSync.Checked = Convert.ToBoolean(dr["IsSyncQBOInvoice"]);
+                    }
+
+                }
+                db.Close();
+
+            }
+            catch { }
+
+        }
         private void LoadCustomerData(DataTable dataTable)
         {
             DataRow dr = dataTable.Rows[0];
@@ -1603,10 +1882,68 @@ namespace TPM
 
             Address.Text = "Address : " + FullAddress;
             Contact.Text = "Phone # " + dr["Phone"].ToString() + ", " + dr["Mobile"].ToString() + " <br/> Email : " + dr["Email"].ToString();
+
+            string syncedBillStreet = dataTable.Columns.Contains("BillToAddress") ? dr["BillToAddress"].ToString().Trim() : "";
+            string syncedShipStreet = dataTable.Columns.Contains("ShipToAddress") ? dr["ShipToAddress"].ToString().Trim() : "";
+
+            bool isBusinessContact = false;
+            if (dataTable.Columns.Contains("IsBusinessContact"))
+            {
+                bool.TryParse(dr["IsBusinessContact"].ToString(), out isBusinessContact);
+            }
+
+            string businessName = dataTable.Columns.Contains("BusinessName") ? dr["BusinessName"].ToString().Trim() : "";
+            string personName = (dr["FirstName"].ToString().Trim() + " " + dr["LastName"].ToString().Trim()).Trim();
+
+            string CustomerName;
+            if (isBusinessContact && !string.IsNullOrEmpty(businessName))
+            {
+                CustomerName = string.IsNullOrEmpty(personName) ? businessName : businessName + " (" + personName + ")";
+            }
+            else
+            {
+                CustomerName = !string.IsNullOrEmpty(personName) ? personName : businessName;
+            }
+
+            string localStreet = dr["Address1"].ToString().Trim();
+            string city = dr["City"].ToString().Trim();
+            string state = dr["State"].ToString().Trim();
+            string zip = dr["ZipCode"].ToString().Trim();
+
+            string cityStateZip = "";
+            if (!string.IsNullOrEmpty(city))
+                cityStateZip = city;
+            if (!string.IsNullOrEmpty(state))
+                cityStateZip = string.IsNullOrEmpty(cityStateZip) ? state : cityStateZip + ", " + state;
+            if (!string.IsNullOrEmpty(zip))
+                cityStateZip = string.IsNullOrEmpty(cityStateZip) ? zip : cityStateZip + " " + zip;
+
+            // A synced value that already contains line breaks is a complete
+            // "Name / Street / City, State Zip" block (e.g. from QBO sync); use it
+            // as-is. A single-line value is just the street, so wrap it with the
+            // name and city/state/zip as before.
+            bool billIsBlock = syncedBillStreet.IndexOf('\n') >= 0;
+            bool shipIsBlock = syncedShipStreet.IndexOf('\n') >= 0;
+
+            string billStreet = !string.IsNullOrEmpty(syncedBillStreet) ? syncedBillStreet : localStreet;
+            string shipStreet = !string.IsNullOrEmpty(syncedShipStreet) ? syncedShipStreet : localStreet;
+
+            BillToAddress.Text = billIsBlock
+                ? syncedBillStreet
+                : string.Join(Environment.NewLine,
+                    new[] { CustomerName, billStreet, cityStateZip }
+                        .Where(s => !string.IsNullOrEmpty(s)));
+            ShipToAddress.Text = shipIsBlock
+                ? syncedShipStreet
+                : string.Join(Environment.NewLine,
+                    new[] { CustomerName, shipStreet, cityStateZip }
+                        .Where(s => !string.IsNullOrEmpty(s)));
+
+            string mobile = dr["Mobile"].ToString().Trim();
             if (!String.IsNullOrEmpty(dr["Phone"].ToString()) || !String.IsNullOrEmpty(dr["Mobile"].ToString()))
             {
                 string phone = dr["Phone"].ToString().Trim();
-                string mobile = dr["Mobile"].ToString().Trim();
+
 
                 if (string.IsNullOrEmpty(phone))
                 {
@@ -1625,6 +1962,12 @@ namespace TPM
                 }
 
 
+
+            }
+            if (!string.IsNullOrEmpty(mobile))
+            {
+                // Use mobile if phone is empty
+                customerMobile.Value = mobile;
             }
             string BusinessID = dr["BusinessID"].ToString();
 
@@ -1743,6 +2086,23 @@ namespace TPM
             return "0";
         }
 
+        // Shown when "Include Payment Link" is requested but the company's Virtual Terminal / payment link
+        // could not be generated (GetCSPaymentLink returned empty -> portal not configured for this company).
+        // Offers the user the choice to continue without the link; on confirm it sets a flag and re-triggers
+        // the same action (retryButtonClientId) so the PDF is generated/sent without the payment link.
+        private void ShowVirtualTerminalNotConfigured(string retryButtonClientId)
+        {
+            string script =
+                "if (typeof HidePdfGenLoader === 'function') { HidePdfGenLoader(); } " +
+                "Swal.fire({ title: 'Virtual Terminal is not configured for this company', " +
+                "text: 'Do you want to continue without the payment link?', icon: 'warning', " +
+                "showCancelButton: true, confirmButtonText: 'Yes, continue', cancelButtonText: 'No' })" +
+                ".then(function (result) { if (result.isConfirmed) { " +
+                "document.getElementById('hf_ContinueWithoutLink').value = 'true'; " +
+                "document.getElementById('" + retryButtonClientId + "').click(); } });";
+            ScriptManager.RegisterStartupScript(this, this.GetType(), "VTNotConfigured", script, true);
+        }
+
         protected void btn_PrintPdf_Click(object sender, EventArgs e)
         {
             string CompanyID = HttpContext.Current.Session["CompanyID"].ToString();
@@ -1763,7 +2123,11 @@ namespace TPM
             RecepientToEmail = Common.CleanInput(RecepientToEmail);
             //added by nazifa [7-31]
             Database db = new Database();
-            bool isSendPaymentLink = IsSendPaymentLink.Checked;
+            // If the user already chose to continue without the payment link (at preview generation),
+            // skip link generation. The decision persists (cleared in JS when the email dialog reopens)
+            // so the follow-up Email send does not prompt again.
+            bool continueWithoutLink = hf_ContinueWithoutLink.Value == "true";
+            bool isSendPaymentLink = IsSendPaymentLink.Checked && !continueWithoutLink;
             string CSPaymentLink = "";
             if (isSendPaymentLink == true)
             {
@@ -1784,17 +2148,24 @@ namespace TPM
 
                 if (reqDAmt > 0) amount = reqDepoAmount;
 
-                //CSPaymentLink = TPM.EmailProcessor.GetCSPaymentLink(CompanyID, textCustomerID, InvoiceNo, CustomerName, RecepientToEmail, amount);
+                CSPaymentLink = EmailProcessor.GetCSPaymentLink(CompanyID, textCustomerID, InvoiceNo, CustomerName, RecepientToEmail, amount);
             }
 
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            // Payment link requested but could not be generated: ask whether to continue without it.
+            if (isSendPaymentLink == true && string.IsNullOrEmpty(CSPaymentLink))
+            {
+                ShowVirtualTerminalNotConfigured(btn_PrintPdf.ClientID);
+                return;
+            }
+
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database dbJob = new Database(connStr);
             string reqDepoAmt = dbJob.ExecuteScalar("select ((isNULL(Total,0)-isNULL(AmountCollect,0)) * isNULL(ReqDepoPercent,0))/100 from tbl_invoice where id='" + _InvoiceNo.Value + "' and CompnyID='" + CompanyID + "'");
 
             string reqDepoAmtDollar = dbJob.ExecuteScalar("select isNULL(RequestedDepoAmt,0)reqDep from tbl_invoice where id='" + _InvoiceNo.Value + "' and CompnyID='" + CompanyID + "'");
 
-            if (reqDepoAmt == "0" || reqDepoAmt == "0.000000") reqDepoAmt = reqDepoAmtDollar;
-            decimal reqAmt = Convert.ToDecimal(reqDepoAmt);
+            if (reqDepoAmt == "0" || reqDepoAmt == "0.00") reqDepoAmt = reqDepoAmtDollar;
+            decimal reqAmt = Math.Round(Convert.ToDecimal(reqDepoAmt), 2);
 
             //end by nazifa
             List<HttpPostedFile> files = new List<HttpPostedFile>();
@@ -1811,31 +2182,31 @@ namespace TPM
             string pdfFileName = string.Empty;
             byte[] invoicepdf = null;
 
-            //if (hf_CurrentPdfType.Value == "AsaInvoice")
-            //{
-            //    invoicepdf = emailProcessor.InvoicePdfForASA(_CustomerID, InvoiceNo, "Invoice", CSPaymentLink, reqAmt);
-            //    pdfFileName = "_Invoice.pdf";
-            //}
-            //else if (hf_CurrentPdfType.Value == "AsaQuote")
-            //{
-            //    invoicepdf = emailProcessor.InvoicePdfForASA(_CustomerID, InvoiceNo, "Proposal", CSPaymentLink, reqAmt);
-            //    pdfFileName = "_Estimate.pdf";
-            //}
-            //else if (hf_CurrentPdfType.Value == "Invoice")
-            //{
-            //    pdfFileName = "_Invoice.pdf";
-            //    invoicepdf = emailProcessor.InvoicePdf(_CustomerID, InvoiceNo, "Invoice", CSPaymentLink, false, reqAmt);
-            //}
-            //else if (hf_CurrentPdfType.Value == "Estimate")
-            //{
-            //    invoicepdf = emailProcessor.InvoicePdf(_CustomerID, InvoiceNo, "Estimate", CSPaymentLink, false, reqAmt);
-            //    pdfFileName = "_Estimate.pdf";
-            //}
-            //else if (hf_CurrentPdfType.Value == "InvoiceWithoutDiscount")
-            //{
-            //    invoicepdf = emailProcessor.InvoicePdf(_CustomerID, InvoiceNo, "Invoice", CSPaymentLink, true, reqAmt);
-            //    pdfFileName = "_Invoice.pdf";
-            //}
+            if (hf_CurrentPdfType.Value == "AsaInvoice")
+            {
+                invoicepdf = emailProcessor.InvoicePdfForASA(_CustomerID, InvoiceNo, "Invoice", CSPaymentLink, reqAmt);
+                pdfFileName = "_Invoice.pdf";
+            }
+            else if (hf_CurrentPdfType.Value == "AsaQuote")
+            {
+                invoicepdf = emailProcessor.InvoicePdfForASA(_CustomerID, InvoiceNo, "Proposal", CSPaymentLink, reqAmt);
+                pdfFileName = "_Estimate.pdf";
+            }
+            else if (hf_CurrentPdfType.Value == "Invoice")
+            {
+                pdfFileName = "_Invoice.pdf";
+                invoicepdf = emailProcessor.InvoicePdf(_CustomerID, InvoiceNo, "Invoice", CSPaymentLink, false, reqAmt);
+            }
+            else if (hf_CurrentPdfType.Value == "Estimate")
+            {
+                invoicepdf = emailProcessor.InvoicePdf(_CustomerID, InvoiceNo, "Estimate", CSPaymentLink, false, reqAmt);
+                pdfFileName = "_Estimate.pdf";
+            }
+            else if (hf_CurrentPdfType.Value == "InvoiceWithoutDiscount")
+            {
+                invoicepdf = emailProcessor.InvoicePdf(_CustomerID, InvoiceNo, "Invoice", CSPaymentLink, true, reqAmt);
+                pdfFileName = "_Invoice.pdf";
+            }
 
             string strFolder;
 
@@ -1849,7 +2220,8 @@ namespace TPM
             File.WriteAllBytes(invoicestrFilePath, invoicepdf);
 
             string strUrl = "EmailHistoryContent/" + _CustomerID + "/" + invoiceCreated + pdfFileName;
-            ScriptManager.RegisterStartupScript(Page, Page.GetType(), "popup", "window.open('" + strUrl + "','_blank')", true);
+            // Show the generated PDF in the preview modal (user then chooses Print or Email) instead of a new tab.
+            ScriptManager.RegisterStartupScript(Page, Page.GetType(), "popup", "OpenPdfPreview('" + strUrl + "');", true);
         }
 
         [Obsolete]
@@ -1874,7 +2246,10 @@ namespace TPM
             // Invoice_List inv = new Invoice_List();
             //added by nazifa [7-31]
             Database db = new Database();
-            bool isSendPaymentLink = IsSendPaymentLink.Checked;
+            // Honor the decision made at preview generation. The Virtual Terminal popup is only shown
+            // during preview (btn_PrintPdf_Click); the Email send never prompts again.
+            bool continueWithoutLink = hf_ContinueWithoutLink.Value == "true";
+            bool isSendPaymentLink = IsSendPaymentLink.Checked && !continueWithoutLink;
             string CSPaymentLink = "";
             if (isSendPaymentLink == true)
             {
@@ -1892,14 +2267,14 @@ namespace TPM
 
                 if (reqDepoAmount == "0" || reqDepoAmount == "0.000000") reqDepoAmount = reqDepoAmtDollarAmt;
 
-                decimal reqDAmt = Convert.ToDecimal(reqDepoAmount);
+                decimal reqDAmt = Math.Round(Convert.ToDecimal(reqDepoAmount), 2);
 
                 if (reqDAmt > 0) amount = reqDepoAmount;
-                //CSPaymentLink = EmailProcessor.GetCSPaymentLink(CompanyID, textCustomerID, InvoiceNo, CustomerName, RecepientToEmail, amount);
+                CSPaymentLink = EmailProcessor.GetCSPaymentLink(CompanyID, textCustomerID, InvoiceNo, CustomerName, RecepientToEmail, amount);
             }
             //end by nazifa
 
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database dbJob = new Database(connStr);
             string reqDepoAmt = dbJob.ExecuteScalar("select ((isNULL(Total,0)-isNULL(AmountCollect,0)) * isNULL(ReqDepoPercent,0))/100 from tbl_invoice where id='" + _InvoiceNo.Value + "' and CompnyID='" + CompanyID + "'");
 
@@ -1908,9 +2283,6 @@ namespace TPM
             if (reqDepoAmt == "0" || reqDepoAmt == "0.000000") reqDepoAmt = reqDepoAmtDollar;
             decimal reqAmt = Convert.ToDecimal(reqDepoAmt);
 
-            EmailProcessor emailProcessor = new EmailProcessor();
-            //emailProcessor.GetWiseTackPaymentLink(InvoiceNo, txtCustomerID);
-
             CustomerProcessor customerProcessor = new CustomerProcessor();
 
             if (customerProcessor.CheckIfValidCustomer(new CustomerEntity { CompanyID = CompanyID, CustomerGuid = txtCustomerID }))
@@ -1918,35 +2290,38 @@ namespace TPM
                 txtCustomerID = customerProcessor.GetCustomerByGuid(txtCustomerID, CompanyID).CustomerID;
             }
 
+            EmailProcessor emailProcessor = new EmailProcessor();
+            emailProcessor.GetWiseTackPaymentLink(InvoiceNo, txtCustomerID);
+
             string returnMessage = "";
             string pdf_FileName = "_Proposal.pdf";
 
             byte[] invoicepdf = null;
 
-            //if (hf_CurrentPdfType.Value == "AsaInvoice")
-            //{
-            //    pdf_FileName = "_Invoice.pdf";
-            //    invoicepdf = emailProcessor.InvoicePdfForASA(txtCustomerID, InvoiceNo, "Invoice", CSPaymentLink, reqAmt);
-            //}
-            //if (hf_CurrentPdfType.Value == "AsaQuote")
-            //{
-            //    invoicepdf = emailProcessor.InvoicePdfForASA(txtCustomerID, InvoiceNo, "Proposal", CSPaymentLink, reqAmt);
-            //}
-            //if (hf_CurrentPdfType.Value == "Invoice")
-            //{
-            //    pdf_FileName = "_Invoice.pdf";
-            //    invoicepdf = emailProcessor.InvoicePdf(txtCustomerID, InvoiceNo, "Invoice", CSPaymentLink, false, reqAmt);
-            //}
-            //if (hf_CurrentPdfType.Value == "Estimate")
-            //{
-            //    invoicepdf = emailProcessor.InvoicePdf(txtCustomerID, InvoiceNo, "Estimate", CSPaymentLink, false, reqAmt);
-            //    pdf_FileName = "_Estimate.pdf";
-            //}
-            //else if (hf_CurrentPdfType.Value == "InvoiceWithoutDiscount")
-            //{
-            //    invoicepdf = emailProcessor.InvoicePdf(txtCustomerID, InvoiceNo, "Invoice", CSPaymentLink, true, reqAmt);
-            //    pdf_FileName = "_Invoice.pdf";
-            //}
+            if (hf_CurrentPdfType.Value == "AsaInvoice")
+            {
+                pdf_FileName = "_Invoice.pdf";
+                invoicepdf = emailProcessor.InvoicePdfForASA(txtCustomerID, InvoiceNo, "Invoice", CSPaymentLink, reqAmt);
+            }
+            if (hf_CurrentPdfType.Value == "AsaQuote")
+            {
+                invoicepdf = emailProcessor.InvoicePdfForASA(txtCustomerID, InvoiceNo, "Proposal", CSPaymentLink, reqAmt);
+            }
+            if (hf_CurrentPdfType.Value == "Invoice")
+            {
+                pdf_FileName = "_Invoice.pdf";
+                invoicepdf = emailProcessor.InvoicePdf(txtCustomerID, InvoiceNo, "Invoice", CSPaymentLink, false, reqAmt);
+            }
+            if (hf_CurrentPdfType.Value == "Estimate")
+            {
+                invoicepdf = emailProcessor.InvoicePdf(txtCustomerID, InvoiceNo, "Estimate", CSPaymentLink, false, reqAmt);
+                pdf_FileName = "_Estimate.pdf";
+            }
+            else if (hf_CurrentPdfType.Value == "InvoiceWithoutDiscount")
+            {
+                invoicepdf = emailProcessor.InvoicePdf(txtCustomerID, InvoiceNo, "Invoice", CSPaymentLink, true, reqAmt);
+                pdf_FileName = "_Invoice.pdf";
+            }
 
             string strFileName;
             string strFilePath;
@@ -2006,7 +2381,7 @@ namespace TPM
 
             //}
 
-            string exception = " Swal.fire('Email sent successfully.', '', 'Successfully');";
+            string exception = "(function(){function s(){try{if(typeof ClosePdfPreview==='function')ClosePdfPreview();}catch(e){}try{if(typeof ClosePopup==='function')ClosePopup();}catch(e){}try{if(typeof HidePdfGenLoader==='function')HidePdfGenLoader();}catch(e){}if(typeof Swal!=='undefined'){Swal.fire('Email sent successfully.','','success');}else{alert('Email sent successfully.');}}if(document.readyState==='complete'){s();}else{window.addEventListener('load',s);}})();";
             ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", exception, true);
         }
 
@@ -2033,7 +2408,10 @@ namespace TPM
 
             //added by nazifa [7-31]
             Database db = new Database();
-            bool isSendPaymentLink = IsSendPaymentLink.Checked;
+            // Honor the decision made at preview generation. The Virtual Terminal popup is only shown
+            // during preview (btn_PrintPdf_Click); the Email send never prompts again.
+            bool continueWithoutLink = hf_ContinueWithoutLink.Value == "true";
+            bool isSendPaymentLink = IsSendPaymentLink.Checked && !continueWithoutLink;
             string CSPaymentLink = "";
             if (isSendPaymentLink == true)
             {
@@ -2054,20 +2432,18 @@ namespace TPM
                 decimal reqDAmt = Convert.ToDecimal(reqDepoAmount);
 
                 if (reqDAmt > 0) amount = reqDepoAmount;
-                //CSPaymentLink = EmailProcessor.GetCSPaymentLink(CompanyID, textCustomerID, InvoiceNo, CustomerName, RecepientToEmail, amount);
+                CSPaymentLink = EmailProcessor.GetCSPaymentLink(CompanyID, textCustomerID, InvoiceNo, CustomerName, RecepientToEmail, amount);
             }
             //end by nazifa
 
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database dbJob = new Database(connStr);
             string reqDepoAmt = dbJob.ExecuteScalar("select ((isNULL(Total,0)-isNULL(AmountCollect,0)) * isNULL(ReqDepoPercent,0))/100 from tbl_invoice where id='" + _InvoiceNo.Value + "' and CompnyID='" + CompanyID + "'");
             string reqDepoAmtDollar = db.ExecuteScalar("select isNULL(RequestedDepoAmt,0)reqDep from tbl_invoice where id='" + _InvoiceNo.Value + "' and CompnyID='" + CompanyID + "'");
 
             if (reqDepoAmt == "0" || reqDepoAmt == "0.000000") reqDepoAmt = reqDepoAmtDollar;
-            decimal reqAmt = Convert.ToDecimal(reqDepoAmt);
+            decimal reqAmt = Math.Round(Convert.ToDecimal(reqDepoAmt), 2);
 
-            EmailProcessor emailProcessor = new EmailProcessor();
-            //emailProcessor.GetWiseTackPaymentLink(InvoiceNo, _CustomerId);
             string returnMessage = "";
             string strFileName;
             string strFilePath;
@@ -2080,32 +2456,35 @@ namespace TPM
                 _CustomerId = customerProcessor.GetCustomerByGuid(_CustomerId, CompanyID).CustomerID;
             }
 
+            EmailProcessor emailProcessor = new EmailProcessor();
+            emailProcessor.GetWiseTackPaymentLink(InvoiceNo, _CustomerId);
+
             string pdf_FileName = "_Proposal.pdf";
             byte[] proposalpdf = null;
 
-            //if (hf_CurrentPdfType.Value == "AsaInvoice")
-            //{
-            //    proposalpdf = emailProcessor.InvoicePdfForASA(_CustomerId, InvoiceNo, "Invoice", CSPaymentLink, reqAmt);
-            //    pdf_FileName = "_Invoice.pdf";
-            //}
-            //if (hf_CurrentPdfType.Value == "AsaQuote")
-            //{
-            //    proposalpdf = emailProcessor.InvoicePdfForASA(_CustomerId, InvoiceNo, "Proposal", CSPaymentLink, reqAmt);
-            //}
-            //if (hf_CurrentPdfType.Value == "Invoice")
-            //{
-            //    pdf_FileName = "_Invoice.pdf";
-            //    proposalpdf = emailProcessor.InvoicePdf(_CustomerId, InvoiceNo, "Invoice", CSPaymentLink, false, reqAmt);
-            //}
-            //if (hf_CurrentPdfType.Value == "Estimate")
-            //{
-            //    proposalpdf = emailProcessor.InvoicePdf(_CustomerId, InvoiceNo, "Estimate", CSPaymentLink, false, reqAmt);
-            //}
-            //else if (hf_CurrentPdfType.Value == "InvoiceWithoutDiscount")
-            //{
-            //    proposalpdf = emailProcessor.InvoicePdf(_CustomerId, InvoiceNo, "Invoice", CSPaymentLink, true, reqAmt);
-            //    pdf_FileName = "_Invoice.pdf";
-            //}
+            if (hf_CurrentPdfType.Value == "AsaInvoice")
+            {
+                proposalpdf = emailProcessor.InvoicePdfForASA(_CustomerId, InvoiceNo, "Invoice", CSPaymentLink, reqAmt);
+                pdf_FileName = "_Invoice.pdf";
+            }
+            if (hf_CurrentPdfType.Value == "AsaQuote")
+            {
+                proposalpdf = emailProcessor.InvoicePdfForASA(_CustomerId, InvoiceNo, "Proposal", CSPaymentLink, reqAmt);
+            }
+            if (hf_CurrentPdfType.Value == "Invoice")
+            {
+                pdf_FileName = "_Invoice.pdf";
+                proposalpdf = emailProcessor.InvoicePdf(_CustomerId, InvoiceNo, "Invoice", CSPaymentLink, false, reqAmt);
+            }
+            if (hf_CurrentPdfType.Value == "Estimate")
+            {
+                proposalpdf = emailProcessor.InvoicePdf(_CustomerId, InvoiceNo, "Estimate", CSPaymentLink, false, reqAmt);
+            }
+            else if (hf_CurrentPdfType.Value == "InvoiceWithoutDiscount")
+            {
+                proposalpdf = emailProcessor.InvoicePdf(_CustomerId, InvoiceNo, "Invoice", CSPaymentLink, true, reqAmt);
+                pdf_FileName = "_Invoice.pdf";
+            }
 
             string proposalCreated = DateTime.UtcNow.ToString("yyyy-MM-dd_HH-mm-ss-fff");
             string _Path = "~/EmailHistoryContent/" + _CustomerId + "/";
@@ -2165,7 +2544,7 @@ namespace TPM
 
             //}
 
-            string exception = " Swal.fire('Email sent successfully.', '', 'Successfully');";
+            string exception = "(function(){function s(){try{if(typeof ClosePdfPreview==='function')ClosePdfPreview();}catch(e){}try{if(typeof ClosePopup==='function')ClosePopup();}catch(e){}try{if(typeof HidePdfGenLoader==='function')HidePdfGenLoader();}catch(e){}if(typeof Swal!=='undefined'){Swal.fire('Email sent successfully.','','success');}else{alert('Email sent successfully.');}}if(document.readyState==='complete'){s();}else{window.addEventListener('load',s);}})();";
             ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", exception, true);
         }
 
@@ -2183,7 +2562,10 @@ namespace TPM
             RecepientToEmail = Common.CleanInput(RecepientToEmail);
 
             Database db = new Database();
-            bool isSendPaymentLink = IsSendPaymentLink.Checked;
+            // Honor a "continue without link" decision; otherwise prompt below if the link can't be generated.
+            bool continueWithoutLink = hf_ContinueWithoutLink.Value == "true";
+            hf_ContinueWithoutLink.Value = "";
+            bool isSendPaymentLink = IsSendPaymentLink.Checked && !continueWithoutLink;
             string CSPaymentLink = "";
             if (isSendPaymentLink == true)
             {
@@ -2204,10 +2586,10 @@ namespace TPM
 
                 if (reqDAmt > 0) amount = reqDepoAmount;
 
-                //CSPaymentLink = EmailProcessor.GetCSPaymentLink(CompanyID, textCustomerID, InvoiceNo, CustomerName, RecepientToEmail, amount);
+                CSPaymentLink = EmailProcessor.GetCSPaymentLink(CompanyID, textCustomerID, InvoiceNo, CustomerName, RecepientToEmail, amount);
             }
 
-            string connStr = ConfigurationManager.AppSettings["ConnString"].ToString();
+            string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
             Database dbJob = new Database(connStr);
             string reqDepoAmt = dbJob.ExecuteScalar("select ((isNULL(Total,0)-isNULL(AmountCollect,0)) * isNULL(ReqDepoPercent,0))/100 from tbl_invoice where id='" + _InvoiceNo.Value + "' and CompnyID='" + CompanyID + "'");
 
@@ -2218,6 +2600,13 @@ namespace TPM
 
             //end by nazifa
             List<HttpPostedFile> files = new List<HttpPostedFile>();
+
+            // Payment link requested but could not be generated: ask whether to continue without it.
+            if (isSendPaymentLink == true && string.IsNullOrEmpty(CSPaymentLink))
+            {
+                ShowVirtualTerminalNotConfigured(btn_SendMMS.ClientID);
+                return;
+            }
 
             CustomerProcessor customerProcessor = new CustomerProcessor();
             string mobile = "";
@@ -2239,31 +2628,31 @@ namespace TPM
             string pdfFileName = string.Empty;
             byte[] invoicepdf = null;
 
-            //if (hf_CurrentPdfType.Value == "AsaInvoice")
-            //{
-            //    invoicepdf = emailProcessor.InvoicePdfForASA(_CustomerID, InvoiceNo, "Invoice", CSPaymentLink, reqAmt);
-            //    pdfFileName = "_Invoice.pdf";
-            //}
-            //else if (hf_CurrentPdfType.Value == "AsaQuote")
-            //{
-            //    invoicepdf = emailProcessor.InvoicePdfForASA(_CustomerID, InvoiceNo, "Proposal", CSPaymentLink, reqAmt);
-            //    pdfFileName = "_Estimate.pdf";
-            //}
-            //else if (hf_CurrentPdfType.Value == "Invoice")
-            //{
-            //    pdfFileName = "_Invoice.pdf";
-            //    invoicepdf = emailProcessor.InvoicePdf(_CustomerID, InvoiceNo, "Invoice", CSPaymentLink, false, reqAmt);
-            //}
-            //else if (hf_CurrentPdfType.Value == "Estimate")
-            //{
-            //    invoicepdf = emailProcessor.InvoicePdf(_CustomerID, InvoiceNo, "Estimate", CSPaymentLink, false, reqAmt);
-            //    pdfFileName = "_Estimate.pdf";
-            //}
-            //else if (hf_CurrentPdfType.Value == "InvoiceWithoutDiscount")
-            //{
-            //    invoicepdf = emailProcessor.InvoicePdf(_CustomerID, InvoiceNo, "Invoice", CSPaymentLink, true, reqAmt);
-            //    pdfFileName = "_Invoice.pdf";
-            //}
+            if (hf_CurrentPdfType.Value == "AsaInvoice")
+            {
+                invoicepdf = emailProcessor.InvoicePdfForASA(_CustomerID, InvoiceNo, "Invoice", CSPaymentLink, reqAmt);
+                pdfFileName = "_Invoice.pdf";
+            }
+            else if (hf_CurrentPdfType.Value == "AsaQuote")
+            {
+                invoicepdf = emailProcessor.InvoicePdfForASA(_CustomerID, InvoiceNo, "Proposal", CSPaymentLink, reqAmt);
+                pdfFileName = "_Estimate.pdf";
+            }
+            else if (hf_CurrentPdfType.Value == "Invoice")
+            {
+                pdfFileName = "_Invoice.pdf";
+                invoicepdf = emailProcessor.InvoicePdf(_CustomerID, InvoiceNo, "Invoice", CSPaymentLink, false, reqAmt);
+            }
+            else if (hf_CurrentPdfType.Value == "Estimate")
+            {
+                invoicepdf = emailProcessor.InvoicePdf(_CustomerID, InvoiceNo, "Estimate", CSPaymentLink, false, reqAmt);
+                pdfFileName = "_Estimate.pdf";
+            }
+            else if (hf_CurrentPdfType.Value == "InvoiceWithoutDiscount")
+            {
+                invoicepdf = emailProcessor.InvoicePdf(_CustomerID, InvoiceNo, "Invoice", CSPaymentLink, true, reqAmt);
+                pdfFileName = "_Invoice.pdf";
+            }
 
             string strFolder;
 
@@ -2278,55 +2667,354 @@ namespace TPM
             string baseUrl = ConfigurationManager.AppSettings["baseurl"];
             string mmsUrl = baseUrl + "EmailHistoryContent/" + _CustomerID + "/" + invoiceCreated + pdfFileName;
             string filePath = "EmailHistoryContent/" + _CustomerID + "/" + invoiceCreated + pdfFileName;
-            //TwilioSMSService twilio = new TwilioSMSService();
-            //bool result = twilio.SendInvoiceMMS(CompanyID, _CustomerID, mmsBody, mobile, filePath, mmsUrl);
-            //string response;
-            //if (result == true)
-            //{
-            //    response = " Swal.fire('MMS Sent Successfully', '', 'Success');CloseMMSPopup();";
-            //}
-            //else
-            //{
-            //    response = " Swal.fire('Something went wrong, Please try again.', '', 'Warning');CloseMMSPopup();";
-            //}
+            TwilioSMSService twilio = new TwilioSMSService();
+            bool result = twilio.SendInvoiceMMS(CompanyID, _CustomerID, mmsBody, mobile, filePath, mmsUrl);
+            string response;
+            if (result == true)
+            {
+                response = " Swal.fire('MMS Sent Successfully', '', 'Success');CloseMMSPopup();";
+            }
+            else
+            {
+                response = " Swal.fire('Something went wrong, Please try again.', '', 'Warning');CloseMMSPopup();";
+            }
 
-            //ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", response, true);
+            ScriptManager.RegisterStartupScript(this, this.GetType(), "ErrorAlertScript", response, true);
 
 
         }
         private void BindQboLocations(string companyId)
         {
 
-
-            using (SqlConnection conn = new SqlConnection(connStr))
+            try
             {
-                string query = "SELECT QboLocationID, Name FROM [msSchedulerV3].[dbo].Tbl_QboLocation where companyId= '" + companyId + "' ORDER BY Name";
-                SqlDataAdapter da = new SqlDataAdapter(query, conn);
-                DataTable dt = new DataTable();
-                da.Fill(dt);
+                using (SqlConnection conn = new SqlConnection(connStr))
+                {
+                    string query = "SELECT QboLocationID, Name FROM [msSchedulerV3].[dbo].Tbl_QboLocation where companyId= '" + companyId + "' ORDER BY Name";
+                    SqlDataAdapter da = new SqlDataAdapter(query, conn);
+                    DataTable dt = new DataTable();
+                    da.Fill(dt);
 
-                qboLocation.DataSource = dt;
-                qboLocation.DataTextField = "Name";
-                qboLocation.DataValueField = "QboLocationID";
-                qboLocation.DataBind();
-                qboLocation.Items.Insert(0, new System.Web.UI.WebControls.ListItem("-- Select Location --", ""));
+                    qboLocation.DataSource = dt;
+                    qboLocation.DataTextField = "Name";
+                    qboLocation.DataValueField = "QboLocationID";
+                    qboLocation.DataBind();
+
+                }
             }
+            catch { }
+           
+            qboLocation.Items.Insert(0, new System.Web.UI.WebControls.ListItem("-- Select Location --", ""));
         }
 
         private void BindQboClasses(string companyId)
         {
-            using (SqlConnection conn = new SqlConnection(connStr))
+            try
             {
-                string query = "SELECT QboClassId, Name FROM [msSchedulerV3].[dbo].Tbl_QboClass  where companyId= '" + companyId + "' ORDER BY Name";
-                SqlDataAdapter da = new SqlDataAdapter(query, conn);
-                DataTable dt = new DataTable();
-                da.Fill(dt);
+                using (SqlConnection conn = new SqlConnection(connStr))
+                {
+                    string query = "SELECT QboClassId, Name FROM [msSchedulerV3].[dbo].Tbl_QboClass  where companyId= '" + companyId + "' ORDER BY Name";
+                    SqlDataAdapter da = new SqlDataAdapter(query, conn);
+                    DataTable dt = new DataTable();
+                    da.Fill(dt);
 
-                qboClass.DataSource = dt;
-                qboClass.DataTextField = "Name";
-                qboClass.DataValueField = "QboClassId";
-                qboClass.DataBind();
-                qboClass.Items.Insert(0, new System.Web.UI.WebControls.ListItem("-- Select Class --", ""));
+                    qboClass.DataSource = dt;
+                    qboClass.DataTextField = "Name";
+                    qboClass.DataValueField = "QboClassId";
+                    qboClass.DataBind();
+
+                }
+            }
+            catch { }
+          
+            qboClass.Items.Insert(0, new System.Web.UI.WebControls.ListItem("-- Select Class --", ""));
+        }
+        [WebMethod]
+        public static string GetTextTemp(string type, string customerName)
+        {
+
+            try
+            {
+                string CompanyID = HttpContext.Current.Session["CompanyID"]?.ToString();
+
+                if (string.IsNullOrEmpty(CompanyID))
+                    return "0";
+
+                string textTemplate = "";
+                string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
+                using (SqlConnection con = new SqlConnection(connStr))
+                {
+                    string query = @"SELECT EstimateText, InvoiceText 
+                             FROM tbl_CustCommunication 
+                             WHERE CompanyID = @CompanyID";
+
+                    using (SqlCommand cmd = new SqlCommand(query, con))
+                    {
+                        cmd.Parameters.AddWithValue("@CompanyID", CompanyID);
+
+                        con.Open();
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                if (type == "Invoice")
+                                {
+
+                                    textTemplate = reader["InvoiceText"] == DBNull.Value
+                                                    ? ""
+                                                    : reader["InvoiceText"].ToString();
+                                }
+                                else
+                                {
+                                    textTemplate = reader["EstimateText"] == DBNull.Value
+                                               ? ""
+                                               : reader["EstimateText"].ToString();
+
+                                }
+
+                            }
+                        }
+
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(textTemplate))
+                {
+                    textTemplate = textTemplate.Replace("[First Name]", customerName);
+                }
+                var result = new
+                {
+                    textTemplate
+                };
+
+                return JsonConvert.SerializeObject(result);
+            }
+            catch (Exception ex)
+            {
+                return "0";
+            }
+        }
+
+        [WebMethod(EnableSession = true)]
+        public static string ResyncInvoiceToQbo(string invoiceId)
+        {
+            try
+            {
+                if (HttpContext.Current.Session["CompanyID"] == null)
+                    return "Session expired. Please log in again.";
+
+                string companyId = HttpContext.Current.Session["CompanyID"].ToString();
+                invoiceId = Common.CleanInput(invoiceId);
+                if (string.IsNullOrEmpty(invoiceId))
+                    return "Invalid invoice.";
+
+                string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
+                Database db = new Database(connStr);
+
+                string sql = @"SELECT [ID],[Number],[CustomerId],[Note],[Subtotal],[Discount],[Tax],[Total],[Status],
+                    [InvoiceDate],[AmountCollect],[TaxType],[Type],[QboId],[DiscountRate],[DiscountOption],
+                    [QboEstimateId],ISNULL(PONO,'') PONO,ISNULL(QboClassId,0) QboClassId,ISNULL(QboLocationId,0) QboLocationId
+                    FROM [msSchedulerV3].[dbo].[tbl_Invoice]
+                    WHERE ID='" + invoiceId + "' AND CompnyID='" + companyId + "'";
+
+                DataTable dtInvoice;
+                db.Execute(sql, out dtInvoice);
+                if (dtInvoice == null || dtInvoice.Rows.Count == 0)
+                    return "Invoice not found.";
+
+                DataRow dr = dtInvoice.Rows[0];
+                if (dr["Type"].ToString().Trim() != "Invoice")
+                    return "Only invoices can be re-synced to QuickBooks.";
+
+                string qboId = dr["QboId"].ToString().Trim();
+                if (string.IsNullOrEmpty(qboId) || qboId == "0")
+                    return "Invoice is not linked to QuickBooks. Save with 'Save To Quick Books' checked instead.";
+
+                sql = "SELECT [ItemId],[Quantity],[uPrice],[ItemName],[Description],[IsTaxable],[ServiceDate] " +
+                    "FROM [msSchedulerV3].[dbo].[tbl_InvoiceDetails] " +
+                    "WHERE RefId='" + invoiceId + "' AND companyid='" + companyId + "' " +
+                    "ORDER BY CAST(NULLIF(LineNum,'') AS INT) ASC";
+
+                DataTable dtDetails;
+                db.Execute(sql, out dtDetails);
+                if (dtDetails == null || dtDetails.Rows.Count == 0)
+                    return "Invoice has no line items to sync.";
+
+                string pid = "", pName = "", pDesc = "", sDate = "", pQty = "", pRate = "", pTax = "";
+                foreach (DataRow detailRow in dtDetails.Rows)
+                {
+                    pid += detailRow["ItemId"].ToString() + "@";
+                    pName += detailRow["ItemName"].ToString() + "@";
+                    pDesc += detailRow["Description"].ToString() + "@";
+                    sDate += detailRow["ServiceDate"].ToString() + "@";
+                    pQty += detailRow["Quantity"].ToString() + "@";
+                    pRate += detailRow["uPrice"].ToString() + "@";
+                    pTax += detailRow["IsTaxable"].ToString().Trim().Replace("No", "NON") + "@";
+                }
+
+                string notes = dr["Note"].ToString().Trim();
+                if (!string.IsNullOrEmpty(dr["PONO"].ToString().Trim()))
+                    notes = notes + Environment.NewLine + "PO: " + dr["PONO"].ToString().Trim();
+
+                string status = "0";
+                if ((Convert.ToDouble(dr["Total"].ToString()) - Convert.ToDouble(dr["AmountCollect"].ToString())) <= 0)
+                    status = "1";
+
+                QBOSettins qBoStngPost = new QBOSettins();
+                QBOManager qBOManager = new QBOManager();
+                if (!qBOManager.VerifyCompanySetting(companyId, ref qBoStngPost))
+                    return "QuickBooks Online is not configured for this company.";
+
+                ServiceContext serviceContext = null;
+                sql = "select isnull(QboId,0) QboId from tbl_Customer where CustomerID='" + dr["CustomerId"].ToString() + "' and CompanyID='" + companyId + "'";
+                DataTable dtCustomer;
+                db.Execute(sql, out dtCustomer);
+                if (dtCustomer != null && dtCustomer.Rows.Count > 0 && dtCustomer.Rows[0]["QboId"].ToString() == "0")
+                    qBOManager.EnsureCustomerInQbo(serviceContext, qBoStngPost, companyId, dr["CustomerId"].ToString());
+
+                string qboClassIdForQbo = "0";
+                string qboLocationIdForQbo = "0";
+                if (HttpContext.Current.Session["IsPCS"] != null && (bool)HttpContext.Current.Session["IsPCS"])
+                {
+                    qboClassIdForQbo = dr["QboClassId"].ToString();
+                    qboLocationIdForQbo = dr["QboLocationId"].ToString();
+                }
+
+                string syncToken = "";
+                string qboPaymentId = "0";
+                string invoiceDate = Convert.ToDateTime(dr["InvoiceDate"]).ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
+
+                string resultId = qBOManager.CreateInvoiceQbo(serviceContext, ref qboPaymentId, ref syncToken, status,
+                    dr["QboEstimateId"].ToString(), qBoStngPost, pid, pName, pDesc, sDate, pQty, pRate, pTax,
+                    dr["CustomerId"].ToString(), invoiceDate, notes, dr["DiscountOption"].ToString(),
+                    dr["DiscountRate"].ToString(), dr["Discount"].ToString(), dr["TaxType"].ToString(),
+                    dr["Tax"].ToString(), dr["Total"].ToString(), dr["Number"].ToString(), qboId,
+                    qboClassIdForQbo, qboLocationIdForQbo);
+
+                if (resultId == "-2")
+                    return "QuickBooks re-sync failed: could not resolve the customer in QuickBooks.";
+                if (resultId == "0" || resultId == "-1")
+                    return "QuickBooks re-sync failed. Please verify customer and line items.";
+
+                sql = "update tbl_Invoice set SyncToken='" + syncToken + "' where ID='" + invoiceId + "' and CompnyID='" + companyId + "'";
+                db.Execute(sql);
+                db.Close();
+
+                return "Invoice re-synced to QuickBooks successfully.";
+            }
+            catch (Exception ex)
+            {
+                return "Re-sync failed: " + ex.Message;
+            }
+        }
+
+        [WebMethod(EnableSession = true)]
+        public static string ResyncEstimateToQbo(string invoiceId)
+        {
+            try
+            {
+                if (HttpContext.Current.Session["CompanyID"] == null)
+                    return "Session expired. Please log in again.";
+
+                string companyId = HttpContext.Current.Session["CompanyID"].ToString();
+                invoiceId = Common.CleanInput(invoiceId);
+                if (string.IsNullOrEmpty(invoiceId))
+                    return "Invalid estimate.";
+
+                string connStr = ConfigurationManager.AppSettings["ConnStrSch"].ToString();
+                Database db = new Database(connStr);
+
+                string sql = @"SELECT [ID],[Number],[CustomerId],[Note],[Subtotal],[Discount],[Tax],[Total],[Status],
+                    [InvoiceDate],[AmountCollect],[TaxType],[Type],[QboId],[DiscountRate],[DiscountOption],
+                    [QboEstimateId],[ExpirationDate],ISNULL(PONO,'') PONO,ISNULL(QboClassId,0) QboClassId,ISNULL(QboLocationId,0) QboLocationId
+                    FROM [msSchedulerV3].[dbo].[tbl_Invoice]
+                    WHERE ID='" + invoiceId + "' AND CompnyID='" + companyId + "'";
+
+                DataTable dtInvoice;
+                db.Execute(sql, out dtInvoice);
+                if (dtInvoice == null || dtInvoice.Rows.Count == 0)
+                    return "Estimate not found.";
+
+                DataRow dr = dtInvoice.Rows[0];
+                string docType = dr["Type"].ToString().Trim();
+                if (docType != "Proposal" && docType != "Estimate")
+                    return "Only proposals/estimates can be re-synced to QuickBooks.";
+
+                string qboEstimateId = dr["QboEstimateId"].ToString().Trim();
+                // QboEstimateId 0 = first sync; -11 = retry after failed sync (handled in CreateEstimateQbo).
+
+                sql = "SELECT [ItemId],[Quantity],[uPrice],[ItemName],[Description],[IsTaxable],[ServiceDate] " +
+                    "FROM [msSchedulerV3].[dbo].[tbl_InvoiceDetails] " +
+                    "WHERE RefId='" + invoiceId + "' AND companyid='" + companyId + "' " +
+                    "ORDER BY CAST(NULLIF(LineNum,'') AS INT) ASC";
+
+                DataTable dtDetails;
+                db.Execute(sql, out dtDetails);
+                if (dtDetails == null || dtDetails.Rows.Count == 0)
+                    return "Estimate has no line items to sync.";
+
+                string pid = "", pName = "", pDesc = "", sDate = "", pQty = "", pRate = "", pTax = "";
+                foreach (DataRow detailRow in dtDetails.Rows)
+                {
+                    pid += detailRow["ItemId"].ToString() + "@";
+                    pName += detailRow["ItemName"].ToString() + "@";
+                    pDesc += detailRow["Description"].ToString() + "@";
+                    sDate += detailRow["ServiceDate"].ToString() + "@";
+                    pQty += detailRow["Quantity"].ToString() + "@";
+                    pRate += detailRow["uPrice"].ToString() + "@";
+                    pTax += detailRow["IsTaxable"].ToString().Trim().Replace("No", "NON") + "@";
+                }
+
+                string notes = dr["Note"].ToString().Trim();
+                if (!string.IsNullOrEmpty(dr["PONO"].ToString().Trim()))
+                    notes = notes + Environment.NewLine + "PO: " + dr["PONO"].ToString().Trim();
+
+                DateTime expirationDate = DateTime.Now.AddDays(42);
+                if (!string.IsNullOrEmpty(dr["ExpirationDate"].ToString()))
+                    expirationDate = Convert.ToDateTime(dr["ExpirationDate"]);
+
+                QBOSettins qBoStngPost = new QBOSettins();
+                QBOManager qBOManager = new QBOManager();
+                if (!qBOManager.VerifyCompanySetting(companyId, ref qBoStngPost))
+                    return "QuickBooks Online is not configured for this company.";
+
+                ServiceContext serviceContext = null;
+                sql = "select isnull(QboId,0) QboId from tbl_Customer where CustomerID='" + dr["CustomerId"].ToString() + "' and CompanyID='" + companyId + "'";
+                DataTable dtCustomer;
+                db.Execute(sql, out dtCustomer);
+                if (dtCustomer != null && dtCustomer.Rows.Count > 0 && dtCustomer.Rows[0]["QboId"].ToString() == "0")
+                    qBOManager.EnsureCustomerInQbo(serviceContext, qBoStngPost, companyId, dr["CustomerId"].ToString());
+
+                string qboClassIdForQbo = "0";
+                string qboLocationIdForQbo = "0";
+                if (HttpContext.Current.Session["IsPCS"] != null && (bool)HttpContext.Current.Session["IsPCS"])
+                {
+                    qboClassIdForQbo = dr["QboClassId"].ToString();
+                    qboLocationIdForQbo = dr["QboLocationId"].ToString();
+                }
+
+                string syncToken = "";
+                string invoiceDate = Convert.ToDateTime(dr["InvoiceDate"]).ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
+
+                string resultId = qBOManager.CreateEstimateQbo(serviceContext, ref syncToken, qBoStngPost, expirationDate,
+                    pid, pName, pDesc, sDate, pQty, pRate, pTax, dr["CustomerId"].ToString(), "", invoiceDate, notes,
+                    dr["DiscountOption"].ToString(), dr["DiscountRate"].ToString(), dr["Discount"].ToString(),
+                    dr["TaxType"].ToString(), "", dr["Tax"].ToString(), dr["Total"].ToString(), dr["Number"].ToString(),
+                    qboEstimateId, qboClassIdForQbo, qboLocationIdForQbo);
+
+                string resyncError = QBOManager.GetEstimateQboSyncErrorMessage(resultId);
+                if (!string.IsNullOrEmpty(resyncError))
+                    return resyncError;
+
+                sql = "update tbl_Invoice set QboEstimateId='" + resultId + "',SyncToken='" + syncToken + "' where ID='" + invoiceId + "' and CompnyID='" + companyId + "'";
+                db.Execute(sql);
+                db.Close();
+
+                return "Estimate re-synced to QuickBooks successfully.";
+            }
+            catch (Exception ex)
+            {
+                return "Re-sync failed: " + ex.Message;
             }
         }
 

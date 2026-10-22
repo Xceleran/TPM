@@ -201,7 +201,7 @@ function CreateProposal(type) {
     var refId = getBusinessGuid();
     if (!requireSavedBusiness('Create ' + (type === 'Proposal' ? 'Estimate' : 'Invoice'))) return false;
     var inType = (type === 'Proposal') ? 'Proposal' : 'Invoice';
-    window.location.href = 'InvoiceCreate.aspx?m=0&InvNum=0&cId=' + encodeURIComponent(refId) + '&InType=' + encodeURIComponent(inType);
+    window.location.href = 'Invoice.aspx?m=0&InvNum=0&cId=' + encodeURIComponent(refId) + '&InType=' + encodeURIComponent(inType);
     return false;
 }
 

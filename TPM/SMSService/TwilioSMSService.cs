@@ -12,6 +12,7 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Net;
 using System.Web;
+using TPM.Entity;
 using Twilio;
 using Twilio.Rest.Api.V2010.Account;
 using Twilio.Rest.Api.V2010.Account.Message;
@@ -118,7 +119,13 @@ namespace FSM.SMSService
             var digitCount = digits.Count(c => char.IsDigit(c));
             return digitCount >= 7; // Minimum digits for a valid phone number
         }
-
+        public bool SendInvoiceMMS(string companyId, string customerId, string MMSBody, string mobile, string filePath, string mmsUrl)
+        {
+            bool result = false;
+            string smsSid = SendMMS(mobile, MMSBody, mmsUrl, out result);
+            LogMMS(companyId, customerId, "", "", mobile, "InvoiceMMS", MMSBody, smsSid, filePath);
+            return result;
+        }
         public string SendSMS(string recipientNumber, string message, string companyId)
         {
             try
@@ -160,36 +167,49 @@ namespace FSM.SMSService
         }
 
 
-        public string SendMMS(string recipientNumber, string message, string fileUrl, string companyId)
+        public string SendMMS(string recipientNumber, string message, string fileUrl, out Boolean result)
         {
+
+
             try
             {
                 ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
 
-                var credentials = GetTwilioCredentials(companyId);
-                TwilioClient.Init(credentials.AccountSid, credentials.AuthToken);
+                CommonClass common = new CommonClass();
+                TwilioSetting twilioSetting = common.GettwilioSetting();
 
-                var to = new PhoneNumber(Common.getValidPhoneNumber(recipientNumber));
-                var msg = MessageResource.Create(
-                    to,
-                    from: new PhoneNumber(credentials.PhoneNumber),
-                    body: message,
-                    mediaUrl: new List<Uri> {
-                    new Uri(fileUrl) });
-                return msg.Sid;
-            }
-            catch (Twilio.Exceptions.ApiException ex)
-            {
-                throw new ApplicationException($"Failed to send MMS: {ex.Message}", ex);
-            }
-            catch (Twilio.Exceptions.AuthenticationException ex)
-            {
-                throw new ApplicationException($"Authentication Error: {ex.Message}", ex);
+                TwilioClient.Init(twilioSetting.TwilioAccountSid, twilioSetting.TwilioAccountAuthToken);
+
+                var to = new PhoneNumber(recipientNumber);
+                if (!string.IsNullOrEmpty(fileUrl))
+                {
+                    var msg = MessageResource.Create(
+                   to,
+                   from: new PhoneNumber(twilioSetting.TwilioPhoneNumber),
+                   body: message,
+                   mediaUrl: new List<Uri> {
+                new Uri(fileUrl) });
+                    result = true;
+                    return msg.Sid;
+                }
+                else
+                {
+                    var msg = MessageResource.Create(
+                   to,
+                   from: new PhoneNumber(twilioSetting.TwilioPhoneNumber),
+                   body: message);
+                    result = true;
+                    return msg.Sid;
+                }
             }
             catch (Exception ex)
             {
-                throw new ApplicationException($"Unexpected Error: {ex.Message}", ex);
+                result = false;
+                return "";
             }
+
+
+
         }
 
         bool LogSMS(string companyId, string customerId, string resourceId, string apptId, string mobile, string SMSType, string SMSBody, string smsSid)
@@ -348,8 +368,8 @@ namespace FSM.SMSService
         public bool SendCustomerMMS(string companyId, string customerId, string MMSBody, string mobile, string filePath, string mmsUrl)
         {
             bool result = false;
-            string smsSid = SendMMS(mobile, MMSBody, mmsUrl, companyId);
-            result = LogMMS(companyId, customerId, "", "", mobile, "CustomerAdHocMMS", MMSBody, smsSid, filePath);
+            string smsSid = SendMMS(mobile, MMSBody, mmsUrl, out result);
+            LogMMS(companyId, customerId, "", "", mobile, "CustomerAdHocMMS", MMSBody, smsSid, filePath);
             return result;
         }
 

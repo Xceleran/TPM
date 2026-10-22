@@ -20,6 +20,7 @@ using FSM.SMSService;
 using FSM.Processors;
 using System.IO;
 using FSM.Models.AppoinmentModel;
+using System.Text.RegularExpressions;
 
 namespace TPM
 {
@@ -466,7 +467,7 @@ namespace TPM
             try
             {
                 db.Open();
-                string strSQL = @"SELECT isnull(Note,'') as Note FROM [msSchedulerV3].dbo.tbl_Appointment WHERE CompanyID='" + companyid + "' AND ApptID='" + ApptID + "'";
+                string strSQL = @"SELECT isnull(Message,'') as Note FROM [msSchedulerV3].dbo.tbl_Appointment WHERE CompanyID='" + companyid + "' AND ApptID='" + ApptID + "'";
                 db.Execute(strSQL, out dt);
                 db.Close();
 
@@ -474,12 +475,18 @@ namespace TPM
                 {
                     foreach (DataRow dr in dt.Rows)
                     {
+                        string sd = dr["Note"].ToString() ?? "";
+                        Int32 sdasd = sd.Length;
+                        string result = Regex.Replace(dr["Note"].ToString() ?? "", @"(\r\n){2,}", "\r\n");
+                        Int32 sdfsdf = result.Length;
+                         result = Regex.Replace(dr["Note"].ToString() ?? "", @"(\r\n)+", "\r\n");
+                        sdfsdf = result.Length;
                         sites.Add(new CustomerSite
                         {
                             
-                            Note = dr["Note"].ToString() ?? "",
-                           
-                        });
+                        Note = Regex.Replace(dr["Note"].ToString() ?? "", @"(\r\n){2,}", "\r\n"),
+
+                    });
                     }
                 }
                 

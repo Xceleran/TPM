@@ -190,6 +190,8 @@ $(document).ready(function () {
             success: function (response) {
                 var messages = response.d || [];
                 if (messages.length > 0 && messages[0].Note) {
+                    const formattedString = messages[0].Note.replace(/\r?\n|\r/g, '<br>')
+
                     $('#div_Msg').html(messages[0].Note);
                 } else {
                     $('#div_Msg').html('<p class="text-muted">No message found.</p>');
@@ -465,7 +467,7 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                     const mmsButton = `
                         <button class="cust-site-icon-btn cust-site-MMS-btn" title="Send MMS" data-site-id="${escapeHTML(site.Id)}" data-customer-id="${escapeHTML(site.CustomerID)}" data-MobileNumber-id="${escapeHTML(site.MobileNumber)}" data-is-default="${isDefaultSite}">
                             <i class="fa-solid fa-photo-film"></i></button>`;
-
+					const formattedString = notes.replace(/\r?\n|\r/g, '<br>')
                     const siteCardHTML = `
                         <div class="cust-site-card" data-site-id="${escapeHTML(site.Id)}">
                             <div class="cust-site-header">
@@ -516,14 +518,14 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                <div class="container">
                                   <div class="row justify-content-start">
                                     <div class="col-3">
-                                      Appointments Status :<select class="form-select form-select-sm appt-status-select" aria-label="Appointment status" style="width:150px;" data-appt-id="${escapeHTML(ApptID)}" data-customer-id="${escapeHTML(customerId)}" data-site-id="${escapeHTML(site.Id)}"><option value="0">Select</option><option ${IsApproved ? 'selected' : ''} value="Accept">Accept</option><option value="Confirm">Confirm</option><option ${!IsApproved ? 'selected' : ''} value="Pending">Pending</option><option value="Cancel">Cancel</option></select>
+                                      Appointments Status :<select class="form-select form-select-sm appt-status-select" aria-label="Appointment status" style="width:150px;" data-appt-id="${escapeHTML(ApptID)}" data-customer-id="${escapeHTML(customerId)}" data-site-id="${escapeHTML(site.Id)}"><option value="0">Select</option><option ${IsApproved ? 'selected' : ''} value="Accept">Accept</option><option ${!IsApproved ? 'selected' : ''} value="Pending">New Appt</option></select>
                                     </div>
                                     <div class="col-3">
                                      Scheduling Calendar :<select class="form-select form-select-sm appt-calendar-select" aria-label="Scheduling calendar" style="width:150px;" data-appt-id="${escapeHTML(ApptID)}"><option value="0">Select</option><option ${SchedulingCal == 'FSM' ? 'selected' : ''} value="FSM">FSM</option><option ${SchedulingCal == 'CEC' ? 'selected' : ''} value="CEC">CEC</option></select>
                                     </div>
                                   </div>
                                 </div>
-                                 Notes :<br>"${escapeHTML(notes)}"
+                                 Notes :<br>${formattedString}
                             </div>
                         </div>`;
                     sitesListContainer.append(siteCardHTML);
