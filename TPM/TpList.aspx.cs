@@ -157,7 +157,7 @@ namespace TPM
 
         public void LoadBusinessontactTable(string searchPerameter, string searchValue, string selectedTags)
         {
-            table.Append("<div><table id='example' class='table table-striped table-bordered nowrap'  style='border: 1px solid #ccc;font-size: 9pt;font-family:Arial;width:100%' >");
+            table.Append("<div><table id='example' class='table tp-table nowrap' style='width:100%'>");
 
             // The grid used to show tbl_Customer.Title (a salutation, empty on every provider
             // row) while the "Job Title" search option filtered on JobTitle - two different
@@ -266,7 +266,7 @@ namespace TPM
                     // on this page (Send Email / SMS / MMS / Ratings) unreachable - and it is
                     // why the export config addressed columns 1-6 of a 7-column table.
                     table.Append("<td class='tp-actions no-export'><div class='dropdown'>"
-                        + "<button class='btn btn-sm btn-outline-secondary dropdown-toggle' type='button' id='tpAction" + i2.ToString() + "' data-bs-toggle='dropdown' aria-expanded='false'>"
+                        + "<button class='btn btn-sm tp-action-btn' type='button' title='Actions' id='tpAction" + i2.ToString() + "' data-bs-toggle='dropdown' data-bs-popper-config='{&quot;strategy&quot;:&quot;fixed&quot;}' aria-expanded='false'>"
                         + "<i class='fas fa-ellipsis-v'></i></button>"
                         + "<ul class='dropdown-menu' aria-labelledby='tpAction" + i2.ToString() + "'>"
                         + "<li><a class='dropdown-item' href='BusinessContact.aspx?id=" + HttpUtility.HtmlAttributeEncode(custGuid) + "'><i class='fas fa-up-right-from-square me-2'></i>Open Provider</a></li>"
@@ -283,7 +283,7 @@ namespace TPM
                     // into the markup raw, so a provider name containing < or a quote broke the
                     // table and a script tag would have executed (stored XSS). CleanInput only
                     // ever guarded the search box, never what came back out of the database.
-                    table.Append("<td><a style='color:#526288' href='BusinessContact.aspx?id=" + HttpUtility.HtmlAttributeEncode(custGuid) + "'>" + Enc(businessName) + "</a></td>");
+                    table.Append("<td><a class='tp-link' href='BusinessContact.aspx?id=" + HttpUtility.HtmlAttributeEncode(custGuid) + "'>" + Enc(businessName) + "</a></td>");
                     table.Append("<td>" + Enc(dr["JobTitle"]) + "</td>");
 
                     string FullAddress = string.Empty;
@@ -299,16 +299,16 @@ namespace TPM
                     // or mail; the old markup emitted <a href='tel: '></a> on every blank cell.
                     table.Append("<td>" + (string.IsNullOrWhiteSpace(mobile)
                         ? string.Empty
-                        : "<a style='color:#526288' href='tel:" + HttpUtility.HtmlAttributeEncode(mobile.Trim()) + "'>" + Enc(mobile) + "</a>") + "</td>");
+                        : "<a class='tp-link' href='tel:" + HttpUtility.HtmlAttributeEncode(mobile.Trim()) + "'>" + Enc(mobile) + "</a>") + "</td>");
 
                     string phone = dr["Phone"].ToString();
                     table.Append("<td>" + (string.IsNullOrWhiteSpace(phone)
                         ? string.Empty
-                        : "<a style='color:#526288' href='tel:" + HttpUtility.HtmlAttributeEncode(phone.Trim()) + "'>" + Enc(phone) + "</a>") + "</td>");
+                        : "<a class='tp-link' href='tel:" + HttpUtility.HtmlAttributeEncode(phone.Trim()) + "'>" + Enc(phone) + "</a>") + "</td>");
 
                     table.Append("<td>" + (string.IsNullOrWhiteSpace(email)
                         ? string.Empty
-                        : "<a href='mailto:" + HttpUtility.HtmlAttributeEncode(email.Trim()) + "'>" + Enc(email) + "</a>") + "</td>");
+                        : "<a class='tp-link' href='mailto:" + HttpUtility.HtmlAttributeEncode(email.Trim()) + "'>" + Enc(email) + "</a>") + "</td>");
 
                     table.Append("</tr>");
                 }

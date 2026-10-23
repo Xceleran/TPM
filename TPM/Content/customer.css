@@ -1416,3 +1416,443 @@ div#contact {
 #cfChipTooltip .cf-tt-opt-sel { color: #198754; font-weight: 500; }
 #cfChipTooltip .cf-tt-empty { font-style: italic; color: #adb5bd; }
 #cfChipTooltip .cf-tt-value { color: #212529; word-break: break-word; }
+
+
+/* ==========================================================================
+   Refresh: list toolbar, section toggle, customer header, site filter bar,
+   site cards and the DataTables controls around them.
+   Shared by Customer.aspx and AppoinementList.aspx.
+   ========================================================================== */
+
+/* List toolbar (Status filter above the left-hand grid) */
+.cust-list-toolbar {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid #eef1f5;
+}
+
+.cust-list-filter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+    .cust-list-filter .form-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        color: #64748b;
+        white-space: nowrap;
+    }
+
+    .cust-list-filter .form-select {
+        height: 36px;
+        min-width: 170px;
+        padding: 4px 32px 4px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 9px;
+        font-size: 13.5px;
+        color: #1e293b;
+        box-shadow: none;
+    }
+
+        .cust-list-filter .form-select:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+
+[data-theme="dark"] .cust-list-toolbar { border-bottom-color: rgba(255, 255, 255, 0.1); }
+[data-theme="dark"] .cust-list-filter .form-label { color: #94a3b8; }
+[data-theme="dark"] .cust-list-filter .form-select {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #e2e8f0;
+}
+
+/* DataTables length + search, for every grid on these pages */
+#customerTable_wrapper .dt-layout-row:first-child,
+#AppointmentListTable_wrapper .dt-layout-row:first-child,
+#customerSiteTable_wrapper .dt-layout-row:first-child {
+    align-items: center;
+    margin: 4px 0 8px;
+}
+
+#customerTable_wrapper .dt-length,
+#customerTable_wrapper .dt-search,
+#AppointmentListTable_wrapper .dt-length,
+#AppointmentListTable_wrapper .dt-search {
+    padding: 8px 16px;
+    font-size: 13px;
+    color: #64748b;
+}
+
+/* Page-length box. Own arrow (appearance:none) so the right padding doesn't squeeze the
+   number out next to the native arrow; !important because the older #customerTable rule
+   and DataTables' own .dt-input border otherwise win on some grids. */
+div.dt-container .dt-length select.dt-input {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    min-width: 70px;
+    height: 34px;
+    margin-right: 8px !important;
+    padding: 4px 28px 4px 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    outline: none !important;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center !important;
+    background-size: 12px !important;
+    color: #1e293b !important;
+    font-size: 13px;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+    div.dt-container .dt-length select.dt-input:focus {
+        border-color: #2563eb !important;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+div.dt-container .dt-length label {
+    font-size: 13px;
+    color: #64748b;
+}
+
+[data-theme="dark"] div.dt-container .dt-length select.dt-input {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    color: #e2e8f0 !important;
+}
+
+#customerTable_wrapper .dt-search label,
+#AppointmentListTable_wrapper .dt-search label,
+#customerSiteTable_wrapper .dt-search label {
+    margin-right: 8px;
+    color: #64748b;
+}
+
+#customerTable_wrapper .dt-search input,
+#AppointmentListTable_wrapper .dt-search input,
+#customerSiteTable_wrapper .dt-search input {
+    width: 220px;
+    height: 34px;
+    margin-left: 0;
+    padding: 6px 12px 6px 32px;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 11px center;
+    font-size: 13px;
+    color: #1e293b;
+}
+
+    #customerTable_wrapper .dt-search input:focus,
+    #AppointmentListTable_wrapper .dt-search input:focus,
+    #customerSiteTable_wrapper .dt-search input:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        outline: none;
+    }
+
+[data-theme="dark"] #customerTable_wrapper .dt-search input,
+[data-theme="dark"] #AppointmentListTable_wrapper .dt-search input,
+[data-theme="dark"] #customerSiteTable_wrapper .dt-search input {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #e2e8f0;
+}
+
+/* Section toggle ("Sites & Locations", "Contact & Appointment Details") */
+.cust-section-block {
+    border-bottom: none;
+}
+
+.cust-section-toggle {
+    padding: 11px 16px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: none;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+    .cust-section-toggle.active {
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+
+    .cust-section-toggle::after {
+        content: '\25BE';
+        font-size: 14px;
+        color: #64748b;
+    }
+
+    .cust-section-toggle:hover {
+        background: #f1f5ff;
+        border-color: #c7d2fe;
+    }
+
+[data-theme="dark"] .cust-section-toggle {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #e2e8f0;
+}
+
+/* Customer header + contact block */
+.cust-details-title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+}
+
+div#contact {
+    margin: 10px 0 16px;
+    padding: 12px 14px;
+    background: #f8fafc;
+    border: 1px solid #eef1f5;
+    border-radius: 10px;
+}
+
+[data-theme="dark"] div#contact {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+#customerAddress-container {
+    align-items: flex-start;
+}
+
+    #customerAddress-container .ci-icon {
+        margin-top: 2px;
+    }
+
+    #customerAddress-container .ci-value > span {
+        display: block;
+        line-height: 1.5;
+    }
+
+        #customerAddress-container .ci-value > span:empty {
+            display: none;
+        }
+
+        #customerAddress-container .ci-value > span:first-child:not(:empty) {
+            font-weight: 600;
+        }
+
+/* Sites filter bar */
+.sites-header {
+    padding-bottom: 10px;
+}
+
+#addSiteBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 16px;
+    border-radius: 9px;
+    background-color: #2563eb;
+    font-size: 13.5px;
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.3);
+}
+
+    #addSiteBtn:hover {
+        background-color: #1d4ed8;
+    }
+
+.sites-filter-bar {
+    gap: 12px 16px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.sites-filter-group label {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.sites-filter-input {
+    height: 36px;
+    border-color: #e2e8f0;
+    border-radius: 9px;
+    font-size: 13.5px;
+    color: #1e293b;
+}
+
+.sites-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 36px;
+    padding: 0 16px;
+    border-radius: 9px;
+    background-color: #2563eb;
+}
+
+    .sites-filter-btn:hover {
+        background-color: #1d4ed8;
+    }
+
+.sites-filter-clear-btn {
+    background-color: #fff;
+    border-color: #e2e8f0;
+    color: #475569;
+}
+
+    .sites-filter-clear-btn:hover {
+        background-color: #f8fafc;
+        color: #1e293b;
+    }
+
+[data-theme="dark"] .sites-filter-bar {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .sites-filter-clear-btn {
+    background-color: transparent;
+}
+
+/* Site list: the one-column grid is only there for sorting/paging, so keep it quiet */
+#customerSiteTable {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    border: none !important;
+}
+
+    #customerSiteTable > thead > tr > th {
+        padding: 6px 4px 8px !important;
+        border-bottom: 1px solid #e5e7eb !important;
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+
+    #customerSiteTable > tbody > tr > td {
+        padding: 6px 0 !important;
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+/* Site cards */
+#customerSiteTable .cust-site-card {
+    margin: 0;
+    padding: 14px 16px;
+    gap: 10px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+    #customerSiteTable .cust-site-card:hover {
+        border-color: #c7d2fe;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.07);
+    }
+
+#customerSiteTable .cust-site-title {
+    font-size: 15.5px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+#customerSiteTable .cust-site-body {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px 20px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+}
+
+#customerSiteTable .cust-site-info {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 13.5px;
+    color: #334155;
+    word-break: break-word;
+}
+
+    #customerSiteTable .cust-site-info > i {
+        flex-shrink: 0;
+        color: #94a3b8;
+    }
+
+    #customerSiteTable .cust-site-info a {
+        color: #2563eb;
+        text-decoration: none;
+    }
+
+        #customerSiteTable .cust-site-info a:hover {
+            text-decoration: underline;
+        }
+
+.cust-site-empty {
+    color: #94a3b8;
+    font-style: italic;
+}
+
+#customerSiteTable .cust-site-footer {
+    padding-top: 0;
+    border-top: none;
+}
+
+#customerSiteTable .cust-site-appts-toggle {
+    height: 32px;
+    padding: 0 12px;
+    border-color: #e2e8f0;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+    #customerSiteTable .cust-site-appts-toggle:hover {
+        background-color: #f1f5ff !important;
+        border-color: #c7d2fe;
+    }
+
+    #customerSiteTable .cust-site-appts-toggle .appointment-count {
+        min-width: 22px;
+        text-align: center;
+        background-color: #dbeafe;
+        color: #1d4ed8;
+    }
+
+[data-theme="dark"] #customerSiteTable .cust-site-card {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] #customerSiteTable .cust-site-title { color: #e2e8f0; }
+[data-theme="dark"] #customerSiteTable .cust-site-body { background: rgba(255, 255, 255, 0.04); }
+[data-theme="dark"] #customerSiteTable .cust-site-info { color: #cbd5e1; }
+[data-theme="dark"] #customerSiteTable .cust-site-appts-toggle .appointment-count {
+    background-color: rgba(96, 165, 250, 0.2);
+    color: #93c5fd;
+}
+
+@media (max-width: 640px) {
+    .cust-list-filter .form-select { min-width: 0; }
+    #customerTable_wrapper .dt-search input,
+    #AppointmentListTable_wrapper .dt-search input,
+    #customerSiteTable_wrapper .dt-search input { width: 100%; }
+}

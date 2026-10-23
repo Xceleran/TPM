@@ -21,9 +21,315 @@
     <script src="https://cdn.datatables.net/buttons/3.2.0/js/buttons.print.min.js"></script>
     <script src="https://cdn.datatables.net/buttons/3.2.0/js/buttons.colVis.min.js"></script>
     <style>
-        .datatableButton, .dt-down-arrow {
-            background-color: #4d78b1 !important; /* Green */
+        .dt-down-arrow {
+            background-color: #4d78b1 !important;
             color: white !important;
+        }
+
+        /* ---- Third Party Providers page ---- */
+        .tp-page {
+            --tp-border: #e5e7eb;
+            --tp-surface: #ffffff;
+            --tp-subtle: #f8fafc;
+            --tp-muted: #64748b;
+            --tp-text: #1e293b;
+            --tp-accent: #2563eb;
+            --tp-accent-hover: #1d4ed8;
+            --tp-hover: #f1f5ff;
+            margin-top: 28px;
+            font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+        }
+
+        [data-theme="dark"] .tp-page {
+            --tp-border: rgba(255, 255, 255, 0.12);
+            --tp-surface: rgba(255, 255, 255, 0.04);
+            --tp-subtle: rgba(255, 255, 255, 0.06);
+            --tp-muted: #94a3b8;
+            --tp-text: #e2e8f0;
+            --tp-accent: #60a5fa;
+            --tp-accent-hover: #93c5fd;
+            --tp-hover: rgba(96, 165, 250, 0.08);
+        }
+
+        .tp-page .card {
+            background: var(--tp-surface);
+            border: 1px solid var(--tp-border);
+            border-radius: 14px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
+            overflow: visible;
+        }
+
+        .tp-page .card-body {
+            padding: 24px 28px;
+        }
+
+        /* Search panel */
+        .tp-filters {
+            row-gap: 14px;
+            padding-bottom: 22px;
+            margin-bottom: 8px;
+            border-bottom: 1px solid var(--tp-border);
+        }
+
+        .tp-label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            color: var(--tp-muted);
+        }
+
+        .tp-filters .form-select,
+        .tp-filters .form-control,
+        .tp-filters .bootstrap-select > .dropdown-toggle {
+            height: 42px;
+            border: 1px solid var(--tp-border) !important;
+            border-radius: 10px !important;
+            background-color: var(--tp-surface) !important;
+            color: var(--tp-text) !important;
+            font-size: 14px;
+            box-shadow: none !important;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+            .tp-filters .form-select:focus,
+            .tp-filters .form-control:focus,
+            .tp-filters .bootstrap-select > .dropdown-toggle:focus {
+                border-color: var(--tp-accent) !important;
+                box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+                outline: none !important;
+            }
+
+        .tp-filters .bootstrap-select > .dropdown-toggle {
+            display: flex;
+            align-items: center;
+        }
+
+        .tp-search-btn {
+            height: 42px;
+            border: none;
+            border-radius: 10px;
+            background: var(--tp-accent);
+            color: #fff;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+            box-shadow: 0 1px 2px rgba(37, 99, 235, 0.3);
+            transition: background-color 0.15s, transform 0.05s;
+        }
+
+            .tp-search-btn:hover,
+            .tp-search-btn:focus {
+                background: var(--tp-accent-hover);
+                color: #fff;
+            }
+
+            .tp-search-btn:active {
+                transform: translateY(1px);
+            }
+
+        /* DataTables toolbar */
+        .tp-page .dt-container .dt-layout-row:first-child {
+            margin: 6px 0 14px;
+            align-items: center;
+        }
+
+        .tp-page .dt-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .tp-page .dt-buttons .dt-button.datatableButton {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            margin: 0;
+            padding: 7px 14px;
+            border: 1px solid var(--tp-border);
+            border-radius: 9px;
+            background: var(--tp-surface);
+            color: var(--tp-text);
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+        }
+
+            .tp-page .dt-buttons .dt-button.datatableButton:hover {
+                background: var(--tp-subtle);
+                border-color: #cbd5e1;
+            }
+
+        .tp-page .dt-button .fa-file-excel { color: #16a34a; }
+        .tp-page .dt-button .fa-print { color: var(--tp-muted); }
+
+        .tp-page div.dt-container .dt-search input {
+            width: 260px;
+            height: 38px;
+            margin-left: 0 !important;
+            padding: 6px 12px 6px 34px;
+            border: 1px solid var(--tp-border);
+            border-radius: 10px;
+            background: var(--tp-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 12px center;
+            color: var(--tp-text);
+            font-size: 13.5px;
+        }
+
+            .tp-page div.dt-container .dt-search input:focus {
+                border-color: var(--tp-accent);
+                box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+                outline: none;
+            }
+
+        /* Grid */
+        .tp-page table.tp-table {
+            margin: 0 !important;
+            border: 1px solid var(--tp-border) !important;
+            border-collapse: separate !important;
+            border-spacing: 0;
+            border-radius: 10px;
+            overflow: hidden;
+            font-family: inherit !important;
+            font-size: 13.5px !important;
+            color: var(--tp-text);
+        }
+
+            .tp-page table.tp-table > thead > tr > th {
+                padding: 12px 14px !important;
+                background: var(--tp-subtle);
+                border: none !important;
+                border-bottom: 1px solid var(--tp-border) !important;
+                color: var(--tp-muted);
+                font-size: 11.5px;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+                text-transform: uppercase;
+                text-align: left !important;
+                white-space: nowrap;
+            }
+
+            .tp-page table.tp-table > tbody > tr > td {
+                padding: 13px 14px !important;
+                border: none !important;
+                border-bottom: 1px solid var(--tp-border) !important;
+                background: var(--tp-surface) !important;
+                box-shadow: none !important;
+                vertical-align: middle;
+                text-align: left !important;
+            }
+
+            .tp-page table.tp-table > tbody > tr:last-child > td {
+                border-bottom: none !important;
+            }
+
+            .tp-page table.tp-table > tbody > tr:hover > td {
+                background: var(--tp-hover) !important;
+            }
+
+            /* Blank cells read as gaps; show a quiet dash instead. */
+            .tp-page table.tp-table > tbody > tr > td:empty::after {
+                content: "\2014";
+                color: #cbd5e1;
+            }
+
+            .tp-page table.tp-table > tbody > tr > td:nth-child(2) .tp-link {
+                font-weight: 600;
+            }
+
+        .tp-page .tp-link {
+            color: var(--tp-accent);
+            text-decoration: none;
+        }
+
+            .tp-page .tp-link:hover {
+                color: var(--tp-accent-hover);
+                text-decoration: underline;
+            }
+
+        .tp-page .tp-action-btn {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            color: var(--tp-muted);
+            background: transparent;
+        }
+
+            .tp-page .tp-action-btn:hover,
+            .tp-page .tp-action-btn[aria-expanded="true"] {
+                background: var(--tp-subtle);
+                border-color: var(--tp-border);
+                color: var(--tp-text);
+            }
+
+        .tp-page .dropdown-menu {
+            padding: 6px;
+            border: 1px solid var(--tp-border);
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+            font-size: 13.5px;
+        }
+
+            .tp-page .dropdown-menu .dropdown-item {
+                padding: 7px 10px;
+                border-radius: 6px;
+            }
+
+        /* Footer: length, info, paging */
+        .tp-page .dt-container .dt-layout-row:last-child {
+            margin-top: 16px;
+            align-items: center;
+            color: var(--tp-muted);
+            font-size: 13px;
+        }
+
+        .tp-page div.dt-container .dt-length select {
+            height: 34px;
+            margin-right: 6px;
+            padding: 4px 8px;
+            border: 1px solid var(--tp-border);
+            border-radius: 8px;
+            background-color: var(--tp-surface);
+            color: var(--tp-text);
+        }
+
+        .tp-page .dt-info {
+            margin-left: 14px;
+        }
+
+        .tp-page .dt-paging .dt-paging-button {
+            min-width: 34px;
+            height: 34px;
+            margin: 0 2px !important;
+            padding: 0 10px !important;
+            border: 1px solid transparent !important;
+            border-radius: 8px !important;
+            background: transparent !important;
+            color: var(--tp-muted) !important;
+            font-size: 13px;
+        }
+
+            .tp-page .dt-paging .dt-paging-button:hover:not(.disabled) {
+                background: var(--tp-subtle) !important;
+                color: var(--tp-text) !important;
+            }
+
+            .tp-page .dt-paging .dt-paging-button.current,
+            .tp-page .dt-paging .dt-paging-button.current:hover {
+                background: var(--tp-accent) !important;
+                color: #fff !important;
+                font-weight: 600;
+            }
+
+            .tp-page .dt-paging .dt-paging-button.disabled {
+                opacity: 0.4;
+            }
+
+        @media (max-width: 767px) {
+            .tp-page .card-body { padding: 18px 16px; }
+            .tp-page div.dt-container .dt-search input { width: 100%; }
+            .tp-page .dt-info { margin-left: 0; }
         }
 
         .custom-file {
@@ -81,7 +387,7 @@
         /* The row action menu sits inside .table-responsive, whose overflow would clip a
            dropdown. Let it escape; the table is only seven columns wide. */
         .table-responsive:has(.dropdown-menu.show) {
-            overflow: visible;
+            overflow: visible !important; /* beats the inline overflow-y:hidden */
         }
 
         td.tp-actions {
@@ -91,7 +397,7 @@
     </style>
 
 
-    <div class="d-flex flex-column-fluid home-1stsec">
+    <div class="d-flex flex-column-fluid home-1stsec tp-page">
         <div class="container-fluid" style="width: 95%">
             <div class="row">
 
@@ -132,7 +438,7 @@
                         <div class="card-body">
 
 
-                            <div class="row">
+                            <div class="row tp-filters">
                                 <div style="display:none" runat="server" id="div_SearchFor" class="col-lg-2 mt-0">
                                     <h6>Search For :</h6>
                                     <asp:DropDownList ID="ddl_SearchFor" ClientIDMode="Static" runat="server" class="form-select">
@@ -142,7 +448,7 @@
                                     </asp:DropDownList>
                                 </div>
                                 <div class="col-lg-2 mt-0">
-                                    <h6>Search By</h6>
+                                    <label class="tp-label" for="SearchBy">Search by</label>
                                     <%-- ClientIDMode=Static: the inline JS below binds to #SearchBy / #ddl_SearchFor /
                                          #ddlTag by their bare ids, which never matched the ASP.NET-generated ids. --%>
                                     <asp:DropDownList ID="SearchBy" ClientIDMode="Static" runat="server" class="form-select">
@@ -158,20 +464,20 @@
                                     </asp:DropDownList>
                                 </div>
                                 <div class="col-lg-2 mt-0">
-                                    <h6>Tag</h6>
+                                    <label class="tp-label">Tags</label>
                                     <select id="ddlTag" clientidmode="Static" runat="server" title="Select Tags" style="width: 100%" class="form-control selectpicker" multiple="true" data-live-search="true">
                                     </select>
                                 </div>
                                 <div class="col-lg-4 mt-0">
-                                    <h6>Search Value</h6>
+                                    <label class="tp-label" for="SearchValue">Search value</label>
 
-                                    <asp:TextBox ID="SearchValue" ClientIDMode="Static" runat="server" class="form-control"></asp:TextBox>
+                                    <asp:TextBox ID="SearchValue" ClientIDMode="Static" runat="server" class="form-control" placeholder="Type to search..."></asp:TextBox>
 
                                 </div>
 
                                 <div class="col-lg-2 mt-0">
-                                    <h6>&nbsp;</h6>
-                                    <asp:Button ID="Search" ClientIDMode="Static" runat="server" OnClick="Search_Click" Text="Search" class="btn btn-secondary w-100" />
+                                    <label class="tp-label d-none d-lg-block">&nbsp;</label>
+                                    <asp:Button ID="Search" ClientIDMode="Static" runat="server" OnClick="Search_Click" Text="Search" class="btn tp-search-btn w-100" />
 
                                 </div>
 
@@ -180,7 +486,6 @@
                                      CustomerList.aspx/SyncCustomerAPItoDB. CustomerList.aspx does not exist in TPM,
                                      so both were guaranteed 404s. --%>
                             </div>
-                            <hr />
                             <div class="row">
                                 <div class="col-lg-12 mt-3">
                                     <div class="col-12 table-responsive" style="overflow-y: hidden;">
@@ -654,6 +959,7 @@
                 // grid inside its own overflow container, which clipped the row action menu.
                 // The surrounding .table-responsive already handles narrow viewports.
                 "order": [],
+                "language": { search: '', searchPlaceholder: 'Filter providers...' },
                 "pageLength": 25,
                 "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
                 "columnDefs": [
@@ -666,7 +972,7 @@
                         buttons: [
                             {
                                 extend: 'excel',
-                                text: 'Excel',
+                                text: '<i class="fas fa-file-excel"></i> Excel',
                                 className: 'datatableButton',
                                 title: 'Third Party Providers',
                                 // was columns: [1,2,3,4,5,6] against a 6-column table (0-5),
@@ -676,7 +982,7 @@
                             },
                             {
                                 extend: 'print',
-                                text: 'Print',
+                                text: '<i class="fas fa-print"></i> Print',
                                 className: 'datatableButton',
                                 title: 'Third Party Providers',
                                 exportOptions: { columns: ':visible:not(.no-export)' }

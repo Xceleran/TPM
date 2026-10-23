@@ -6,7 +6,7 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/select/3.0.0/css/select.dataTables.min.css">
 
     <!-- Local Styles and Scripts -->
-    <link rel="stylesheet" href="Content/customer.css?v=4">
+    <link rel="stylesheet" href="Content/customer.css?v=6">
 
     <%-- The custom-fields chip tooltip styles moved to Content/customer.css so CustomerDetails.aspx,
          which renders the same chips in its appointment modal, picks them up too. --%>
@@ -110,10 +110,10 @@
         <section class="cust-section">
             <!-- Customer List -->
             <div class="cust-list-container">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div class="pt-2 ps-2 d-flex align-items-center gap-3">
-                        <div>
-                            <label for="statusFilter" class="form-label">Filter by Status:</label>
+                <div class="cust-list-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="cust-list-filter">
+                            <label for="statusFilter" class="form-label"><i class="fas fa-filter"></i> Status</label>
                             <asp:DropDownList ID="statusFilter" runat="server" CssClass="form-select w-auto">
                                 <asp:ListItem Text="Active appointments" Value=""></asp:ListItem>
                                 <asp:ListItem Text="All (incl. Closed/Canceled)" Value="all_inclusive"></asp:ListItem>
@@ -162,11 +162,11 @@
                         <div class="ci-item" id="customerAddress-container">
                             <i class="ci-icon fas fa-map-marker-alt"></i>
                             <span class="ci-value">
+                                <%-- One line per span; empty spans are hidden in customer.css, so a missing
+                                     street no longer leaves a blank line above the country. --%>
                                 <span id="customerAddress1"></span>
-                                <br />
                                 <span id="customerAddress2"></span>
                                 <span id="customerCityStateZip"></span>
-                                <br />
                                 <span id="customerCountry"></span>
                             </span>
                         </div>
@@ -240,7 +240,7 @@
                              <table id="customerSiteTable" class="display" style="width: 100%">
                                     <thead>
                                         <tr>
-                                             <th>FIRSTNAME</th>
+                                             <th>Site name</th>
                                           
                                         </tr>
                                     </thead>
@@ -974,5 +974,5 @@
         </div>
     </div>
 
-      <script src="Scripts/customer.js?v=23"></script>
+      <script src="Scripts/customer.js?v=24"></script>
 </asp:Content>

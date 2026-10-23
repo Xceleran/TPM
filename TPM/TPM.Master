@@ -354,7 +354,7 @@
 
             <div class="content-wrapper">
                 <div class="header-container">
-                    <button type="button" id="toggleSidebar" class="toggle-btn">☰</button>
+                   <button type="button" id="toggleSidebar" class="toggle-btn"><i class="fas fa-bars"></i></button>
                     <span class="page-header"></span>
                 </div>
                 <asp:ContentPlaceHolder ID="MainContent" runat="server">
@@ -362,7 +362,7 @@
                 </asp:ContentPlaceHolder>
                 <hr />
                 <footer class="footer">
-                    <p>© <%: DateTime.Now.Year %> - All rights reserved by <a href="https://xceleran.com" target="_blank">Xceleran</a></p>
+                    <p>&copy; <%: DateTime.Now.Year %> - All rights reserved by <a href="https://xceleran.com" target="_blank">Xceleran</a></p>
                 </footer>
             </div>
         </div>
@@ -985,7 +985,7 @@
                         if (isMobile()) {
                             sidebarTexts.forEach(text => text.style.display = 'inline');
                             sidebarIcons.forEach(icon => icon.style.display = 'inline');
-                            toggleButton.textContent = isHidden ? '☰' : '✕';
+                            toggleButton.textContent = isHidden ? '\u2630' : '\u2715';
                             toggleButton.classList.remove('collapsed');
                             headerContainer.classList.toggle('visible', !isHidden);
                             headerContainer.classList.toggle('hidden', isHidden);
@@ -994,7 +994,7 @@
                                 text.style.display = isCollapsed ? 'none' : 'inline';
                             });
                             sidebarIcons.forEach(icon => icon.style.display = 'inline');
-                            toggleButton.textContent = isExpanded ? '➤' : '☰';
+                            toggleButton.textContent = isExpanded ? '\u27A4' : '\u2630';
                             toggleButton.classList.toggle('collapsed', isCollapsed);
                             headerContainer.classList.toggle('collapsed', isCollapsed);
                             headerContainer.classList.toggle('hidden', false);

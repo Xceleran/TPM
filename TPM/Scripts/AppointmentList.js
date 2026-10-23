@@ -431,6 +431,73 @@ function generateCustomerDetails(data) {
     loadCustomerSiteData(data.CustomerID, data.Notes, data.ApptID, data.SchedulingCal, data.IsApproved, data.SiteID, data.ApptDateTime);
 }
 
+// Notes arrive as plain text from the dispatch feed. Escape first, then give
+// the common shapes some structure: "Key: value" lines, "- " bullets,
+// "*** ... ***" callouts, "-----LABEL-----" dividers and blank-line breaks.
+function formatNotes(notes) {
+    // The feed usually opens with its own "Notes :" line, which the panel title already covers.
+    const text = String(notes ?? '').trim().replace(/^notes\s*:\s*(\r?\n|\r)+/i, '');
+    if (!text) return '<p class="ad-empty">No notes for this appointment.</p>';
+
+    const out = [];
+    let list = null;
+    let pairs = null;
+    let loud = null;
+
+    const flush = () => {
+        if (list) { out.push(`<ul class="ad-notes-list">${list.join('')}</ul>`); list = null; }
+        if (pairs) { out.push(`<dl class="ad-notes-pairs">${pairs.join('')}</dl>`); pairs = null; }
+        if (loud) { out.push(`<div class="ad-notes-important">${loud.join('')}</div>`); loud = null; }
+    };
+    const isLoud = (line) => line.length > 3 && line === line.toUpperCase() && /[A-Z]{3}/.test(line);
+
+    text.split(/\r?\n|\r/).forEach(raw => {
+        const line = raw.trim();
+        let m;
+
+        if (!line) {
+            flush();
+            out.push('<div class="ad-notes-gap"></div>');
+        } else if ((m = line.match(/^-{3,}\s*([^-]*?)\s*-*$/))) {
+            flush();
+            out.push(`<div class="ad-notes-divider">${m[1] ? `<span>${escapeHTML(m[1])}</span>` : ''}</div>`);
+        } else if ((m = line.match(/^[-\u2022]\s+(.*)$/))) {
+            if (pairs) flush();
+            // "Plumbing - Additional Coverage": lead with the item, show the qualifier as a tag.
+            const [item, ...rest] = m[1].split(' - ');
+            const tag = rest.join(' - ').trim();
+            (list = list || []).push(`<li><i class="fas fa-check-circle"></i><span>${escapeHTML(item.trim())}</span>${tag ? `<span class="ad-notes-tag">${escapeHTML(tag)}</span>` : ''}</li>`);
+        } else if ((m = line.match(/^\*{2,}\s*(.*?)\s*\**$/))) {
+            flush();
+            out.push(`<div class="ad-notes-callout"><i class="fas fa-info-circle"></i> ${escapeHTML(m[1])}</div>`);
+        } else if (isLoud(line)) {
+            // All-caps warranty rules ("REMINDER: ...") read better together than as key/value pairs.
+            if (list || pairs) flush();
+            (loud = loud || []).push(`<div>${escapeHTML(line)}</div>`);
+        } else if ((m = line.match(/^([A-Za-z][\w #\/().'&-]{0,40}?)\s*:\s*(.*)$/)) && !m[2].startsWith('//')) {
+            if (list || loud) flush();
+            if (!m[2]) {
+                flush();
+                // A bare "Notes:" would just repeat the panel title.
+                out.push(/^notes$/i.test(m[1])
+                    ? '<div class="ad-notes-gap"></div>'
+                    : `<h5 class="ad-notes-heading">${escapeHTML(m[1])}</h5>`);
+            } else {
+                (pairs = pairs || []).push(`<dt>${escapeHTML(m[1])}</dt><dd>${escapeHTML(m[2])}</dd>`);
+            }
+        } else {
+            flush();
+            out.push(`<p class="ad-notes-line">${escapeHTML(line)}</p>`);
+        }
+    });
+    flush();
+
+    // Collapse runs of blank-line gaps and drop leading/trailing ones.
+    return out.join('')
+        .replace(/(<div class="ad-notes-gap"><\/div>)+/g, '<div class="ad-notes-gap"></div>')
+        .replace(/^(<div class="ad-notes-gap"><\/div>)|(<div class="ad-notes-gap"><\/div>)$/g, '');
+}
+
 function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApproved, SiteId, ApptDateTime) {
 
     if (!customerId) return;
@@ -467,13 +534,22 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                     const mmsButton = `
                         <button class="cust-site-icon-btn cust-site-MMS-btn" title="Send MMS" data-site-id="${escapeHTML(site.Id)}" data-customer-id="${escapeHTML(site.CustomerID)}" data-MobileNumber-id="${escapeHTML(site.MobileNumber)}" data-is-default="${isDefaultSite}">
                             <i class="fa-solid fa-photo-film"></i></button>`;
-					const formattedString = notes.replace(/\r?\n|\r/g, '<br>')
+                    const contactName = [site.FirstName, site.LastName].filter(Boolean).join(' ');
+                    const mapQuery = [site.Address, site.City, site.State, site.Zip].filter(Boolean).join(', ');
+                    const detailRow = (icon, label, value) => `
+                        <div class="ad-row">
+                            <i class="${icon} fa-fw ad-row-icon"></i>
+                            <span class="ad-row-label">${label}</span>
+                            <span class="ad-row-value">${value || '<span class="ad-empty">Not provided</span>'}</span>
+                        </div>`;
+
                     const siteCardHTML = `
-                        <div class="cust-site-card" data-site-id="${escapeHTML(site.Id)}">
-                            <div class="cust-site-header">
+                        <div class="cust-site-card ad-card" data-site-id="${escapeHTML(site.Id)}">
+                            <div class="cust-site-header ad-header">
                                 <div class="cust-site-title-group">
                                     <div class="cust-site-status-indicator ${statusClass}" title="${statusTitle}"></div>
                                     <h3 class="cust-site-title">${escapeHTML(site.SiteName)}</h3>
+                                    <span class="ad-badge ${statusClass}">${statusTitle}</span>
                                 </div>
                                 <div class="cust-site-actions">
                                     <button class="cust-site-icon-btn cust-site-Duplicate-btn" title="Check for duplicate sites" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
@@ -488,45 +564,48 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                     </a>
                                 </div>
                             </div>
-                            <div class="cust-site-body">
-                            <div class="cust-site-address-group">
-                                <p class="cust-site-info">
-                                    <i class="fas fa-map-marker-alt fa-fw"></i> <strong>Street:</strong> ${escapeHTML(site.Address) || '-'}
-                                </p>
-                                <p class="cust-site-info">
-                                    <i class="fas fa-city fa-fw"></i> <strong>City:</strong> ${escapeHTML(site.City) || '-'}
-                                </p>
-                                <p class="cust-site-info">
-                                    <i class="fas fa-flag fa-fw"></i> <strong>State:</strong> ${escapeHTML(site.State) || '-'}
-                                </p>
-                                <p class="cust-site-info">
-                                    <i class="fas fa-mail-bulk fa-fw"></i> <strong>Zip:</strong> ${escapeHTML(site.Zip) || '-'}
-                                </p>
-                                <p class="cust-site-info">
-                                    <i class="fas fa-globe-americas fa-fw"></i> <strong>Country:</strong> ${escapeHTML(site.Country) || '-'}
-                                </p>
-                            </div>
-                                <p class="cust-site-info"> <i class="fas fa-user fa-fw"></i> ${escapeHTML(site.FirstName || '')} ${escapeHTML(site.LastName || '')}</p>
-                                <p class="cust-site-info"> <i class="fas fa-envelope fa-fw"></i> ${site.Email ? `<a href="mailto:${encodeURIComponent(site.Email)}" class="site-email-link" data-customer-id="${escapeHTML(site.CustomerID)}">${escapeHTML(site.Email)}</a>` : '-'}<br>Requested Date:- ${escapeHTML(ApptDateTime) || '-'}</p>
-                                <p class="cust-site-info"><i class="fas fa-phone-alt fa-fw"></i> ${site.PhoneNumber ? `<a href="tel:${escapeHTML(site.PhoneNumber)}">${escapeHTML(site.PhoneNumber)}</a>` : '-'}</p>
-                                <p class="cust-site-info"><i class="fas fa-mobile-alt fa-fw"></i> ${site.MobileNumber ? `<a href="tel:${escapeHTML(site.MobileNumber)}">${escapeHTML(site.MobileNumber)}</a>` : '-'}</p>
-                            </div>
-                            <div class="cust-site-footer">
-                                <button class="cust-site-appts-toggle btn-primary" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
-                                     Duplicate Site Check
-                                </button>
-                               <div class="container">
-                                  <div class="row justify-content-start">
-                                    <div class="col-3">
-                                      Appointments Status :<select class="form-select form-select-sm appt-status-select" aria-label="Appointment status" style="width:150px;" data-appt-id="${escapeHTML(ApptID)}" data-customer-id="${escapeHTML(customerId)}" data-site-id="${escapeHTML(site.Id)}"><option value="0">Select</option><option ${IsApproved ? 'selected' : ''} value="Accept">Accept</option><option ${!IsApproved ? 'selected' : ''} value="Pending">New Appt</option></select>
-                                    </div>
-                                    <div class="col-3">
-                                     Scheduling Calendar :<select class="form-select form-select-sm appt-calendar-select" aria-label="Scheduling calendar" style="width:150px;" data-appt-id="${escapeHTML(ApptID)}"><option value="0">Select</option><option ${SchedulingCal == 'FSM' ? 'selected' : ''} value="FSM">FSM</option><option ${SchedulingCal == 'CEC' ? 'selected' : ''} value="CEC">CEC</option></select>
-                                    </div>
-                                  </div>
+
+                            <div class="ad-toolbar">
+                                <label class="ad-field">
+                                    <span class="ad-field-label">Appointment status</span>
+                                    <select class="form-select form-select-sm appt-status-select" aria-label="Appointment status" data-appt-id="${escapeHTML(ApptID)}" data-customer-id="${escapeHTML(customerId)}" data-site-id="${escapeHTML(site.Id)}"><option value="0">Select</option><option ${IsApproved ? 'selected' : ''} value="Accept">Accept</option><option ${!IsApproved ? 'selected' : ''} value="Pending">New Appt</option></select>
+                                </label>
+                                <label class="ad-field">
+                                    <span class="ad-field-label">Scheduling calendar</span>
+                                    <select class="form-select form-select-sm appt-calendar-select" aria-label="Scheduling calendar" data-appt-id="${escapeHTML(ApptID)}"><option value="0">Select</option><option ${SchedulingCal == 'FSM' ? 'selected' : ''} value="FSM">FSM</option><option ${SchedulingCal == 'CEC' ? 'selected' : ''} value="CEC">CEC</option></select>
+                                </label>
+                                <div class="ad-field">
+                                    <span class="ad-field-label">Requested date</span>
+                                    <span class="ad-field-static"><i class="far fa-calendar-alt"></i> ${escapeHTML(ApptDateTime) || '-'}</span>
                                 </div>
-                                 Notes :<br>${formattedString}
+                                <button type="button" class="cust-site-appts-toggle ad-dup-btn" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
+                                    <i class="fa fa-clone"></i> Duplicate Site Check
+                                </button>
                             </div>
+
+                            <div class="ad-panels">
+                                <section class="ad-panel">
+                                    <h4 class="ad-panel-title"><i class="fas fa-map-marker-alt"></i> Site address</h4>
+                                    ${detailRow('fas fa-road', 'Street', escapeHTML(site.Address))}
+                                    ${detailRow('fas fa-city', 'City', escapeHTML(site.City))}
+                                    ${detailRow('fas fa-flag', 'State', escapeHTML(site.State))}
+                                    ${detailRow('fas fa-mail-bulk', 'Zip', escapeHTML(site.Zip))}
+                                    ${detailRow('fas fa-globe-americas', 'Country', escapeHTML(site.Country))}
+                                    ${mapQuery ? `<a class="ad-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Open in Maps</a>` : ''}
+                                </section>
+                                <section class="ad-panel">
+                                    <h4 class="ad-panel-title"><i class="fas fa-address-card"></i> Contact</h4>
+                                    ${detailRow('fas fa-user', 'Name', escapeHTML(contactName))}
+                                    ${detailRow('fas fa-envelope', 'Email', site.Email ? `<a href="mailto:${encodeURIComponent(site.Email)}" class="site-email-link" data-customer-id="${escapeHTML(site.CustomerID)}">${escapeHTML(site.Email)}</a>` : '')}
+                                    ${detailRow('fas fa-phone-alt', 'Phone', site.PhoneNumber ? `<a href="tel:${escapeHTML(site.PhoneNumber)}">${escapeHTML(site.PhoneNumber)}</a>` : '')}
+                                    ${detailRow('fas fa-mobile-alt', 'Mobile', site.MobileNumber ? `<a href="tel:${escapeHTML(site.MobileNumber)}">${escapeHTML(site.MobileNumber)}</a>` : '')}
+                                </section>
+                            </div>
+
+                            <section class="ad-panel ad-notes">
+                                <h4 class="ad-panel-title"><i class="fas fa-sticky-note"></i> Notes</h4>
+                                <div class="ad-notes-body">${formatNotes(notes)}</div>
+                            </section>
                         </div>`;
                     sitesListContainer.append(siteCardHTML);
                 });

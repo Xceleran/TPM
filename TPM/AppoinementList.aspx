@@ -6,7 +6,7 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/select/3.0.0/css/select.dataTables.min.css">
 
     <!-- Local Styles and Scripts -->
-    <link rel="stylesheet" href="Content/customer.css">
+    <link rel="stylesheet" href="Content/customer.css?v=6">
 
     <style>
         .cust-action-btns {
@@ -42,6 +42,314 @@
             width: 22px;
             height: 22px;
         }
+
+        /* Work order details card (rendered by AppointmentList.js) */
+        .ad-card {
+            --ad-border: #e2e8f0;
+            --ad-panel: #ffffff;
+            --ad-muted: #64748b;
+            --ad-text: #1e293b;
+            --ad-accent: #007bff;
+            background: #f8fafc;
+            border-color: var(--ad-border);
+            border-radius: 10px;
+            padding: 14px 16px;
+            gap: 14px;
+            color: var(--ad-text);
+            font-size: 13.5px;
+        }
+
+        [data-theme="dark"] .ad-card {
+            --ad-border: rgba(255, 255, 255, 0.14);
+            --ad-panel: rgba(255, 255, 255, 0.04);
+            --ad-muted: #94a3b8;
+            --ad-text: #e2e8f0;
+            --ad-accent: #60a5fa;
+        }
+
+        .ad-header {
+            align-items: center;
+            flex-wrap: wrap;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--ad-border);
+        }
+
+        .ad-header .cust-site-title {
+            font-size: 17px;
+            letter-spacing: 0.2px;
+        }
+
+        .ad-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 99px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+            .ad-badge.active { background: #dcfce7; color: #166534; }
+            .ad-badge.inactive { background: #e2e8f0; color: #475569; }
+
+        [data-theme="dark"] .ad-badge.active { background: rgba(34, 197, 94, 0.18); color: #86efac; }
+        [data-theme="dark"] .ad-badge.inactive { background: rgba(148, 163, 184, 0.18); color: #cbd5e1; }
+
+        .ad-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            gap: 12px 20px;
+            padding: 12px 14px;
+            background: var(--ad-panel);
+            border: 1px solid var(--ad-border);
+            border-radius: 8px;
+        }
+
+        .ad-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin: 0;
+            min-width: 160px;
+        }
+
+        .ad-field-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--ad-muted);
+        }
+
+        .ad-field .form-select {
+            min-width: 160px;
+        }
+
+        .ad-field-static {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 31px;
+            font-weight: 500;
+        }
+
+            .ad-field-static i { color: var(--ad-muted); }
+
+        .ad-dup-btn {
+            margin-left: auto !important;
+            align-self: flex-end;
+        }
+
+        .ad-panels {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 14px;
+        }
+
+        .ad-panel {
+            background: var(--ad-panel);
+            border: 1px solid var(--ad-border);
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+
+        .ad-panel-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0 0 10px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--ad-muted);
+        }
+
+            .ad-panel-title i { color: var(--ad-accent); }
+
+        .ad-link {
+            display: inline-block;
+            margin-top: 8px;
+            font-size: 12.5px;
+            color: var(--ad-accent);
+            text-decoration: none;
+        }
+
+            .ad-link:hover { text-decoration: underline; }
+
+        .ad-row {
+            display: grid;
+            grid-template-columns: 20px 70px 1fr;
+            align-items: baseline;
+            gap: 6px;
+            padding: 5px 0;
+            border-bottom: 1px dashed var(--ad-border);
+        }
+
+            .ad-row:last-child { border-bottom: none; }
+
+        .ad-row-icon { color: var(--ad-muted); }
+        .ad-row-label { color: var(--ad-muted); font-size: 12.5px; }
+        .ad-row-value { word-break: break-word; font-weight: 500; }
+        .ad-row-value a { color: var(--ad-accent); text-decoration: none; }
+        .ad-row-value a:hover { text-decoration: underline; }
+
+        .ad-empty {
+            color: var(--ad-muted);
+            font-style: italic;
+            font-weight: 400;
+        }
+
+        .ad-notes-body {
+            max-height: 460px;
+            overflow-y: auto;
+            padding-right: 6px;
+            line-height: 1.55;
+        }
+
+        .ad-notes-line { margin: 0; }
+
+        .ad-notes-important {
+            margin: 10px 0;
+            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: #f1f5f9;
+            border-left: 3px solid var(--ad-accent);
+            border-radius: 4px;
+            font-size: 12.5px;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+            line-height: 1.5;
+        }
+
+        [data-theme="dark"] .ad-notes-important { background: rgba(255, 255, 255, 0.06); }
+
+        .ad-notes-gap { height: 10px; }
+
+        .ad-notes-heading {
+            margin: 10px 0 6px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--ad-text);
+        }
+
+        .ad-notes-list {
+            margin: 8px 0 6px;
+            padding: 0;
+            list-style: none;
+            /* Columns rather than a grid, so a wrapped item doesn't pad out its whole row. */
+            columns: 240px;
+            column-gap: 10px;
+        }
+
+            .ad-notes-list li {
+                /* No wrapping: long text wraps inside its own span, next to the check. */
+                display: flex;
+                align-items: flex-start;
+                gap: 8px;
+                margin-bottom: 8px;
+                padding: 7px 10px;
+                background: var(--ad-panel);
+                border: 1px solid var(--ad-border);
+                border-radius: 6px;
+                font-size: 13.5px;
+                font-weight: 500;
+                line-height: 1.35;
+                color: var(--ad-text);
+                break-inside: avoid;
+            }
+
+                .ad-notes-list li > i {
+                    flex-shrink: 0;
+                    margin-top: 3px;
+                    color: #16a34a;
+                    font-size: 13px;
+                }
+
+                .ad-notes-list li > span:not(.ad-notes-tag) {
+                    flex: 1;
+                    min-width: 0;
+                }
+
+        [data-theme="dark"] .ad-notes-list li > i { color: #4ade80; }
+
+        .ad-notes-tag {
+            flex-shrink: 0;
+            align-self: center;
+            padding: 1px 8px;
+            border-radius: 99px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        [data-theme="dark"] .ad-notes-tag {
+            background: rgba(96, 165, 250, 0.15);
+            color: #93c5fd;
+        }
+
+        .ad-notes-pairs {
+            display: grid;
+            grid-template-columns: max-content 1fr;
+            gap: 3px 14px;
+            margin: 0;
+        }
+
+            .ad-notes-pairs dt {
+                color: var(--ad-muted);
+                font-weight: 500;
+            }
+
+            .ad-notes-pairs dd {
+                margin: 0;
+                font-weight: 500;
+                word-break: break-word;
+            }
+
+        .ad-notes-callout {
+            margin: 4px 0;
+            padding: 6px 10px;
+            border-left: 3px solid #f59e0b;
+            background: #fffbeb;
+            color: #92400e;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        [data-theme="dark"] .ad-notes-callout {
+            background: rgba(245, 158, 11, 0.12);
+            color: #fcd34d;
+        }
+
+        .ad-notes-divider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 8px 0;
+            color: var(--ad-muted);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.6px;
+        }
+
+            .ad-notes-divider::before,
+            .ad-notes-divider::after {
+                content: "";
+                flex: 1;
+                height: 1px;
+                background: var(--ad-border);
+            }
+
+        @media (max-width: 640px) {
+            .ad-dup-btn { margin-left: 0 !important; }
+            .ad-field, .ad-field .form-select { min-width: 0; width: 100%; }
+            .ad-notes-pairs { grid-template-columns: 1fr; }
+            .ad-notes-pairs dd { margin-bottom: 4px; }
+        }
     </style>
 
 
@@ -67,10 +375,10 @@
         <section class="cust-section">
             <!-- Customer List -->
             <div class="cust-list-container">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div class="pt-2 ps-2 d-flex align-items-center gap-3">
-                        <div>
-                            <label for="statusFilter" class="form-label">Filter by Status:</label>
+                <div class="cust-list-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="cust-list-filter">
+                            <label for="statusFilter" class="form-label"><i class="fas fa-filter"></i> Status</label>
                             <%-- Sp_GetAppointmnetData only branches on 'accept' and 'pending'; an
                                  appointment's status here is IsApproved, so there is no Cancel to filter by. --%>
                             <asp:DropDownList ID="statusFilter"  ClientIDMode="Static" runat="server" CssClass="form-select w-auto">
@@ -151,7 +459,7 @@
                 <div class="cust-details-content">
                     <!-- Note: The original cust-section-block wrappers have been removed as requested -->
                     <div class="cust-section-block">
-                        <button class="cust-section-toggle" data-section="sites" id="sitesBtn">Contact & Appointments details:-</button>
+                        <button class="cust-section-toggle" data-section="sites" id="sitesBtn">Contact &amp; Appointment Details</button>
                         <div class="cust-section-content" id="sites">
                             <div class="sites-header">
                             </div>
@@ -474,5 +782,5 @@
         }
 
     </script>
-     <script src="Scripts/AppointmentList.js?v=11"></script>
+     <script src="Scripts/AppointmentList.js?v=15"></script>
 </asp:Content>
