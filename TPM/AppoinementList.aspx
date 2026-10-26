@@ -44,7 +44,8 @@
         }
 
         /* Work order details card (rendered by AppointmentList.js) */
-        .ad-card {
+        .ad-card,
+        .ahs-modal-content {
             --ad-border: #e2e8f0;
             --ad-panel: #ffffff;
             --ad-muted: #64748b;
@@ -59,7 +60,8 @@
             font-size: 13.5px;
         }
 
-        [data-theme="dark"] .ad-card {
+        [data-theme="dark"] .ad-card,
+        [data-theme="dark"] .ahs-modal-content {
             --ad-border: rgba(255, 255, 255, 0.14);
             --ad-panel: rgba(255, 255, 255, 0.04);
             --ad-muted: #94a3b8;
@@ -139,6 +141,118 @@
             margin-left: auto !important;
             align-self: flex-end;
         }
+
+        .ad-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .ahs-modal-content {
+            max-width: 560px;
+            width: 100%;
+            color: var(--ad-text);
+        }
+
+        .ahs-subtitle {
+            margin: -4px 0 16px;
+            color: var(--ad-muted);
+            font-size: 13px;
+        }
+
+            .ahs-subtitle strong { color: var(--ad-text); }
+
+        .ahs-list {
+            border: 1px solid var(--ad-border);
+            border-radius: 12px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .ahs-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-height: 58px;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--ad-border);
+            transition: background 0.15s;
+        }
+
+            .ahs-row:last-child { border-bottom: none; }
+            .ahs-row:hover { background: rgba(100, 116, 139, 0.06); }
+
+        .ahs-row-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .ahs-row-title {
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .ahs-row-meta {
+            margin-top: 2px;
+            font-size: 12px;
+            color: var(--ad-muted);
+        }
+
+            .ahs-row-meta.is-saved { color: #16a34a; }
+
+        .ahs-date {
+            width: 150px;
+            flex-shrink: 0;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+            .ahs-submit-btn {
+            flex-shrink: 0;
+            min-width: 84px;
+            height: 34px;
+            padding: 0 14px;
+            border: none;
+            border-radius: 8px;
+            background: var(--ad-accent);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+            .ahs-submit-btn:hover:not(:disabled) { filter: brightness(1.08); }
+
+            .ahs-submit-btn:disabled {
+                opacity: 0.6;
+                cursor: wait;
+            }
+
+        .ahs-row-danger .ahs-row-title { color: #dc2626; }
+        .ahs-row-danger .ahs-submit-btn { background: #dc2626; }
+
+        .ahs-footer {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 18px;
+        }
+
+        .ahs-btn {
+            height: 38px;
+            padding: 0 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .ahs-btn-secondary {
+            border: 1px solid var(--ad-border);
+            background: transparent;
+            color: var(--ad-text);
+        }
+
 
         .ad-panels {
             display: grid;
@@ -347,6 +461,10 @@
         @media (max-width: 640px) {
             .ad-dup-btn { margin-left: 0 !important; }
             .ad-field, .ad-field .form-select { min-width: 0; width: 100%; }
+            .ahs-row { flex-wrap: wrap; }
+            .ahs-date { order: 3; width: 100%; }
+            .ahs-date { flex: 1; width: auto; }
+            .ahs-footer .ahs-btn { width: 100%; }
             .ad-notes-pairs { grid-template-columns: 1fr; }
             .ad-notes-pairs dd { margin-bottom: 4px; }
         }
@@ -499,6 +617,23 @@
                     <button type="button" class="cust-modal-cancel" id="clossadaseAddSite">Close</button>
                 </div>
 
+        </div>
+    </div>
+
+    <%-- AHS Status: one row per AHS status with a date and its own Submit, which
+         asks Yes/No and then calls the backend. Rows are built by openAhsStatus()
+         in AppointmentList.js. --%>
+    <div class="cust-modal" id="mdl_AhsStatus">
+        <div class="cust-modal-content ahs-modal-content">
+            <button type="button" class="cust-modal-close" id="close_mdl_AhsStatus">×</button>
+            <h2 class="cust-modal-title">AHS Status</h2>
+            <p class="ahs-subtitle" id="ahsStatusSubtitle"></p>
+
+            <div class="ahs-list" id="AhsStatusList"></div>
+
+            <div class="ahs-footer">
+                <button type="button" class="ahs-btn ahs-btn-secondary" id="btn_CloseAhsStatus">Close</button>
+            </div>
         </div>
     </div>
 

@@ -164,7 +164,27 @@ $(document).ready(function () {
 
     // Both the eye icon in the header and the button in the card footer open the
     // duplicate-site check.
-    $('#sites').on('click', '.cust-site-Duplicate-btn, .cust-site-appts-toggle', function () {
+    $('#sites').on('click', '.ahs-status-btn', function () {
+        openAhsStatus(currentRow);
+    });
+
+    $('#close_mdl_AhsStatus, #btn_CloseAhsStatus').on('click', function () {
+        closeModal('mdl_AhsStatus');
+    });
+
+    // One click event per AHS Submit button; each calls SubmitAhsStatus().
+    $('#mdl_AhsStatus')
+        .on('click', '#btn_AhsAppointmentSet', AppointmentSet_Click)
+        .on('click', '#btn_AhsWaitingOnCallBack', WaitingOnCallBack_Click)
+        .on('click', '#btn_AhsUnableToContact', UnableToContact_Click)
+        .on('click', '#btn_AhsPartsOnOrder', PartsOnOrder_Click)
+        .on('click', '#btn_AhsComplete', Complete_Click)
+        .on('click', '#btn_AhsMissedAppointment', MissedAppointment_Click)
+        .on('click', '#btn_AhsNeedToReplace', NeedToReplace_Click)
+        .on('click', '#btn_AhsPartsEquipmentStatus', PartsEquipmentStatus_Click)
+        .on('click', '#btn_AhsCancelDispatch', CancelDispatch_Click);
+
+    $('#sites').on('click', '.cust-site-Duplicate-btn, .cust-site-appts-toggle:not(.ahs-status-btn)', function () {
         openDuplicateCheck({
             customerId: $(this).attr('data-customerid'),
             siteId: $(this).attr('data-siteid'),
@@ -578,9 +598,14 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                     <span class="ad-field-label">Requested date</span>
                                     <span class="ad-field-static"><i class="far fa-calendar-alt"></i> ${escapeHTML(ApptDateTime) || '-'}</span>
                                 </div>
-                                <button type="button" class="cust-site-appts-toggle ad-dup-btn" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
-                                    <i class="fa fa-clone"></i> Duplicate Site Check
-                                </button>
+                                <div class="ad-dup-btn ad-actions">
+                                    <button type="button" class="cust-site-appts-toggle ahs-status-btn">
+                                        <i class="fas fa-clipboard-list"></i> AHS Status
+                                    </button>
+                                    <button type="button" class="cust-site-appts-toggle" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
+                                        <i class="fa fa-clone"></i> Duplicate Site Check
+                                    </button>
+                                </div>
                             </div>
 
                             <div class="ad-panels">
@@ -618,6 +643,132 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
             $('#sites .sites-list').html('<p class="text-danger">Failed to load site data.</p>');
         }
     });
+}
+
+// The AHS statuses offered in the AHS Status modal, in the order shown, with
+// the id of each row's Submit button.
+const AHS_STATUSES = [
+    { id: 'btn_AhsAppointmentSet', status: 'Appointment Set' },
+    { id: 'btn_AhsWaitingOnCallBack', status: 'Waiting on Customer Call Back' },
+    { id: 'btn_AhsUnableToContact', status: 'Unable To Contact' },
+    { id: 'btn_AhsPartsOnOrder', status: 'In Progress with Parts on Order' },
+    { id: 'btn_AhsComplete', status: 'Complete (AHS)' },
+    { id: 'btn_AhsMissedAppointment', status: 'Customer Missed Appointment' },
+    { id: 'btn_AhsNeedToReplace', status: 'In Progress With Need To Replace' },
+    { id: 'btn_AhsPartsEquipmentStatus', status: 'Parts/Equipment Status' },
+    { id: 'btn_AhsCancelDispatch', status: 'Cancel Dispatch' }
+];
+
+// Click events for the AHS Submit buttons, one per status. They all call the
+// same SubmitAhsStatus() so the confirm and the API call live in one place.
+function AppointmentSet_Click() { SubmitAhsStatus($(this), 'Appointment Set'); }
+function WaitingOnCallBack_Click() { SubmitAhsStatus($(this), 'Waiting on Customer Call Back'); }
+function UnableToContact_Click() { SubmitAhsStatus($(this), 'Unable To Contact'); }
+function PartsOnOrder_Click() { SubmitAhsStatus($(this), 'In Progress with Parts on Order'); }
+function Complete_Click() { SubmitAhsStatus($(this), 'Complete (AHS)'); }
+function MissedAppointment_Click() { SubmitAhsStatus($(this), 'Customer Missed Appointment'); }
+function NeedToReplace_Click() { SubmitAhsStatus($(this), 'In Progress With Need To Replace'); }
+function PartsEquipmentStatus_Click() { SubmitAhsStatus($(this), 'Parts/Equipment Status'); }
+function CancelDispatch_Click() { SubmitAhsStatus($(this), 'Cancel Dispatch'); }
+
+// Asks Yes/No, then calls the AHS backend method.
+function SubmitAhsStatus(btn, status) {
+    const row = btn.closest('.ahs-row');
+    const date = row.find('.ahs-date').val();
+    const apptId = $('#mdl_AhsStatus').data('appt-id');
+
+    if (!date) {
+        notify('warning', `Pick a date for "${status}".`);
+        return;
+    }
+
+    confirmYesNo(`Submit "${status}"?`, `Date: ${formatIsoDate(date)}`).then(yes => {
+        if (!yes) return;
+
+        btn.prop('disabled', true).text('Saving…');
+        $.ajax({
+            type: "POST",
+            url: AHS_STATUS_API_URL,
+            data: JSON.stringify(AHS_STATUS_API_PARAMS),
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function () {
+                (ahsStatusUpdates[apptId] = ahsStatusUpdates[apptId] || {})[status] = date;
+                row.find('.ahs-row-meta').addClass('is-saved')
+                    .html(`<i class="fas fa-check-circle"></i> Submitted ${escapeHTML(formatIsoDate(date))}`);
+                notify('success', `${status} submitted`);
+            },
+            error: function (xhr) {
+                console.error("Error submitting AHS status: ", xhr.responseText);
+                notify('error', 'Could not submit the status.', 'Please try again.');
+            },
+            complete: function () {
+                btn.prop('disabled', false).text('Submit');
+            }
+        });
+    });
+}
+
+// Every Submit calls this one backend method. Its two parameters are static
+// placeholders for now; the backend will tell us what to send in them.
+const AHS_STATUS_API_URL = "AppoinementList.aspx/UpdateAhsStatus";
+const AHS_STATUS_API_PARAMS = { Param1: "1", Param2: "1" };
+
+// Remembers each successful submit per appointment until the page reloads,
+// so the row can show "Submitted <date>".
+const ahsStatusUpdates = {};
+
+function todayIso() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function formatIsoDate(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+    return m ? `${m[2]}/${m[3]}/${m[1]}` : iso;
+}
+
+function openAhsStatus(row) {
+    if (!row) {
+        notify('warning', 'Select a work order first.');
+        return;
+    }
+
+    const saved = ahsStatusUpdates[row.ApptID] || {};
+    $('#mdl_AhsStatus').data('appt-id', row.ApptID);
+    $('#ahsStatusSubtitle').html(row.CustomerName ? `Work order for <strong>${escapeHTML(row.CustomerName)}</strong>` : '');
+
+    $('#AhsStatusList').html(AHS_STATUSES.map(({ id, status }) => {
+        const date = saved[status];
+        const danger = status === 'Cancel Dispatch' ? ' ahs-row-danger' : '';
+        return `
+            <div class="ahs-row${danger}" data-status="${escapeHTML(status)}">
+                <div class="ahs-row-text">
+                    <div class="ahs-row-title">${escapeHTML(status)}</div>
+                    <div class="ahs-row-meta${date ? ' is-saved' : ''}">${date ? `<i class="fas fa-check-circle"></i> Submitted ${escapeHTML(formatIsoDate(date))}` : 'Not submitted'}</div>
+                </div>
+                <input type="date" class="form-control ahs-date" aria-label="${escapeHTML(status)} date" value="${escapeHTML(date || todayIso())}" />
+                <button type="button" class="ahs-submit-btn" id="${id}">Submit</button>
+            </div>`;
+    }).join(''));
+
+    openModal('mdl_AhsStatus');
+}
+
+// Yes/No confirm; Swal comes from the master page, confirm() is the fallback.
+function confirmYesNo(title, text) {
+    if (typeof Swal !== 'undefined') {
+        return Swal.fire({
+            icon: 'question',
+            title: title,
+            text: text || '',
+            showCancelButton: true,
+            confirmButtonText: 'Yes',
+            cancelButtonText: 'No',
+            reverseButtons: true
+        }).then(result => result.isConfirmed);
+    }
+    return Promise.resolve(confirm(title + (text ? '\n' + text : '')));
 }
 
 // TPM has no site-merge endpoint, so this lists the sites that share a name and
