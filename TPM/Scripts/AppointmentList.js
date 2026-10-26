@@ -113,7 +113,7 @@ $(document).ready(function () {
     window.openSiteEditModal = function (site, isDefault) {
         isDefault = isDefault === undefined ? site.Id === 0 : isDefault;
 
-        $('.cust-modal-title').text(isDefault ? 'Edit Default Site (Customer Info)' : 'Edit Site');
+        $('#addSiteModal .cust-modal-title').text(isDefault ? 'Edit Default Site (Customer Info)' : 'Edit Site');
         $('#addSiteModal .cust-modal-submit').text('Update');
 
         // For default site, disable Site Name editing or make it read-only
@@ -184,7 +184,29 @@ $(document).ready(function () {
         .on('click', '#btn_AhsPartsEquipmentStatus', PartsEquipmentStatus_Click)
         .on('click', '#btn_AhsCancelDispatch', CancelDispatch_Click);
 
-    $('#sites').on('click', '.cust-site-Duplicate-btn, .cust-site-appts-toggle:not(.ahs-status-btn)', function () {
+    $('#sites').on('click', '.site-dup-btn', function () {
+        openSiteDuplicateCheck({
+            customerId: $(this).attr('data-customerid'),
+            siteId: $(this).attr('data-siteid'),
+            siteName: $(this).attr('data-site-name')
+        });
+    });
+
+    $('#close_mdl_CheckSiteDuplicate, #btn_CloseSiteDuplicate').on('click', function () {
+        closeModal('mdl_CheckSiteDuplicate');
+    });
+
+    $('#btn_SearchSiteDuplicates').on('click', SearchSiteDuplicates);
+    $('#btn_MergeSiteDuplicates').on('click', MergeSiteDuplicates);
+
+    $('#dupSiteName').on('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            SearchSiteDuplicates();
+        }
+    });
+
+    $('#sites').on('click', '.cust-site-Duplicate-btn, .cust-site-appts-toggle:not(.ahs-status-btn):not(.site-dup-btn)', function () {
         openDuplicateCheck({
             customerId: $(this).attr('data-customerid'),
             siteId: $(this).attr('data-siteid'),
@@ -194,6 +216,25 @@ $(document).ready(function () {
 
     $('#close_mdl_CheckDuplicate, #clossadaseAddSite').on('click', function () {
         closeModal('mdl_CheckDuplicate');
+    });
+
+    $('#btn_SearchDuplicates').on('click', SearchDuplicates);
+    $('#btn_MergeDuplicates').on('click', MergeDuplicates);
+
+    // Enter in a search box searches instead of submitting the page's server form.
+    $('#mdl_CheckDuplicate .dup-search').on('keydown', 'input', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            SearchDuplicates();
+        }
+    });
+
+    // Tint the rows so the Primary and the ticked Duplicates stand out.
+    $('#DuplicateCustomerTable, #DuplicateSiteTable').on('change', 'input', function () {
+        $(this).closest('tbody').find('tr').each(function () {
+            $(this).toggleClass('is-primary', $(this).find('.dup-primary').is(':checked'));
+            $(this).toggleClass('is-duplicate', $(this).find('.dup-target').is(':checked'));
+        });
     });
 
     $('#sites').on('click', '.cust-site-msgview-btn', function () {
@@ -572,7 +613,7 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                     <span class="ad-badge ${statusClass}">${statusTitle}</span>
                                 </div>
                                 <div class="cust-site-actions">
-                                    <button class="cust-site-icon-btn cust-site-Duplicate-btn" title="Check for duplicate sites" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
+                                    <button class="cust-site-icon-btn cust-site-Duplicate-btn" title="Check for duplicate customers" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
                                         <i class="fa fa-clone"></i></button>
                                     <button class="cust-site-icon-btn cust-site-msgview-btn" title="View Original Message" data-site-id="${escapeHTML(ApptID)}" data-is-default="${isDefaultSite}">
                                         <i class="fa fa-envelope-open-text"></i></button>
@@ -603,7 +644,10 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                         <i class="fas fa-clipboard-list"></i> AHS Status
                                     </button>
                                     <button type="button" class="cust-site-appts-toggle" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
-                                        <i class="fa fa-clone"></i> Duplicate Site Check
+                                        <i class="fa fa-clone"></i> Customer Duplicates
+                                    </button>
+                                    <button type="button" class="cust-site-appts-toggle site-dup-btn" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
+                                        <i class="fas fa-map-marker-alt"></i> Site Duplicates
                                     </button>
                                 </div>
                             </div>
@@ -771,50 +815,291 @@ function confirmYesNo(title, text) {
     return Promise.resolve(confirm(title + (text ? '\n' + text : '')));
 }
 
-// TPM has no site-merge endpoint, so this lists the sites that share a name and
-// leaves the resolving to the user.
-function openDuplicateCheck(opts) {
-    const tbody = $('#DuplicatecustomerSiteTable').find('tbody');
-    const body = tbody.length ? tbody : $('<tbody></tbody>').appendTo('#DuplicatecustomerSiteTable');
+// Duplicate customer check, ported from Jobs-Scheduler's customerDetail.aspx.
+// Front end only: both methods below still have to be added to
+// AppoinementList.aspx.cs. Jobs-Scheduler's versions can be copied as they are
+// (same parameter names, same DupCustomer fields).
+const DUP_SEARCH_URL = "AppoinementList.aspx/FindDuplicateCustomers";
+const DUP_MERGE_URL = "AppoinementList.aspx/ReassignCustomerCompany";
 
-    body.html('<tr><td colspan="2" class="text-muted">Loading…</td></tr>');
+// The customer the popup was opened from; listed first and preselected as Primary.
+let dupCurrentCustomerId = null;
+
+function dupMessage(html, table) {
+    $(table || '#DuplicateCustomerTable').find('tbody').html(`<tr class="dup-message"><td colspan="10">${html}</td></tr>`);
+}
+
+// Opens the popup with the search prefilled from the clicked site's contact.
+function openDuplicateCheck(opts) {
+    const site = sites.find(s => String(s.Id) === String(opts.siteId)) || {};
+    dupCurrentCustomerId = opts.customerId || site.CustomerID || null;
+
+    $('#dupFirstName').val(site.FirstName || '');
+    $('#dupLastName').val(site.LastName || '');
+    $('#dupAddress').val(site.Address || '');
+    $('#dupPhone').val(site.PhoneNumber || '');
+    $('#dupMobile').val(site.MobileNumber || '');
+    $('#dupEmail').val(site.Email || '');
+
     openModal('mdl_CheckDuplicate');
+    SearchDuplicates();
+}
+
+function SearchDuplicates() {
+    const payload = {
+        firstName: $.trim($('#dupFirstName').val()),
+        lastName: $.trim($('#dupLastName').val()),
+        address: $.trim($('#dupAddress').val()),
+        phone: $.trim($('#dupPhone').val()),
+        mobile: $.trim($('#dupMobile').val()),
+        email: $.trim($('#dupEmail').val())
+    };
+
+    if (!Object.values(payload).some(Boolean)) {
+        dupMessage('Fill in at least one search box.');
+        return;
+    }
+
+    dupMessage('<span class="spinner-border spinner-border-sm"></span> Searching…');
+    $('#btn_SearchDuplicates').prop('disabled', true);
 
     $.ajax({
         type: "POST",
-        url: "Customer.aspx/GetDuplicatecustomerSiteTable",
+        url: DUP_SEARCH_URL,
+        data: JSON.stringify(payload),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            const list = response.d || [];
+            if (!list.length) {
+                dupMessage('No matching customers found. Try adjusting the search.');
+                return;
+            }
+
+            // The current customer goes first and starts out as the Primary.
+            const isCurrent = c => String(c.CustomerID) === String(dupCurrentCustomerId);
+            const ordered = list.filter(isCurrent).concat(list.filter(c => !isCurrent(c)));
+
+            $('#DuplicateCustomerTable tbody').html(ordered.map(c => {
+                const id = escapeHTML(c.CustomerID);
+                const company = escapeHTML(c.CompanyID);
+                const current = isCurrent(c);
+                return `
+                    <tr class="${current ? 'is-primary' : ''}">
+                        <td class="dup-pick"><input type="radio" name="dupPrimary" class="dup-primary" value="${id}" data-company="${company}" aria-label="Keep as primary" ${current ? 'checked' : ''} /></td>
+                        <td class="dup-pick"><input type="checkbox" class="dup-target" value="${id}" aria-label="Mark as duplicate" /></td>
+                        <td class="dup-pick"><input type="radio" name="dupSecondary" class="dup-secondary" value="${id}" aria-label="Use as secondary contact" /></td>
+                        <td>${escapeHTML(c.FirstName)}${current ? '<span class="dup-current-tag">current</span>' : ''}</td>
+                        <td>${escapeHTML(c.LastName)}</td>
+                        <td>${escapeHTML(c.Address1)}</td>
+                        <td>${escapeHTML(c.City)}</td>
+                        <td>${escapeHTML(c.Phone)}</td>
+                        <td>${escapeHTML(c.Email)}</td>
+                        <td>${escapeHTML(c.Mobile)}</td>
+                    </tr>`;
+            }).join(''));
+        },
+        error: function (xhr) {
+            console.error("Error searching duplicate customers: ", xhr.responseText);
+            dupMessage('<span class="text-danger">Something went wrong while searching. Please try again.</span>');
+        },
+        complete: function () {
+            $('#btn_SearchDuplicates').prop('disabled', false);
+        }
+    });
+}
+
+function MergeDuplicates() {
+    const $primary = $('#DuplicateCustomerTable .dup-primary:checked');
+    if (!$primary.length) {
+        notify('warning', 'Select a customer', 'Please choose the customer you want to keep.');
+        return;
+    }
+    const primaryId = String($primary.val());
+
+    const targetIds = $('#DuplicateCustomerTable .dup-target:checked').map(function () {
+        return $(this).val();
+    }).get().filter(id => id !== primaryId).map(id => parseInt(id, 10));
+
+    if (!targetIds.length) {
+        notify('warning', 'Select duplicates', 'Please tick at least one duplicate record to merge.');
+        return;
+    }
+
+    const secondaryId = parseInt($('#DuplicateCustomerTable .dup-secondary:checked').val(), 10) || 0;
+    const deleteMerged = $('#chk_DeleteMerged').is(':checked');
+
+    confirmYesNo('Merge duplicates?',
+        `The ${targetIds.length} selected duplicate(s) will be merged into the customer you chose to keep, ` +
+        `and their appointments and invoices will be moved to it.` +
+        (deleteMerged ? ' The old accounts will be removed.' : '')
+    ).then(yes => {
+        if (!yes) return;
+
+        $('#btn_MergeDuplicates').prop('disabled', true).text('Merging…');
+        $.ajax({
+            type: "POST",
+            url: DUP_MERGE_URL,
+            data: JSON.stringify({
+                targetCompanyId: String($primary.data('company') ?? ''),
+                primaryCustomerId: parseInt(primaryId, 10),
+                customerIds: targetIds,
+                Isdelete: deleteMerged,
+                secondaryCustomerId: secondaryId
+            }),
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function (response) {
+                closeModal('mdl_CheckDuplicate');
+                // The server answers with a message ("Done! ..." or what went wrong).
+                const msg = response.d || 'Duplicates merged.';
+                const ok = /^done/i.test(msg);
+                // Reload once the message is dismissed, like Jobs-Scheduler does.
+                Promise.resolve(notify(ok ? 'info' : 'error', ok ? 'Merged' : 'Merge failed', msg))
+                    .then(() => { if (ok) location.reload(); });
+            },
+            error: function (xhr) {
+                console.error("Error merging duplicate customers: ", xhr.responseText);
+                notify('error', 'Merge failed', 'Something went wrong while merging. Please try again.');
+            },
+            complete: function () {
+                $('#btn_MergeDuplicates').prop('disabled', false).text('Merge Selected Duplicates');
+            }
+        });
+    });
+}
+
+// Duplicate site check. Search uses the existing Customer.aspx endpoint (it
+// matches on site name); merge is front end only until the backend adds
+// MergeCustomerSites(primarySiteId, siteIds, Isdelete) to AppoinementList.aspx.cs.
+const SITE_DUP_SEARCH_URL = "Customer.aspx/GetDuplicatecustomerSiteTable";
+const SITE_DUP_MERGE_URL = "AppoinementList.aspx/MergeCustomerSites";
+
+// The site the popup was opened from; listed first and preselected as Primary.
+let siteDupContext = {};
+
+function openSiteDuplicateCheck(opts) {
+    siteDupContext = opts;
+    $('#dupSiteName').val(opts.siteName || '');
+    openModal('mdl_CheckSiteDuplicate');
+    SearchSiteDuplicates();
+}
+
+function SearchSiteDuplicates() {
+    const siteName = $.trim($('#dupSiteName').val());
+    if (!siteName) {
+        dupMessage('Enter a site name to search.', '#DuplicateSiteTable');
+        return;
+    }
+
+    dupMessage('<span class="spinner-border spinner-border-sm"></span> Searching…', '#DuplicateSiteTable');
+    $('#btn_SearchSiteDuplicates').prop('disabled', true);
+
+    $.ajax({
+        type: "POST",
+        url: SITE_DUP_SEARCH_URL,
         data: JSON.stringify({
-            customerId: opts.customerId,
-            siteId: opts.siteId,
-            Sitename: opts.siteName
+            customerId: String(siteDupContext.customerId ?? ''),
+            siteId: String(siteDupContext.siteId ?? ''),
+            Sitename: siteName
         }),
         contentType: "application/json; charset=utf-8",
         dataType: "json",
         success: function (response) {
+            // This endpoint returns its rows as a JSON string under "data".
             let payload = response.d;
             if (typeof payload === 'string') {
                 try { payload = JSON.parse(payload); } catch (e) { payload = null; }
             }
-            const rows = (payload && payload.data) || [];
-
-            if (!rows.length) {
-                body.html('<tr><td colspan="2" class="text-muted">No other site matches this name.</td></tr>');
+            const list = (payload && payload.data) || [];
+            if (!list.length) {
+                dupMessage('No matching sites found. Try a shorter name.', '#DuplicateSiteTable');
                 return;
             }
 
-            body.html(rows.map(site => {
-                const address = [site.Address, site.City, site.State, site.Zip].filter(Boolean).join(', ');
-                const isCurrent = String(site.Id) === String(opts.siteId);
-                return `<tr>
-                            <td>${escapeHTML(site.SiteName)}${isCurrent ? ' <span class="badge status-confirmed">this site</span>' : ''}</td>
-                            <td>${escapeHTML(address) || '-'}</td>
-                        </tr>`;
+            const isCurrent = s => String(s.Id) === String(siteDupContext.siteId);
+            const ordered = list.filter(isCurrent).concat(list.filter(s => !isCurrent(s)));
+
+            $('#DuplicateSiteTable tbody').html(ordered.map(s => {
+                const id = escapeHTML(s.Id);
+                const current = isCurrent(s);
+                const contact = [s.FirstName, s.LastName].filter(Boolean).join(' ');
+                return `
+                    <tr class="${current ? 'is-primary' : ''}">
+                        <td class="dup-pick"><input type="radio" name="dupSitePrimary" class="dup-primary" value="${id}" aria-label="Keep as primary" ${current ? 'checked' : ''} /></td>
+                        <td class="dup-pick"><input type="checkbox" class="dup-target" value="${id}" aria-label="Mark as duplicate" /></td>
+                        <td>${escapeHTML(s.SiteName)}${current ? '<span class="dup-current-tag">current</span>' : ''}</td>
+                        <td>${escapeHTML(contact)}</td>
+                        <td>${escapeHTML(s.Address)}</td>
+                        <td>${escapeHTML(s.State)}</td>
+                        <td>${escapeHTML(s.Zip)}</td>
+                        <td>${escapeHTML(s.PhoneNumber)}</td>
+                        <td>${escapeHTML(s.Email)}</td>
+                    </tr>`;
             }).join(''));
         },
         error: function (xhr) {
-            console.error("Error loading duplicate sites: ", xhr.responseText);
-            body.html('<tr><td colspan="2" class="text-danger">Failed to load duplicate sites.</td></tr>');
+            console.error("Error searching duplicate sites: ", xhr.responseText);
+            dupMessage('<span class="text-danger">Something went wrong while searching. Please try again.</span>', '#DuplicateSiteTable');
+        },
+        complete: function () {
+            $('#btn_SearchSiteDuplicates').prop('disabled', false);
         }
+    });
+}
+
+function MergeSiteDuplicates() {
+    const $primary = $('#DuplicateSiteTable .dup-primary:checked');
+    if (!$primary.length) {
+        notify('warning', 'Select a site', 'Please choose the site you want to keep.');
+        return;
+    }
+    const primaryId = String($primary.val());
+
+    const siteIds = $('#DuplicateSiteTable .dup-target:checked').map(function () {
+        return $(this).val();
+    }).get().filter(id => id !== primaryId).map(id => parseInt(id, 10));
+
+    if (!siteIds.length) {
+        notify('warning', 'Select duplicates', 'Please tick at least one duplicate site to merge.');
+        return;
+    }
+
+    const deleteMerged = $('#chk_DeleteMergedSites').is(':checked');
+
+    confirmYesNo('Merge duplicate sites?',
+        `The ${siteIds.length} selected site(s) will be merged into the site you chose to keep, ` +
+        `and their appointments will be moved to it.` +
+        (deleteMerged ? ' The old sites will be removed.' : '')
+    ).then(yes => {
+        if (!yes) return;
+
+        $('#btn_MergeSiteDuplicates').prop('disabled', true).text('Merging…');
+        $.ajax({
+            type: "POST",
+            url: SITE_DUP_MERGE_URL,
+            data: JSON.stringify({
+                primarySiteId: parseInt(primaryId, 10),
+                siteIds: siteIds,
+                Isdelete: deleteMerged
+            }),
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function (response) {
+                closeModal('mdl_CheckSiteDuplicate');
+                const msg = response.d || 'Sites merged.';
+                const ok = /^done/i.test(msg);
+                Promise.resolve(notify(ok ? 'info' : 'error', ok ? 'Merged' : 'Merge failed', msg))
+                    .then(() => { if (ok) location.reload(); });
+            },
+            error: function (xhr) {
+                console.error("Error merging duplicate sites: ", xhr.responseText);
+                notify('error', 'Merge failed', 'Something went wrong while merging. Please try again.');
+            },
+            complete: function () {
+                $('#btn_MergeSiteDuplicates').prop('disabled', false).text('Merge Selected Sites');
+            }
+        });
     });
 }
 
@@ -906,7 +1191,7 @@ function saveSite(event) {
     event.preventDefault();
     if (validateSiteForm()) {
         const siteId = parseInt($('#SiteId').val());
-        const isDefaultSite = siteId === 0 && $('.cust-modal-title').text().includes('Default');
+        const isDefaultSite = siteId === 0 && $('#addSiteModal .cust-modal-title').text().includes('Default');
 
         const site = {
             Id: siteId,

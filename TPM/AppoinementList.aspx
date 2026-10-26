@@ -45,7 +45,8 @@
 
         /* Work order details card (rendered by AppointmentList.js) */
         .ad-card,
-        .ahs-modal-content {
+        .ahs-modal-content,
+        .dup-modal-content {
             --ad-border: #e2e8f0;
             --ad-panel: #ffffff;
             --ad-muted: #64748b;
@@ -61,7 +62,8 @@
         }
 
         [data-theme="dark"] .ad-card,
-        [data-theme="dark"] .ahs-modal-content {
+        [data-theme="dark"] .ahs-modal-content,
+        [data-theme="dark"] .dup-modal-content {
             --ad-border: rgba(255, 255, 255, 0.14);
             --ad-panel: rgba(255, 255, 255, 0.04);
             --ad-muted: #94a3b8;
@@ -253,6 +255,207 @@
             color: var(--ad-text);
         }
 
+
+        /* Duplicate customer check modal */
+        .dup-modal-content {
+            width: 1200px;
+            max-width: 95%;
+            color: var(--ad-text);
+        }
+
+        .dup-search {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px 14px;
+            align-items: end;
+        }
+
+        .dup-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin: 0;
+        }
+
+            .dup-field-wide { grid-column: 1 / 3; }
+
+            .dup-field > span {
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                color: var(--ad-muted);
+            }
+
+        .dup-search-btn,
+        .dup-merge-btn {
+            height: 34px;
+            padding: 0 16px;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .dup-search-btn {
+            grid-column: 3;
+            background: var(--ad-accent);
+        }
+
+        .dup-merge-btn { background: #16a34a; }
+
+            .dup-search-btn:hover:not(:disabled),
+            .dup-merge-btn:hover:not(:disabled) { filter: brightness(1.08); }
+
+            .dup-search-btn:disabled,
+            .dup-merge-btn:disabled {
+                opacity: 0.6;
+                cursor: wait;
+            }
+
+        .dup-help {
+            margin: 14px 0 10px;
+            font-size: 12.5px;
+            color: var(--ad-muted);
+        }
+
+            .dup-help strong { color: var(--ad-text); }
+
+        .dup-table-wrap {
+            max-height: 45vh;
+            overflow: auto;
+            border: 1px solid var(--ad-border);
+            border-radius: 10px;
+        }
+
+        .dup-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+            .dup-table th {
+                position: sticky;
+                top: 0;
+                z-index: 1;
+                padding: 9px 10px;
+                background: #f8fafc;
+                border-bottom: 1px solid var(--ad-border);
+                color: var(--ad-muted);
+                font-size: 11.5px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.4px;
+                text-align: left;
+                white-space: nowrap;
+            }
+
+            .dup-table td {
+                padding: 8px 10px;
+                border-bottom: 1px solid var(--ad-border);
+                word-break: break-word;
+            }
+
+            .dup-table tbody tr:last-child td { border-bottom: none; }
+            .dup-table tbody tr:hover td { background: rgba(100, 116, 139, 0.06); }
+            .dup-table tr.is-primary td { background: rgba(0, 123, 255, 0.07); }
+            .dup-table tr.is-duplicate td { background: rgba(245, 158, 11, 0.08); }
+
+            .dup-table .dup-pick {
+                width: 84px;
+                text-align: center;
+            }
+
+                .dup-table .dup-pick input {
+                    width: 16px;
+                    height: 16px;
+                    accent-color: var(--ad-accent);
+                    cursor: pointer;
+                }
+
+            .dup-table .dup-message td {
+                padding: 24px 10px;
+                text-align: center;
+                color: var(--ad-muted);
+            }
+
+        [data-theme="dark"] .dup-table th { background: rgba(255, 255, 255, 0.06); }
+
+        .dup-current-tag {
+            margin-left: 6px;
+            padding: 1px 7px;
+            border-radius: 99px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: 10.5px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .dup-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .dup-delete {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0;
+            font-size: 13.5px;
+            font-weight: 500;
+            cursor: pointer;
+            user-select: none;
+        }
+
+            /* The real checkbox stays for the form/JS; the switch is drawn by .dup-switch. */
+            .dup-delete input {
+                position: absolute;
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+
+        .dup-switch {
+            position: relative;
+            flex-shrink: 0;
+            width: 40px;
+            height: 22px;
+            border-radius: 99px;
+            background: #cbd5e1;
+            transition: background 0.2s;
+        }
+
+            .dup-switch::before {
+                content: "";
+                position: absolute;
+                top: 3px;
+                left: 3px;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: #fff;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+                transition: transform 0.2s;
+            }
+
+        .dup-delete input:checked + .dup-switch { background: #dc2626; }
+        .dup-delete input:checked + .dup-switch::before { transform: translateX(18px); }
+        .dup-delete input:focus-visible + .dup-switch { box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3); }
+
+        [data-theme="dark"] .dup-switch { background: #475569; }
+
+        .dup-footer-btns {
+            display: flex;
+            gap: 8px;
+        }
 
         .ad-panels {
             display: grid;
@@ -461,6 +664,11 @@
         @media (max-width: 640px) {
             .ad-dup-btn { margin-left: 0 !important; }
             .ad-field, .ad-field .form-select { min-width: 0; width: 100%; }
+            .dup-search { grid-template-columns: 1fr; }
+            .dup-field-wide { grid-column: auto; }
+            .dup-search-btn { grid-column: auto; }
+            .dup-footer-btns { width: 100%; }
+            .dup-footer-btns > * { flex: 1; }
             .ahs-row { flex-wrap: wrap; }
             .ahs-date { order: 3; width: 100%; }
             .ahs-date { flex: 1; width: auto; }
@@ -593,30 +801,114 @@
         </section>
     </div>
 
-          <div class="cust-modal" id="mdl_CheckDuplicate">
-        <div class="cust-modal-content">
-            <button class="cust-modal-close" id="close_mdl_CheckDuplicate">×</button>
-            <h2 class="cust-modal-title">Duplicate Check</h2>
-                <!-- Site Name -->
-                <div class="form-row">
-                    <div class="cust-modal-field full-width">
+    <%-- Duplicate customer check, same flow as Jobs-Scheduler's customerDetail.aspx:
+         search, pick the Primary to keep, tick Duplicates, optionally a Secondary
+         contact, then merge. Front end only: it calls FindDuplicateCustomers and
+         ReassignCustomerCompany on this page, which the backend still has to add.
+         No HTML5 "required" on the inputs: the modal sits inside the page's server form. --%>
+    <div class="cust-modal" id="mdl_CheckDuplicate">
+        <div class="cust-modal-content dup-modal-content">
+            <button type="button" class="cust-modal-close" id="close_mdl_CheckDuplicate">×</button>
+            <h2 class="cust-modal-title">Check for Duplicate Customers</h2>
 
-                         <table id="DuplicatecustomerSiteTable" class="display" style="width: 100%">
-                                    <thead>
-                                        <tr>
-                                             <th>Site Name</th>
-                                            <th>Address</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody></tbody>
-                                </table>
-                    </div>
-                </div>
-                <%-- Read-only: TPM has no endpoint for merging a sub site into a main site. --%>
-                <div class="cust-modal-btns">
-                    <button type="button" class="cust-modal-cancel" id="clossadaseAddSite">Close</button>
-                </div>
+            <div class="dup-search">
+                <label class="dup-field"><span>First Name</span><input type="text" id="dupFirstName" class="form-control form-control-sm" /></label>
+                <label class="dup-field"><span>Last Name</span><input type="text" id="dupLastName" class="form-control form-control-sm" /></label>
+                <label class="dup-field"><span>Address</span><input type="text" id="dupAddress" class="form-control form-control-sm" /></label>
+                <label class="dup-field"><span>Phone</span><input type="text" id="dupPhone" class="form-control form-control-sm" /></label>
+                <label class="dup-field"><span>Mobile</span><input type="text" id="dupMobile" class="form-control form-control-sm" /></label>
+                <label class="dup-field"><span>E-Mail</span><input type="text" id="dupEmail" class="form-control form-control-sm" /></label>
+                <button type="button" class="dup-search-btn" id="btn_SearchDuplicates"><i class="fas fa-search"></i> Search</button>
+            </div>
 
+            <p class="dup-help">
+                Pick the customer to <strong>keep (Primary)</strong>, then tick the <strong>Duplicate</strong> records to merge into it.
+                Their appointments and invoices move to the Primary. <strong>Secondary</strong> (optional) copies that person in as the Primary's second contact.
+            </p>
+
+            <div class="dup-table-wrap">
+                <table class="dup-table" id="DuplicateCustomerTable">
+                    <thead>
+                        <tr>
+                            <th class="dup-pick">Primary</th>
+                            <th class="dup-pick">Duplicate</th>
+                            <th class="dup-pick">Secondary</th>
+                            <th>First Name</th>
+                            <th>Last Name</th>
+                            <th>Address</th>
+                            <th>City</th>
+                            <th>Phone</th>
+                            <th>Email</th>
+                            <th>Mobile</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="dup-footer">
+                <label class="dup-delete">
+                    <input type="checkbox" id="chk_DeleteMerged" role="switch" checked />
+                    <span class="dup-switch" aria-hidden="true"></span>
+                    <span>Delete the old (merged) accounts</span>
+                </label>
+                <div class="dup-footer-btns">
+                    <button type="button" class="cust-modal-cancel" id="clossadaseAddSite">Cancel</button>
+                    <button type="button" class="dup-merge-btn" id="btn_MergeDuplicates">Merge Selected Duplicates</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <%-- Duplicate site check: same flow as the customer check above, for sites.
+         Search uses the existing Customer.aspx/GetDuplicatecustomerSiteTable (matches
+         on site name). Merge calls MergeCustomerSites on this page, which the backend
+         still has to add. --%>
+    <div class="cust-modal" id="mdl_CheckSiteDuplicate">
+        <div class="cust-modal-content dup-modal-content">
+            <button type="button" class="cust-modal-close" id="close_mdl_CheckSiteDuplicate">×</button>
+            <h2 class="cust-modal-title">Check for Duplicate Sites</h2>
+
+            <div class="dup-search">
+                <label class="dup-field dup-field-wide"><span>Site Name</span><input type="text" id="dupSiteName" class="form-control form-control-sm" /></label>
+                <button type="button" class="dup-search-btn" id="btn_SearchSiteDuplicates"><i class="fas fa-search"></i> Search</button>
+            </div>
+
+            <p class="dup-help">
+                Pick the site to <strong>keep (Primary)</strong>, then tick the <strong>Duplicate</strong> sites to merge into it.
+                Their appointments move to the Primary site.
+            </p>
+
+            <div class="dup-table-wrap">
+                <table class="dup-table" id="DuplicateSiteTable">
+                    <thead>
+                        <tr>
+                            <th class="dup-pick">Primary</th>
+                            <th class="dup-pick">Duplicate</th>
+                            <th>Site Name</th>
+                            <th>Contact</th>
+                            <th>Address</th>
+                            <th>State</th>
+                            <th>Zip</th>
+                            <th>Phone</th>
+                            <th>Email</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="dup-footer">
+                <label class="dup-delete">
+                    <input type="checkbox" id="chk_DeleteMergedSites" role="switch" checked />
+                    <span class="dup-switch" aria-hidden="true"></span>
+                    <span>Delete the old (merged) sites</span>
+                </label>
+                <div class="dup-footer-btns">
+                    <button type="button" class="cust-modal-cancel" id="btn_CloseSiteDuplicate">Cancel</button>
+                    <button type="button" class="dup-merge-btn" id="btn_MergeSiteDuplicates">Merge Selected Sites</button>
+                </div>
+            </div>
         </div>
     </div>
 
