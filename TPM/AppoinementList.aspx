@@ -73,23 +73,77 @@
 
         .ad-header {
             align-items: center;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             padding-bottom: 10px;
             border-bottom: 1px solid var(--ad-border);
         }
 
+        .ad-header .cust-site-title-group {
+            align-items: center;
+            flex: 1;
+            min-width: 0;
+        }
+
+        /* Long site names cut off with "..." instead of running into the badge or icons. */
         .ad-header .cust-site-title {
             font-size: 17px;
+            line-height: 1.2;
             letter-spacing: 0.2px;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .ad-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
             font-size: 11px;
             font-weight: 600;
-            padding: 2px 8px;
+            line-height: 1;
+            padding: 4px 10px 4px 8px;
             border-radius: 99px;
             text-transform: uppercase;
             letter-spacing: 0.4px;
+        }
+
+        .ad-header .cust-site-actions { flex-shrink: 0; }
+
+        .ad-badge-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+            .ad-badge.active .ad-badge-dot { background: #22c55e; }
+
+        /* Header address: one line, cut off with "..." so it never runs into the name. */
+        .cust-details-header div#contact .ci-value {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .cust-details-header div#contact .ci-item { min-width: 0; gap: 8px; }
+
+        .cust-details-header div#contact .ci-tag {
+            flex-shrink: 0;
+            padding: 3px 8px;
+            border-radius: 99px;
+            background: #eef2f7;
+            color: #64748b;
+            font-size: 10.5px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        [data-theme="dark"] .cust-details-header div#contact .ci-tag {
+            background: rgba(255, 255, 255, 0.08);
+            color: #94a3b8;
         }
 
             .ad-badge.active { background: #dcfce7; color: #166534; }
@@ -138,6 +192,118 @@
         }
 
             .ad-field-static i { color: var(--ad-muted); }
+
+        /* Name and customer address share one line in the details header. */
+        .cust-details-container .cust-details-header {
+            flex-direction: row;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .cust-details-container .cust-details-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex: 1;
+            min-width: 0;
+        }
+
+            .cust-details-container .cust-details-left .cust-details-title {
+                flex-shrink: 0;
+                max-width: 50%;
+                margin: 0;
+                line-height: 1.2;
+            }
+
+        /* Rows whose items are all empty are hidden, so they don't push the address off center. */
+        .cust-details-header div#contact .ci-row { margin: 0; }
+        .cust-details-header div#contact .ci-row:not(:has(.ci-item:not(.is-empty))) { display: none; }
+        .cust-details-header div#contact .ci-value { line-height: 1.2; font-size: 16px; }
+
+        .cust-details-container .cust-details-header div#contact {
+            flex: 1;
+            min-width: 0;
+            margin: 0;
+            padding: 0;
+            background: none;
+            border: none;
+            box-shadow: none;
+        }
+
+        /* Appointment fields and site address side by side. */
+        .ad-top {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+            gap: 14px;
+            align-items: stretch;
+        }
+
+            .ad-top .ad-toolbar {
+                flex-direction: column;
+                flex-wrap: nowrap;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            .ad-top .ad-field {
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                min-width: 0;
+            }
+
+            .ad-top .ad-field .form-select {
+                min-width: 0;
+                width: 150px;
+            }
+
+        .ad-address .ad-panel-title {
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+            .ad-address .ad-panel-title .ad-link {
+                margin: 0;
+                text-transform: none;
+                letter-spacing: 0;
+                font-weight: 500;
+            }
+
+        .ad-address-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            column-gap: 16px;
+        }
+
+            .ad-address-grid .ad-address-wide { grid-column: 1 / -1; }
+            .ad-address-grid .ad-row { grid-template-columns: 18px 46px 1fr; }
+            .ad-address-grid .ad-row:last-child { border-bottom: 1px dashed var(--ad-border); }
+
+        .ad-address-warn {
+            margin-top: 8px;
+            padding: 6px 10px;
+            border-left: 3px solid #f59e0b;
+            border-radius: 4px;
+            background: #fffbeb;
+            color: #92400e;
+            font-size: 12.5px;
+            font-weight: 500;
+        }
+
+        [data-theme="dark"] .ad-address-warn {
+            background: rgba(245, 158, 11, 0.12);
+            color: #fcd34d;
+        }
+
+        @media (max-width: 1100px) {
+            .ad-top { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 700px) {
+            .cust-details-container .cust-details-header,
+            .cust-details-container .cust-details-left { flex-wrap: wrap; }
+        }
 
         .ahs-modal-content {
             max-width: 560px;
@@ -724,12 +890,18 @@
             color: #93c5fd;
         }
 
+        /* Fixed label column so every block of pairs in the notes lines up. */
         .ad-notes-pairs {
             display: grid;
-            grid-template-columns: max-content 1fr;
+            grid-template-columns: 130px minmax(0, 1fr);
             gap: 3px 14px;
             margin: 0;
         }
+
+            .ad-notes-pairs dd.ad-notes-cont {
+                margin-top: -2px;
+                color: var(--ad-muted);
+            }
 
             .ad-notes-pairs dt {
                 color: var(--ad-muted);
@@ -792,6 +964,7 @@
             .ahs-footer .ahs-btn { width: 100%; }
             .ad-notes-pairs { grid-template-columns: 1fr; }
             .ad-notes-pairs dd { margin-bottom: 4px; }
+            .ad-notes-pairs dt:empty { display: none; }
         }
     </style>
 
@@ -854,21 +1027,13 @@
                     <div class="cust-details-left">
 
                         <h2 class="cust-details-title" id="customerName">Select a Customer</h2>
-                    </div>
-                    <div class="cust-details-actions">
-
-                        <button class="cust-table-edit-btn" title="Edit Site" id="editCustomerBtn">
-                            <i class="fa-solid fa-user-pen"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- This is the moved section -->
+                <!-- Customer address, beside the name -->
                 <div id="contact">
                     <!-- Row 1: Address -->
                     <div class="ci-row">
-                        <div class="ci-item" id="customerAddress-container">
+                        <div class="ci-item" id="customerAddress-container" title="Customer's address on file (the job site is in the card below)">
                             <i class="ci-icon fas fa-map-marker-alt"></i>
+                            <span class="ci-tag">Customer</span>
                             <span class="ci-value" id="customerAddress">-</span>
                         </div>
                     </div>
@@ -897,22 +1062,21 @@
                         </div>
                     </div>
                 </div>
-                <!-- End of moved section -->
+                    </div>
+                    <div class="cust-details-actions">
+                        <button type="button" class="cust-table-edit-btn" title="Edit Site" id="editCustomerBtn">
+                            <i class="fa-solid fa-user-pen"></i>
+                        </button>
+                    </div>
+                </div>
 
                 <div class="cust-details-content">
-                    <!-- Note: The original cust-section-block wrappers have been removed as requested -->
-                    <div class="cust-section-block">
-                        <button class="cust-section-toggle" data-section="sites" id="sitesBtn">Contact &amp; Appointment Details</button>
-                        <div class="cust-section-content" id="sites">
-                            <div class="sites-header">
-                            </div>
-                           
-                            <div class="sites-list">
-                                
-                            </div>
+                    <div id="sites">
+                        <div class="sites-header">
+                        </div>
+                        <div class="sites-list">
                         </div>
                     </div>
-
                 </div>
             </div>
         </section>

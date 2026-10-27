@@ -54,20 +54,6 @@ $(document).ready(function () {
 
     LoadAppointments();
 
-    $('.cust-section-toggle').on('click', function () {
-        const sectionId = $(this).data('section');
-        const content = $('#' + sectionId);
-        const isActive = content.is(':visible');
-
-        $('.cust-section-content').slideUp();
-        $('.cust-section-toggle').removeClass('active');
-
-        if (!isActive) {
-            content.slideDown();
-            $(this).addClass('active');
-        }
-    });
-
     // Delegated from the table itself: DataTables replaces <tbody> on every draw,
     // so a handler bound to the tbody stops firing after the first reload.
     $('#AppointmentListTable').on('click', 'tbody tr', function () {
@@ -75,8 +61,7 @@ $(document).ready(function () {
         const data = table.row(this).data();
         if (!data) return; // the "No data available" placeholder row
 
-        $('#contact, #sites').slideDown();
-        $('#contactBtn, #sitesBtn').addClass('active');
+        $('#contact').slideDown();
 
         if (currentRow && currentRow.ApptID === data.ApptID) return;
         generateCustomerDetails(data);
@@ -537,6 +522,10 @@ function formatNotes(notes) {
         } else if ((m = line.match(/^\*{2,}\s*(.*?)\s*\**$/))) {
             flush();
             out.push(`<div class="ad-notes-callout"><i class="fas fa-info-circle"></i> ${escapeHTML(m[1])}</div>`);
+        } else if (pairs && line.length <= 60 && !line.includes(':')) {
+            // A short line right under a "Key: value" is that value's second line
+            // (the phone under the customer, the city under the street).
+            pairs.push(`<dt></dt><dd class="ad-notes-cont">${escapeHTML(line)}</dd>`);
         } else if (isLoud(line)) {
             // All-caps warranty rules ("REMINDER: ...") read better together than as key/value pairs.
             if (list || pairs) flush();
@@ -550,7 +539,10 @@ function formatNotes(notes) {
                     ? '<div class="ad-notes-gap"></div>'
                     : `<h5 class="ad-notes-heading">${escapeHTML(m[1])}</h5>`);
             } else {
-                (pairs = pairs || []).push(`<dt>${escapeHTML(m[1])}</dt><dd>${escapeHTML(m[2])}</dd>`);
+                // The feed leaves blank fields as a bare trailing label ("Effective Date : Expires :"),
+                // so drop that label rather than show it as the value.
+                const value = m[2].replace(/\s*[A-Za-z][\w ]{0,30}:\s*$/, '').trim();
+                (pairs = pairs || []).push(`<dt>${escapeHTML(m[1])}</dt><dd>${value ? escapeHTML(value) : '<span class="ad-empty">Not provided</span>'}</dd>`);
             }
         } else {
             flush();
@@ -601,7 +593,6 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                     const mmsButton = `
                         <button class="cust-site-icon-btn cust-site-MMS-btn" title="Send MMS" data-site-id="${escapeHTML(site.Id)}" data-customer-id="${escapeHTML(site.CustomerID)}" data-MobileNumber-id="${escapeHTML(site.MobileNumber)}" data-is-default="${isDefaultSite}">
                             <i class="fa-solid fa-photo-film"></i></button>`;
-                    const contactName = [site.FirstName, site.LastName].filter(Boolean).join(' ');
                     const mapQuery = [site.Address, site.City, site.State, site.Zip].filter(Boolean).join(', ');
                     const detailRow = (icon, label, value) => `
                         <div class="ad-row">
@@ -614,9 +605,8 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                         <div class="cust-site-card ad-card" data-site-id="${escapeHTML(site.Id)}">
                             <div class="cust-site-header ad-header">
                                 <div class="cust-site-title-group">
-                                    <div class="cust-site-status-indicator ${statusClass}" title="${statusTitle}"></div>
-                                    <h3 class="cust-site-title">${escapeHTML(site.SiteName)}</h3>
-                                    <span class="ad-badge ${statusClass}">${statusTitle}</span>
+                                    <h3 class="cust-site-title" title="${escapeHTML(site.SiteName)}">${escapeHTML(site.SiteName)}</h3>
+                                    <span class="ad-badge ${statusClass}"><span class="ad-badge-dot"></span>${statusTitle}</span>
                                 </div>
                                 <div class="cust-site-actions">
                                     <button type="button" class="cust-site-icon-btn ahs-status-btn" title="AHS Status">
@@ -636,6 +626,21 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                 </div>
                             </div>
 
+                            <div class="ad-top">
+                            <section class="ad-panel ad-address">
+                                <h4 class="ad-panel-title">
+                                    <span><i class="fas fa-map-marker-alt"></i> Site address</span>
+                                    ${mapQuery ? `<a class="ad-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Maps</a>` : ''}
+                                </h4>
+                                <div class="ad-address-grid">
+                                    <div class="ad-address-wide">${detailRow('fas fa-road', 'Street', escapeHTML(site.Address))}</div>
+                                    ${detailRow('fas fa-city', 'City', escapeHTML(site.City))}
+                                    ${detailRow('fas fa-flag', 'State', escapeHTML(site.State))}
+                                    ${detailRow('fas fa-mail-bulk', 'Zip', escapeHTML(site.Zip))}
+                                    ${detailRow('fas fa-globe-americas', 'Country', escapeHTML(site.Country))}
+                                </div>
+                                ${isDefaultSite ? `<div class="ad-address-warn"><i class="fas fa-exclamation-triangle"></i> No site is linked to this appointment, so this is the customer's address, not the job site.</div>` : ''}
+                            </section>
                             <div class="ad-toolbar">
                                 <label class="ad-field">
                                     <span class="ad-field-label">Appointment status</span>
@@ -650,24 +655,6 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                     <span class="ad-field-static"><i class="far fa-calendar-alt"></i> ${escapeHTML(ApptDateTime) || '-'}</span>
                                 </div>
                             </div>
-
-                            <div class="ad-panels">
-                                <section class="ad-panel">
-                                    <h4 class="ad-panel-title"><i class="fas fa-map-marker-alt"></i> Site address</h4>
-                                    ${detailRow('fas fa-road', 'Street', escapeHTML(site.Address))}
-                                    ${detailRow('fas fa-city', 'City', escapeHTML(site.City))}
-                                    ${detailRow('fas fa-flag', 'State', escapeHTML(site.State))}
-                                    ${detailRow('fas fa-mail-bulk', 'Zip', escapeHTML(site.Zip))}
-                                    ${detailRow('fas fa-globe-americas', 'Country', escapeHTML(site.Country))}
-                                    ${mapQuery ? `<a class="ad-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Open in Maps</a>` : ''}
-                                </section>
-                                <section class="ad-panel">
-                                    <h4 class="ad-panel-title"><i class="fas fa-address-card"></i> Contact</h4>
-                                    ${detailRow('fas fa-user', 'Name', escapeHTML(contactName))}
-                                    ${detailRow('fas fa-envelope', 'Email', site.Email ? `<a href="mailto:${encodeURIComponent(site.Email)}" class="site-email-link" data-customer-id="${escapeHTML(site.CustomerID)}">${escapeHTML(site.Email)}</a>` : '')}
-                                    ${detailRow('fas fa-phone-alt', 'Phone', site.PhoneNumber ? `<a href="tel:${escapeHTML(site.PhoneNumber)}">${escapeHTML(site.PhoneNumber)}</a>` : '')}
-                                    ${detailRow('fas fa-mobile-alt', 'Mobile', site.MobileNumber ? `<a href="tel:${escapeHTML(site.MobileNumber)}">${escapeHTML(site.MobileNumber)}</a>` : '')}
-                                </section>
                             </div>
 
                             <section class="ad-panel ad-notes">
