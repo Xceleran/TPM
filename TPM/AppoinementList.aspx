@@ -139,17 +139,6 @@
 
             .ad-field-static i { color: var(--ad-muted); }
 
-        .ad-dup-btn {
-            margin-left: auto !important;
-            align-self: flex-end;
-        }
-
-        .ad-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
         .ahs-modal-content {
             max-width: 560px;
             width: 100%;
@@ -256,6 +245,102 @@
         }
 
 
+        /* Original message modal: tinted header, scrolling body */
+        .msg-modal-content {
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .msg-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px 20px;
+            background: #eef4ff;
+            border-bottom: 1px solid #dbe5f5;
+        }
+
+        [data-theme="dark"] .msg-header {
+            background: rgba(96, 165, 250, 0.1);
+            border-bottom-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .msg-header-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: #fff;
+            color: #007bff;
+            font-size: 17px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        [data-theme="dark"] .msg-header-icon {
+            background: rgba(255, 255, 255, 0.08);
+            color: #60a5fa;
+        }
+
+        .msg-header-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .MSg-modal-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        .msg-subject {
+            margin: 2px 0 0;
+            font-size: 13px;
+            color: #64748b;
+            overflow-wrap: anywhere;
+        }
+
+            .msg-subject:empty { display: none; }
+
+        [data-theme="dark"] .msg-subject { color: #94a3b8; }
+
+        .msg-close {
+            position: static;
+            align-self: flex-start;
+            flex-shrink: 0;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            font-size: 22px;
+        }
+
+            .msg-close:hover { background: rgba(0, 0, 0, 0.06); }
+
+        .msg-body {
+            flex: 1;
+            min-height: 120px;
+            padding: 20px;
+            overflow: auto;
+        }
+
+        .msg-footer {
+            display: flex;
+            justify-content: flex-end;
+            padding: 12px 20px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        [data-theme="dark"] .msg-footer { border-top-color: rgba(255, 255, 255, 0.1); }
+
+            /* The email HTML brings its own fixed widths; keep it inside the popup. */
+            .msg-body img,
+            .msg-body table { max-width: 100%; }
+
         /* Duplicate customer check modal */
         .dup-modal-content {
             width: 1200px;
@@ -263,11 +348,41 @@
             color: var(--ad-text);
         }
 
-        .dup-search {
+        /* Two lanes: search on the left, results on the right. */
+        .dup-layout {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px 14px;
-            align-items: end;
+            grid-template-columns: 280px minmax(0, 1fr);
+            gap: 18px;
+            align-items: start;
+        }
+
+        .dup-side {
+            padding: 14px;
+            border: 1px solid var(--ad-border);
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+
+        [data-theme="dark"] .dup-side { background: rgba(255, 255, 255, 0.04); }
+
+        .dup-side-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0 0 12px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--ad-muted);
+        }
+
+            .dup-side-title i { color: var(--ad-accent); }
+
+        .dup-search {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
 
         .dup-field {
@@ -276,8 +391,6 @@
             gap: 4px;
             margin: 0;
         }
-
-            .dup-field-wide { grid-column: 1 / 3; }
 
             .dup-field > span {
                 font-size: 11px;
@@ -300,7 +413,7 @@
         }
 
         .dup-search-btn {
-            grid-column: 3;
+            margin-top: 4px;
             background: var(--ad-accent);
         }
 
@@ -316,15 +429,17 @@
             }
 
         .dup-help {
-            margin: 14px 0 10px;
+            margin: 14px 0 0;
             font-size: 12.5px;
+            line-height: 1.5;
             color: var(--ad-muted);
         }
 
             .dup-help strong { color: var(--ad-text); }
 
         .dup-table-wrap {
-            max-height: 45vh;
+            max-height: 60vh;
+            min-height: 200px;
             overflow: auto;
             border: 1px solid var(--ad-border);
             border-radius: 10px;
@@ -661,12 +776,14 @@
                 background: var(--ad-border);
             }
 
+        /* Stack the duplicate popups' lanes once the table would get too narrow. */
+        @media (max-width: 900px) {
+            .dup-layout { grid-template-columns: 1fr; }
+            .dup-table-wrap { min-height: 0; }
+        }
+
         @media (max-width: 640px) {
-            .ad-dup-btn { margin-left: 0 !important; }
             .ad-field, .ad-field .form-select { min-width: 0; width: 100%; }
-            .dup-search { grid-template-columns: 1fr; }
-            .dup-field-wide { grid-column: auto; }
-            .dup-search-btn { grid-column: auto; }
             .dup-footer-btns { width: 100%; }
             .dup-footer-btns > * { flex: 1; }
             .ahs-row { flex-wrap: wrap; }
@@ -811,6 +928,9 @@
             <button type="button" class="cust-modal-close" id="close_mdl_CheckDuplicate">×</button>
             <h2 class="cust-modal-title">Check for Duplicate Customers</h2>
 
+            <div class="dup-layout">
+            <aside class="dup-side">
+            <h4 class="dup-side-title"><i class="fas fa-user"></i> Customer</h4>
             <div class="dup-search">
                 <label class="dup-field"><span>First Name</span><input type="text" id="dupFirstName" class="form-control form-control-sm" /></label>
                 <label class="dup-field"><span>Last Name</span><input type="text" id="dupLastName" class="form-control form-control-sm" /></label>
@@ -825,6 +945,7 @@
                 Pick the customer to <strong>keep (Primary)</strong>, then tick the <strong>Duplicate</strong> records to merge into it.
                 Their appointments and invoices move to the Primary. <strong>Secondary</strong> (optional) copies that person in as the Primary's second contact.
             </p>
+            </aside>
 
             <div class="dup-table-wrap">
                 <table class="dup-table" id="DuplicateCustomerTable">
@@ -845,6 +966,7 @@
                     <tbody></tbody>
                 </table>
             </div>
+            </div>
 
             <div class="dup-footer">
                 <label class="dup-delete">
@@ -861,16 +983,23 @@
     </div>
 
     <%-- Duplicate site check: same flow as the customer check above, for sites.
-         Search uses the existing Customer.aspx/GetDuplicatecustomerSiteTable (matches
-         on site name). Merge calls MergeCustomerSites on this page, which the backend
-         still has to add. --%>
+         Front end only: it calls FindDuplicateSites and MergeCustomerSites on this
+         page, which the backend still has to add. --%>
     <div class="cust-modal" id="mdl_CheckSiteDuplicate">
         <div class="cust-modal-content dup-modal-content">
             <button type="button" class="cust-modal-close" id="close_mdl_CheckSiteDuplicate">×</button>
             <h2 class="cust-modal-title">Check for Duplicate Sites</h2>
 
+            <div class="dup-layout">
+            <aside class="dup-side">
+            <h4 class="dup-side-title"><i class="fas fa-map-marker-alt"></i> Site</h4>
             <div class="dup-search">
-                <label class="dup-field dup-field-wide"><span>Site Name</span><input type="text" id="dupSiteName" class="form-control form-control-sm" /></label>
+                <label class="dup-field"><span>Site Name</span><input type="text" id="dupSiteName" class="form-control form-control-sm" /></label>
+                <label class="dup-field"><span>Address</span><input type="text" id="dupSiteAddress" class="form-control form-control-sm" /></label>
+                <label class="dup-field"><span>City</span><input type="text" id="dupSiteCity" class="form-control form-control-sm" /></label>
+                <label class="dup-field"><span>Zip</span><input type="text" id="dupSiteZip" class="form-control form-control-sm" /></label>
+                <label class="dup-field"><span>Phone</span><input type="text" id="dupSitePhone" class="form-control form-control-sm" /></label>
+                <label class="dup-field"><span>E-Mail</span><input type="text" id="dupSiteEmail" class="form-control form-control-sm" /></label>
                 <button type="button" class="dup-search-btn" id="btn_SearchSiteDuplicates"><i class="fas fa-search"></i> Search</button>
             </div>
 
@@ -878,6 +1007,7 @@
                 Pick the site to <strong>keep (Primary)</strong>, then tick the <strong>Duplicate</strong> sites to merge into it.
                 Their appointments move to the Primary site.
             </p>
+            </aside>
 
             <div class="dup-table-wrap">
                 <table class="dup-table" id="DuplicateSiteTable">
@@ -888,6 +1018,7 @@
                             <th>Site Name</th>
                             <th>Contact</th>
                             <th>Address</th>
+                            <th>City</th>
                             <th>State</th>
                             <th>Zip</th>
                             <th>Phone</th>
@@ -896,6 +1027,7 @@
                     </thead>
                     <tbody></tbody>
                 </table>
+            </div>
             </div>
 
             <div class="dup-footer">
@@ -930,19 +1062,27 @@
     </div>
 
     <div class="cust-modal" id="MsgViewModal">
-        <div class="cust-modal-content">
-            <button class="cust-modal-close" id="closeMsgView">×</button>
-            <h2 class="MSg-modal-title">Message</h2>
-          <div class="text-center ajax-loader">
-  <div class="spinner-border" role="status">
-    <span class="visually-hidden">Loading...</span>
-  </div>
-</div>
-                <div class="cust-modal-field">
-                    <div id="div_Msg" ></div>
+        <div class="cust-modal-content msg-modal-content">
+            <div class="msg-header">
+                <div class="msg-header-icon"><i class="fa fa-envelope-open-text"></i></div>
+                <div class="msg-header-text">
+                    <h2 class="MSg-modal-title">Message</h2>
+                    <p class="msg-subject" id="msgSubject"></p>
                 </div>
-               
+                <button type="button" class="cust-modal-close msg-close" id="closeMsgView" aria-label="Close">×</button>
+            </div>
+            <div class="msg-body">
+                <div class="text-center ajax-loader">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
                     </div>
+                </div>
+                <div id="div_Msg"></div>
+            </div>
+            <div class="msg-footer">
+                <button type="button" class="cust-modal-cancel" id="btn_CloseMsgView">Close</button>
+            </div>
+        </div>
     </div>
 
     <%-- The Add/Edit Customer modals were removed: nothing on this page opened them,

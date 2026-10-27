@@ -162,8 +162,7 @@ $(document).ready(function () {
         openSiteEditModal(site, isDefault);
     });
 
-    // Both the eye icon in the header and the button in the card footer open the
-    // duplicate-site check.
+    // Card header icons: AHS Status, Customer Duplicates and Site Duplicates.
     $('#sites').on('click', '.ahs-status-btn', function () {
         openAhsStatus(currentRow);
     });
@@ -206,7 +205,7 @@ $(document).ready(function () {
         }
     });
 
-    $('#sites').on('click', '.cust-site-Duplicate-btn, .cust-site-appts-toggle:not(.ahs-status-btn):not(.site-dup-btn)', function () {
+    $('#sites').on('click', '.cust-site-Duplicate-btn', function () {
         openDuplicateCheck({
             customerId: $(this).attr('data-customerid'),
             siteId: $(this).attr('data-siteid'),
@@ -239,8 +238,9 @@ $(document).ready(function () {
 
     $('#sites').on('click', '.cust-site-msgview-btn', function () {
         $('#div_Msg').html('');
+        $('#msgSubject').text('');
         openModal('MsgViewModal');
-        $('#MsgViewModal .ajax-loader').css("visibility", "visible");
+        $('#MsgViewModal .ajax-loader').show();
         const ApptID = $(this).attr('data-site-id');
         $.ajax({
             type: "POST",
@@ -251,23 +251,29 @@ $(document).ready(function () {
             success: function (response) {
                 var messages = response.d || [];
                 if (messages.length > 0 && messages[0].Note) {
-                    const formattedString = messages[0].Note.replace(/\r?\n|\r/g, '<br>')
-
-                    $('#div_Msg').html(messages[0].Note);
+                    // The note starts "Subject: ... Body:" ahead of the email HTML;
+                    // the subject goes in the header and the rest is the body.
+                    let body = messages[0].Note;
+                    const m = /^\s*Subject:\s*([\s\S]*?)\s*Body:\s*/i.exec(body);
+                    if (m) {
+                        $('#msgSubject').text($('<div>').html(m[1]).text());
+                        body = body.slice(m[0].length);
+                    }
+                    $('#div_Msg').html(body);
                 } else {
                     $('#div_Msg').html('<p class="text-muted">No message found.</p>');
                 }
-                $('#MsgViewModal .ajax-loader').css("visibility", "hidden");
+                $('#MsgViewModal .ajax-loader').hide();
             },
             error: function (xhr) {
                 console.error("Error loading message: ", xhr.responseText);
                 $('#div_Msg').html('<p class="text-danger">Failed to load the original message.</p>');
-                $('#MsgViewModal .ajax-loader').css("visibility", "hidden");
+                $('#MsgViewModal .ajax-loader').hide();
             }
         });
     });
 
-    $('#closeMsgView').on('click', function () {
+    $('#closeMsgView, #btn_CloseMsgView').on('click', function () {
         closeModal('MsgViewModal');
     });
 
@@ -613,8 +619,12 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                     <span class="ad-badge ${statusClass}">${statusTitle}</span>
                                 </div>
                                 <div class="cust-site-actions">
-                                    <button class="cust-site-icon-btn cust-site-Duplicate-btn" title="Check for duplicate customers" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
-                                        <i class="fa fa-clone"></i></button>
+                                    <button type="button" class="cust-site-icon-btn ahs-status-btn" title="AHS Status">
+                                        <i class="fas fa-clipboard-list"></i></button>
+                                    <button type="button" class="cust-site-icon-btn cust-site-Duplicate-btn" title="Customer Duplicates" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
+                                        <i class="fas fa-users"></i></button>
+                                    <button type="button" class="cust-site-icon-btn site-dup-btn" title="Site Duplicates" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
+                                        <i class="fas fa-map-marker-alt"></i></button>
                                     <button class="cust-site-icon-btn cust-site-msgview-btn" title="View Original Message" data-site-id="${escapeHTML(ApptID)}" data-is-default="${isDefaultSite}">
                                         <i class="fa fa-envelope-open-text"></i></button>
                                     ${editButton}
@@ -638,17 +648,6 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                 <div class="ad-field">
                                     <span class="ad-field-label">Requested date</span>
                                     <span class="ad-field-static"><i class="far fa-calendar-alt"></i> ${escapeHTML(ApptDateTime) || '-'}</span>
-                                </div>
-                                <div class="ad-dup-btn ad-actions">
-                                    <button type="button" class="cust-site-appts-toggle ahs-status-btn">
-                                        <i class="fas fa-clipboard-list"></i> AHS Status
-                                    </button>
-                                    <button type="button" class="cust-site-appts-toggle" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
-                                        <i class="fa fa-clone"></i> Customer Duplicates
-                                    </button>
-                                    <button type="button" class="cust-site-appts-toggle site-dup-btn" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
-                                        <i class="fas fa-map-marker-alt"></i> Site Duplicates
-                                    </button>
                                 </div>
                             </div>
 
@@ -969,26 +968,46 @@ function MergeDuplicates() {
     });
 }
 
-// Duplicate site check. Search uses the existing Customer.aspx endpoint (it
-// matches on site name); merge is front end only until the backend adds
-// MergeCustomerSites(primarySiteId, siteIds, Isdelete) to AppoinementList.aspx.cs.
-const SITE_DUP_SEARCH_URL = "Customer.aspx/GetDuplicatecustomerSiteTable";
+// Duplicate site check, same flow as the customer check. Front end only: the
+// backend still has to add both methods to AppoinementList.aspx.cs:
+//   FindDuplicateSites(siteName, address, city, zip, phone, email) -> list of
+//     { Id, SiteName, FirstName, LastName, Address, City, State, Zip, PhoneNumber, Email },
+//     matching ANY filled-in box (like FindDuplicateCustomers)
+//   MergeCustomerSites(primarySiteId, siteIds, Isdelete) -> "Done! ..." message
+const SITE_DUP_SEARCH_URL = "AppoinementList.aspx/FindDuplicateSites";
 const SITE_DUP_MERGE_URL = "AppoinementList.aspx/MergeCustomerSites";
 
 // The site the popup was opened from; listed first and preselected as Primary.
 let siteDupContext = {};
 
+// Opens the popup with the search prefilled from the clicked site.
 function openSiteDuplicateCheck(opts) {
     siteDupContext = opts;
-    $('#dupSiteName').val(opts.siteName || '');
+    const site = sites.find(s => String(s.Id) === String(opts.siteId)) || {};
+
+    $('#dupSiteName').val(site.SiteName || opts.siteName || '');
+    $('#dupSiteAddress').val(site.Address || '');
+    $('#dupSiteCity').val(site.City || '');
+    $('#dupSiteZip').val(site.Zip || '');
+    $('#dupSitePhone').val(site.PhoneNumber || '');
+    $('#dupSiteEmail').val(site.Email || '');
+
     openModal('mdl_CheckSiteDuplicate');
     SearchSiteDuplicates();
 }
 
 function SearchSiteDuplicates() {
-    const siteName = $.trim($('#dupSiteName').val());
-    if (!siteName) {
-        dupMessage('Enter a site name to search.', '#DuplicateSiteTable');
+    const payload = {
+        siteName: $.trim($('#dupSiteName').val()),
+        address: $.trim($('#dupSiteAddress').val()),
+        city: $.trim($('#dupSiteCity').val()),
+        zip: $.trim($('#dupSiteZip').val()),
+        phone: $.trim($('#dupSitePhone').val()),
+        email: $.trim($('#dupSiteEmail').val())
+    };
+
+    if (!Object.values(payload).some(Boolean)) {
+        dupMessage('Fill in at least one search box.', '#DuplicateSiteTable');
         return;
     }
 
@@ -998,22 +1017,13 @@ function SearchSiteDuplicates() {
     $.ajax({
         type: "POST",
         url: SITE_DUP_SEARCH_URL,
-        data: JSON.stringify({
-            customerId: String(siteDupContext.customerId ?? ''),
-            siteId: String(siteDupContext.siteId ?? ''),
-            Sitename: siteName
-        }),
+        data: JSON.stringify(payload),
         contentType: "application/json; charset=utf-8",
         dataType: "json",
         success: function (response) {
-            // This endpoint returns its rows as a JSON string under "data".
-            let payload = response.d;
-            if (typeof payload === 'string') {
-                try { payload = JSON.parse(payload); } catch (e) { payload = null; }
-            }
-            const list = (payload && payload.data) || [];
+            const list = response.d || [];
             if (!list.length) {
-                dupMessage('No matching sites found. Try a shorter name.', '#DuplicateSiteTable');
+                dupMessage('No matching sites found. Try adjusting the search.', '#DuplicateSiteTable');
                 return;
             }
 
@@ -1031,6 +1041,7 @@ function SearchSiteDuplicates() {
                         <td>${escapeHTML(s.SiteName)}${current ? '<span class="dup-current-tag">current</span>' : ''}</td>
                         <td>${escapeHTML(contact)}</td>
                         <td>${escapeHTML(s.Address)}</td>
+                        <td>${escapeHTML(s.City)}</td>
                         <td>${escapeHTML(s.State)}</td>
                         <td>${escapeHTML(s.Zip)}</td>
                         <td>${escapeHTML(s.PhoneNumber)}</td>
