@@ -216,6 +216,7 @@ namespace TPM
 
                         // you don't need to open it with Fill
                         adapter.Fill(dataSet);
+                        conn.Close();
                     }
                 }
                 catch (Exception ex) { }
@@ -227,7 +228,7 @@ namespace TPM
                         SiteName = dataRow["SiteName"].ToString(),
                         CustomerName = dataRow["CustomerName"].ToString(),
                         Address1 = dataRow["Address1"].ToString(),
-                        Apptstatus = Convert.ToBoolean(dataRow["IsApproved"]) ? "Accept" : "Pending",
+                        Apptstatus = Convert.ToBoolean(dataRow["IsApproved"]) ? "Accept" : "New Appt",
                         Email = dataRow["Email"].ToString(),
                         CustomerID = dataRow["CustomerID"].ToString(),
                         CustomerGuid = dataRow["CustomerGuid"].ToString(),
@@ -317,7 +318,7 @@ namespace TPM
                     HttpContext.Current.Session["LoginUser"]?.ToString() ?? "System");
 
                 DataSet dataSet = null;
-                if (false && myStatus == AppointmentStatus.Accept)
+                if ( myStatus == AppointmentStatus.Accept)
                 {
 
                     var _CommunicationSettings = new CommunicationSettings();
@@ -365,6 +366,7 @@ namespace TPM
                     {
                         if (db.Connection.State == ConnectionState.Open) db.Close();
                     }
+
                     if(Convert.ToBoolean(_CommunicationSettings.smsEnabled))
                     {
                         try
