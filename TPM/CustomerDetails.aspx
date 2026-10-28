@@ -11,7 +11,7 @@
             href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
 
         <link rel="stylesheet" href="Content/customerdetails.css?v=1">
-        <link rel="stylesheet" href="Content/customer.css?v=4">
+        <link rel="stylesheet" href="Content/customer.css?v=6">
         <style>
             #siteAppointmentDetailsModal_PopUP .modal-dialog {
                 max-width: 95vw;
@@ -37,6 +37,119 @@
 
             .icon-btn.dropdown-toggle::after {
                 display: none !important;
+            }
+
+            /* Same look as the Dispatch ID pill on the Appointment List page. */
+            .dispatch-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                padding: 5px 10px;
+                border: 1px solid #858585;
+                border-radius: 99px;
+                background: #d3d3d3;
+                color: #0c0000;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.3px;
+                line-height: 1;
+                white-space: nowrap;
+            }
+
+                .dispatch-pill i {
+                    font-size: 10px;
+                }
+
+            .appt-note-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 6px;
+            }
+
+            .appt-note-toggle {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                padding: 3px 10px;
+                border: 1px solid #dee2e6;
+                border-radius: 6px;
+                background: transparent;
+                color: #0d6efd;
+                font-size: 12px;
+                font-weight: 500;
+            }
+
+                .appt-note-toggle:hover {
+                    background: #f1f5f9;
+                }
+
+            .appt-note-view {
+                max-height: 460px;
+                overflow-y: auto;
+                padding: 10px 12px;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                font-size: 13.5px;
+                line-height: 1.5;
+            }
+
+            .appt-note-pairs {
+                display: grid;
+                grid-template-columns: max-content minmax(0, 1fr);
+                align-items: center;
+                gap: 6px 12px;
+                margin: 0 0 8px;
+            }
+
+                .appt-note-pairs dt {
+                    color: #64748b;
+                    font-weight: 500;
+                }
+
+                .appt-note-pairs dd {
+                    margin: 0;
+                    font-weight: 600;
+                    word-break: break-word;
+                }
+
+            .appt-note-line {
+                margin: 0 0 2px;
+                font-weight: 500;
+            }
+
+            .appt-note-list {
+                margin: 8px 0 0;
+                padding: 0;
+                list-style: none;
+            }
+
+                .appt-note-list li {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 8px;
+                    padding: 3px 0;
+                }
+
+                    .appt-note-list li i {
+                        margin-top: 4px;
+                        color: #16a34a;
+                        font-size: 12px;
+                    }
+
+            .appt-note-empty {
+                color: #94a3b8;
+                font-style: italic;
+            }
+
+            .appt-note-callout {
+                margin: 6px 0 0;
+                padding: 6px 10px;
+                border-left: 3px solid #f59e0b;
+                border-radius: 4px;
+                background: #fffbeb;
+                color: #92400e;
+                font-weight: 500;
             }
         </style>
 
@@ -311,6 +424,7 @@
                                         <th scope="col" class="sortable-header" data-sort="AppoinmentId">Appointment ID
                                             <i class="fas fa-sort"></i>
                                         </th>
+                                        <th scope="col">Dispatch ID</th>
                                         <th scope="col" class="sortable-header" data-sort="RequestDate">Request Date
                                             <i class="fas fa-sort"></i>
                                         </th>
@@ -967,27 +1081,6 @@
                                         onmouseout="if(!this.classList.contains('active')){this.style.backgroundColor='white'; this.style.color='#4b5563';}">Forms</button>
                                 </li>
                             </ul>
-                            <%-- CSL nav buttons - jump straight to one of this page's own tabs. They are pure
-                                 navigation, NOT Bootstrap tabs (no data-bs-toggle), so clicking must not swap
-                                 an inline pane; customerdetails.js binds a delegated handler by id-prefix. --%>
-                            <div class="d-flex flex-wrap gap-2">
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-basic-tab" type="button">
-                                    Basic Info</button>
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-appointments-tab" type="button">
-                                    Appointments</button>
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-invoices-tab" type="button">
-                                    Invoices/Estimates</button>
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-notes-tab" type="button">
-                                    Notes</button>
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-equipment-tab" type="button">
-                                    Equipment</button>
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-pictures-tab" type="button">
-                                    Pictures</button>
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-files-tab" type="button">
-                                    Files</button>
-                                <button class="btn btn-sm btn-outline-secondary" id="csl-agreements-tab" type="button">
-                                    Maintenance Agreements</button>
-                            </div>
                             <div class="ms-auto">
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"
                                     aria-label="Close modal"></button>
@@ -1156,9 +1249,16 @@
                                                 <!-- Populated via JS -->
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Any details</label>
-                                                <textarea id="editApptNote" name="note" class="form-control"
-                                                    rows="6"></textarea>
+                                                <div class="appt-note-head">
+                                                    <label class="form-label mb-0" for="editApptNote">Any details</label>
+                                                    <button type="button" class="appt-note-toggle" id="btnToggleApptNote">
+                                                        <i class="fas fa-pen"></i> Edit</button>
+                                                </div>
+                                                <%-- Formatted read view of the note; the textarea underneath is
+                                                     still what gets saved, it is just hidden until Edit. --%>
+                                                <div id="apptNoteView" class="appt-note-view"></div>
+                                                <textarea id="editApptNote" name="note" class="form-control d-none"
+                                                    rows="16"></textarea>
                                             </div>
                                             <!-- Appointment-Specific Links -->
                                             <div class="mb-3">
@@ -1830,5 +1930,5 @@
                 });
             })();
         </script>
-               <script src="Scripts/customerdetails.js?v=17"></script>
+               <script src="Scripts/customerdetails.js?v=21"></script>
     </asp:Content>

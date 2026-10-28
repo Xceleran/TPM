@@ -12,7 +12,6 @@
         .cust-action-btns {
             display: flex;
             gap: 10px;
-           
         }
 
         .cust-action-btn {
@@ -78,22 +77,22 @@
             border-bottom: 1px solid var(--ad-border);
         }
 
-        .ad-header .cust-site-title-group {
-            align-items: center;
-            flex: 1;
-            min-width: 0;
-        }
+            .ad-header .cust-site-title-group {
+                align-items: center;
+                flex: 1;
+                min-width: 0;
+            }
 
-        /* Long site names cut off with "..." instead of running into the badge or icons. */
-        .ad-header .cust-site-title {
-            font-size: 17px;
-            line-height: 1.2;
-            letter-spacing: 0.2px;
-            min-width: 0;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
+            /* Long site names cut off with "..." instead of running into the badge or icons. */
+            .ad-header .cust-site-title {
+                font-size: 17px;
+                line-height: 1.2;
+                letter-spacing: 0.2px;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
 
         .ad-badge {
             display: inline-flex;
@@ -109,7 +108,41 @@
             letter-spacing: 0.4px;
         }
 
-        .ad-header .cust-site-actions { flex-shrink: 0; }
+        .ad-header .cust-site-actions {
+            flex-shrink: 0;
+        }
+
+        /* Dispatch ID stands out from the grey/green header bits on purpose. */
+        .ad-dispatch {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            flex-shrink: 0;
+            padding: 5px 10px;
+            border: 1px solid #858585;
+            border-radius: 99px;
+            background: #d3d3d3;
+            color: #0c0000;
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+            .ad-dispatch strong {
+                font-weight: 700;
+                letter-spacing: 0.3px;
+            }
+
+            .ad-dispatch i {
+                font-size: 10px;
+            }
+
+        [data-theme="dark"] .ad-dispatch {
+            border-color: rgba(252, 211, 77, 0.35);
+            background: rgba(245, 158, 11, 0.16);
+            color: #fcd34d;
+        }
 
         .ad-badge-dot {
             width: 7px;
@@ -118,7 +151,9 @@
             background: currentColor;
         }
 
-            .ad-badge.active .ad-badge-dot { background: #22c55e; }
+        .ad-badge.active .ad-badge-dot {
+            background: #22c55e;
+        }
 
         /* Header address: one line, cut off with "..." so it never runs into the name. */
         .cust-details-header div#contact .ci-value {
@@ -127,7 +162,10 @@
             white-space: nowrap;
         }
 
-        .cust-details-header div#contact .ci-item { min-width: 0; gap: 8px; }
+        .cust-details-header div#contact .ci-item {
+            min-width: 0;
+            gap: 8px;
+        }
 
         .cust-details-header div#contact .ci-tag {
             flex-shrink: 0;
@@ -146,11 +184,25 @@
             color: #94a3b8;
         }
 
-            .ad-badge.active { background: #dcfce7; color: #166534; }
-            .ad-badge.inactive { background: #e2e8f0; color: #475569; }
+        .ad-badge.active {
+            background: #dcfce7;
+            color: #166534;
+        }
 
-        [data-theme="dark"] .ad-badge.active { background: rgba(34, 197, 94, 0.18); color: #86efac; }
-        [data-theme="dark"] .ad-badge.inactive { background: rgba(148, 163, 184, 0.18); color: #cbd5e1; }
+        .ad-badge.inactive {
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        [data-theme="dark"] .ad-badge.active {
+            background: rgba(34, 197, 94, 0.18);
+            color: #86efac;
+        }
+
+        [data-theme="dark"] .ad-badge.inactive {
+            background: rgba(148, 163, 184, 0.18);
+            color: #cbd5e1;
+        }
 
         .ad-toolbar {
             display: flex;
@@ -191,7 +243,9 @@
             font-weight: 500;
         }
 
-            .ad-field-static i { color: var(--ad-muted); }
+            .ad-field-static i {
+                color: var(--ad-muted);
+            }
 
         /* Name and customer address share one line in the details header. */
         .cust-details-container .cust-details-header {
@@ -216,9 +270,18 @@
             }
 
         /* Rows whose items are all empty are hidden, so they don't push the address off center. */
-        .cust-details-header div#contact .ci-row { margin: 0; }
-        .cust-details-header div#contact .ci-row:not(:has(.ci-item:not(.is-empty))) { display: none; }
-        .cust-details-header div#contact .ci-value { line-height: 1.2; font-size: 16px; }
+        .cust-details-header div#contact .ci-row {
+            margin: 0;
+        }
+
+            .cust-details-header div#contact .ci-row:not(:has(.ci-item:not(.is-empty))) {
+                display: none;
+            }
+
+        .cust-details-header div#contact .ci-value {
+            line-height: 1.2;
+            font-size: 16px;
+        }
 
         .cust-details-container .cust-details-header div#contact {
             flex: 1;
@@ -228,6 +291,61 @@
             background: none;
             border: none;
             box-shadow: none;
+        }
+
+        /* Loading overlay for the details panel, styled like the table's own "Loading..." dots. */
+        .cust-details-container { position: relative; }
+
+        .details-loading {
+            position: absolute;
+            inset: 0;
+            z-index: 20;
+            display: none;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 120px;
+            background: rgba(255, 255, 255, 0.75);
+            border-radius: inherit;
+        }
+
+            .details-loading.is-active { display: flex; }
+
+        [data-theme="dark"] .details-loading { background: rgba(15, 23, 42, 0.7); }
+
+        .details-loading-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: 14px 26px;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
+        }
+
+        [data-theme="dark"] .details-loading-box { background: #1e293b; }
+
+        .details-loading-dots { display: flex; gap: 6px; }
+
+            .details-loading-dots span {
+                width: 9px;
+                height: 9px;
+                border-radius: 50%;
+                background: #0d6efd;
+                animation: details-loading-bounce 1s infinite ease-in-out;
+            }
+
+                .details-loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+                .details-loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+        .details-loading-text {
+            font-size: 12.5px;
+            color: #64748b;
+        }
+
+        @keyframes details-loading-bounce {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
         }
 
         /* Appointment fields and site address side by side. */
@@ -253,10 +371,10 @@
                 min-width: 0;
             }
 
-            .ad-top .ad-field .form-select {
-                min-width: 0;
-                width: 150px;
-            }
+                .ad-top .ad-field .form-select {
+                    min-width: 0;
+                    width: 150px;
+                }
 
         .ad-address .ad-panel-title {
             justify-content: space-between;
@@ -276,9 +394,17 @@
             column-gap: 16px;
         }
 
-            .ad-address-grid .ad-address-wide { grid-column: 1 / -1; }
-            .ad-address-grid .ad-row { grid-template-columns: 18px 46px 1fr; }
-            .ad-address-grid .ad-row:last-child { border-bottom: 1px dashed var(--ad-border); }
+            .ad-address-grid .ad-address-wide {
+                grid-column: 1 / -1;
+            }
+
+            .ad-address-grid .ad-row {
+                grid-template-columns: 18px 46px 1fr;
+            }
+
+                .ad-address-grid .ad-row:last-child {
+                    border-bottom: 1px dashed var(--ad-border);
+                }
 
         .ad-address-warn {
             margin-top: 8px;
@@ -297,12 +423,16 @@
         }
 
         @media (max-width: 1100px) {
-            .ad-top { grid-template-columns: 1fr; }
+            .ad-top {
+                grid-template-columns: 1fr;
+            }
         }
 
         @media (max-width: 700px) {
             .cust-details-container .cust-details-header,
-            .cust-details-container .cust-details-left { flex-wrap: wrap; }
+            .cust-details-container .cust-details-left {
+                flex-wrap: wrap;
+            }
         }
 
         .ahs-modal-content {
@@ -317,7 +447,9 @@
             font-size: 13px;
         }
 
-            .ahs-subtitle strong { color: var(--ad-text); }
+            .ahs-subtitle strong {
+                color: var(--ad-text);
+            }
 
         .ahs-list {
             border: 1px solid var(--ad-border);
@@ -336,8 +468,13 @@
             transition: background 0.15s;
         }
 
-            .ahs-row:last-child { border-bottom: none; }
-            .ahs-row:hover { background: rgba(100, 116, 139, 0.06); }
+            .ahs-row:last-child {
+                border-bottom: none;
+            }
+
+            .ahs-row:hover {
+                background: rgba(100, 116, 139, 0.06);
+            }
 
         .ahs-row-text {
             flex: 1;
@@ -356,7 +493,9 @@
             color: var(--ad-muted);
         }
 
-            .ahs-row-meta.is-saved { color: #16a34a; }
+            .ahs-row-meta.is-saved {
+                color: #16a34a;
+            }
 
         .ahs-date {
             width: 150px;
@@ -365,7 +504,7 @@
             font-size: 13px;
         }
 
-            .ahs-submit-btn {
+        .ahs-submit-btn {
             flex-shrink: 0;
             min-width: 84px;
             height: 34px;
@@ -379,15 +518,22 @@
             cursor: pointer;
         }
 
-            .ahs-submit-btn:hover:not(:disabled) { filter: brightness(1.08); }
+            .ahs-submit-btn:hover:not(:disabled) {
+                filter: brightness(1.08);
+            }
 
             .ahs-submit-btn:disabled {
                 opacity: 0.6;
                 cursor: wait;
             }
 
-        .ahs-row-danger .ahs-row-title { color: #dc2626; }
-        .ahs-row-danger .ahs-submit-btn { background: #dc2626; }
+        .ahs-row-danger .ahs-row-title {
+            color: #dc2626;
+        }
+
+        .ahs-row-danger .ahs-submit-btn {
+            background: #dc2626;
+        }
 
         .ahs-footer {
             display: flex;
@@ -471,9 +617,13 @@
             overflow-wrap: anywhere;
         }
 
-            .msg-subject:empty { display: none; }
+            .msg-subject:empty {
+                display: none;
+            }
 
-        [data-theme="dark"] .msg-subject { color: #94a3b8; }
+        [data-theme="dark"] .msg-subject {
+            color: #94a3b8;
+        }
 
         .msg-close {
             position: static;
@@ -485,7 +635,9 @@
             font-size: 22px;
         }
 
-            .msg-close:hover { background: rgba(0, 0, 0, 0.06); }
+            .msg-close:hover {
+                background: rgba(0, 0, 0, 0.06);
+            }
 
         .msg-body {
             flex: 1;
@@ -501,11 +653,15 @@
             border-top: 1px solid #e2e8f0;
         }
 
-        [data-theme="dark"] .msg-footer { border-top-color: rgba(255, 255, 255, 0.1); }
+        [data-theme="dark"] .msg-footer {
+            border-top-color: rgba(255, 255, 255, 0.1);
+        }
 
-            /* The email HTML brings its own fixed widths; keep it inside the popup. */
-            .msg-body img,
-            .msg-body table { max-width: 100%; }
+        /* The email HTML brings its own fixed widths; keep it inside the popup. */
+        .msg-body img,
+        .msg-body table {
+            max-width: 100%;
+        }
 
         /* Duplicate customer check modal */
         .dup-modal-content {
@@ -529,7 +685,9 @@
             background: #f8fafc;
         }
 
-        [data-theme="dark"] .dup-side { background: rgba(255, 255, 255, 0.04); }
+        [data-theme="dark"] .dup-side {
+            background: rgba(255, 255, 255, 0.04);
+        }
 
         .dup-side-title {
             display: flex;
@@ -543,7 +701,9 @@
             color: var(--ad-muted);
         }
 
-            .dup-side-title i { color: var(--ad-accent); }
+            .dup-side-title i {
+                color: var(--ad-accent);
+            }
 
         .dup-search {
             display: flex;
@@ -583,10 +743,14 @@
             background: var(--ad-accent);
         }
 
-        .dup-merge-btn { background: #16a34a; }
+        .dup-merge-btn {
+            background: #16a34a;
+        }
 
             .dup-search-btn:hover:not(:disabled),
-            .dup-merge-btn:hover:not(:disabled) { filter: brightness(1.08); }
+            .dup-merge-btn:hover:not(:disabled) {
+                filter: brightness(1.08);
+            }
 
             .dup-search-btn:disabled,
             .dup-merge-btn:disabled {
@@ -601,7 +765,9 @@
             color: var(--ad-muted);
         }
 
-            .dup-help strong { color: var(--ad-text); }
+            .dup-help strong {
+                color: var(--ad-text);
+            }
 
         .dup-table-wrap {
             max-height: 60vh;
@@ -639,10 +805,21 @@
                 word-break: break-word;
             }
 
-            .dup-table tbody tr:last-child td { border-bottom: none; }
-            .dup-table tbody tr:hover td { background: rgba(100, 116, 139, 0.06); }
-            .dup-table tr.is-primary td { background: rgba(0, 123, 255, 0.07); }
-            .dup-table tr.is-duplicate td { background: rgba(245, 158, 11, 0.08); }
+            .dup-table tbody tr:last-child td {
+                border-bottom: none;
+            }
+
+            .dup-table tbody tr:hover td {
+                background: rgba(100, 116, 139, 0.06);
+            }
+
+            .dup-table tr.is-primary td {
+                background: rgba(0, 123, 255, 0.07);
+            }
+
+            .dup-table tr.is-duplicate td {
+                background: rgba(245, 158, 11, 0.08);
+            }
 
             .dup-table .dup-pick {
                 width: 84px;
@@ -662,7 +839,9 @@
                 color: var(--ad-muted);
             }
 
-        [data-theme="dark"] .dup-table th { background: rgba(255, 255, 255, 0.06); }
+        [data-theme="dark"] .dup-table th {
+            background: rgba(255, 255, 255, 0.06);
+        }
 
         .dup-current-tag {
             margin-left: 6px;
@@ -727,11 +906,21 @@
                 transition: transform 0.2s;
             }
 
-        .dup-delete input:checked + .dup-switch { background: #dc2626; }
-        .dup-delete input:checked + .dup-switch::before { transform: translateX(18px); }
-        .dup-delete input:focus-visible + .dup-switch { box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3); }
+        .dup-delete input:checked + .dup-switch {
+            background: #dc2626;
+        }
 
-        [data-theme="dark"] .dup-switch { background: #475569; }
+            .dup-delete input:checked + .dup-switch::before {
+                transform: translateX(18px);
+            }
+
+        .dup-delete input:focus-visible + .dup-switch {
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3);
+        }
+
+        [data-theme="dark"] .dup-switch {
+            background: #475569;
+        }
 
         .dup-footer-btns {
             display: flex;
@@ -763,7 +952,9 @@
             color: var(--ad-muted);
         }
 
-            .ad-panel-title i { color: var(--ad-accent); }
+            .ad-panel-title i {
+                color: var(--ad-accent);
+            }
 
         .ad-link {
             display: inline-block;
@@ -773,7 +964,9 @@
             text-decoration: none;
         }
 
-            .ad-link:hover { text-decoration: underline; }
+            .ad-link:hover {
+                text-decoration: underline;
+            }
 
         .ad-row {
             display: grid;
@@ -784,13 +977,32 @@
             border-bottom: 1px dashed var(--ad-border);
         }
 
-            .ad-row:last-child { border-bottom: none; }
+            .ad-row:last-child {
+                border-bottom: none;
+            }
 
-        .ad-row-icon { color: var(--ad-muted); }
-        .ad-row-label { color: var(--ad-muted); font-size: 12.5px; }
-        .ad-row-value { word-break: break-word; font-weight: 500; }
-        .ad-row-value a { color: var(--ad-accent); text-decoration: none; }
-        .ad-row-value a:hover { text-decoration: underline; }
+        .ad-row-icon {
+            color: var(--ad-muted);
+        }
+
+        .ad-row-label {
+            color: var(--ad-muted);
+            font-size: 12.5px;
+        }
+
+        .ad-row-value {
+            word-break: break-word;
+            font-weight: 500;
+        }
+
+            .ad-row-value a {
+                color: var(--ad-accent);
+                text-decoration: none;
+            }
+
+                .ad-row-value a:hover {
+                    text-decoration: underline;
+                }
 
         .ad-empty {
             color: var(--ad-muted);
@@ -805,7 +1017,9 @@
             line-height: 1.55;
         }
 
-        .ad-notes-line { margin: 0; }
+        .ad-notes-line {
+            margin: 0;
+        }
 
         .ad-notes-important {
             margin: 10px 0;
@@ -822,9 +1036,13 @@
             line-height: 1.5;
         }
 
-        [data-theme="dark"] .ad-notes-important { background: rgba(255, 255, 255, 0.06); }
+        [data-theme="dark"] .ad-notes-important {
+            background: rgba(255, 255, 255, 0.06);
+        }
 
-        .ad-notes-gap { height: 10px; }
+        .ad-notes-gap {
+            height: 10px;
+        }
 
         .ad-notes-heading {
             margin: 10px 0 6px;
@@ -871,7 +1089,9 @@
                     min-width: 0;
                 }
 
-        [data-theme="dark"] .ad-notes-list li > i { color: #4ade80; }
+        [data-theme="dark"] .ad-notes-list li > i {
+            color: #4ade80;
+        }
 
         .ad-notes-tag {
             flex-shrink: 0;
@@ -950,21 +1170,58 @@
 
         /* Stack the duplicate popups' lanes once the table would get too narrow. */
         @media (max-width: 900px) {
-            .dup-layout { grid-template-columns: 1fr; }
-            .dup-table-wrap { min-height: 0; }
+            .dup-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .dup-table-wrap {
+                min-height: 0;
+            }
         }
 
         @media (max-width: 640px) {
-            .ad-field, .ad-field .form-select { min-width: 0; width: 100%; }
-            .dup-footer-btns { width: 100%; }
-            .dup-footer-btns > * { flex: 1; }
-            .ahs-row { flex-wrap: wrap; }
-            .ahs-date { order: 3; width: 100%; }
-            .ahs-date { flex: 1; width: auto; }
-            .ahs-footer .ahs-btn { width: 100%; }
-            .ad-notes-pairs { grid-template-columns: 1fr; }
-            .ad-notes-pairs dd { margin-bottom: 4px; }
-            .ad-notes-pairs dt:empty { display: none; }
+            .ad-field, .ad-field .form-select {
+                min-width: 0;
+                width: 100%;
+            }
+
+            .dup-footer-btns {
+                width: 100%;
+            }
+
+                .dup-footer-btns > * {
+                    flex: 1;
+                }
+
+            .ahs-row {
+                flex-wrap: wrap;
+            }
+
+            .ahs-date {
+                order: 3;
+                width: 100%;
+            }
+
+            .ahs-date {
+                flex: 1;
+                width: auto;
+            }
+
+            .ahs-footer .ahs-btn {
+                width: 100%;
+            }
+
+            .ad-notes-pairs {
+                grid-template-columns: 1fr;
+            }
+
+                .ad-notes-pairs dd {
+                    margin-bottom: 4px;
+                }
+
+                .ad-notes-pairs dt:empty {
+                    display: none;
+                }
         }
     </style>
 
@@ -972,8 +1229,8 @@
     <div class="cust-page-container">
         <!-- Page Header -->
         <header class="cust-header mt-0 mb-0">
-          <div class="cec-btn">
-             <a id="LaunchCecButton" runat="server" href="#" class="custom-launch-btn" role="button" target="_blank">
+            <div class="cec-btn">
+                <a id="LaunchCecButton" runat="server" href="#" class="custom-launch-btn" role="button" target="_blank">
                     <span>
                         <span>CEC Customer</span>
                         <span aria-hidden="true">
@@ -994,17 +1251,17 @@
                 <div class="cust-list-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div class="d-flex align-items-center gap-3">
                         <div class="cust-list-filter">
-                            <label for="statusFilter" class="form-label"><i class="fas fa-filter"></i> Status</label>
+                            <label for="statusFilter" class="form-label"><i class="fas fa-filter"></i>Status</label>
                             <%-- Sp_GetAppointmnetData only branches on 'accept' and 'pending'; an
                                  appointment's status here is IsApproved, so there is no Cancel to filter by. --%>
-                            <asp:DropDownList ID="statusFilter"  ClientIDMode="Static" runat="server" CssClass="form-select w-auto">
+                            <asp:DropDownList ID="statusFilter" ClientIDMode="Static" runat="server" CssClass="form-select w-auto">
                                 <asp:ListItem Text="All Statuses" Value="ALL"></asp:ListItem>
-                                 <asp:ListItem Text="Accept" Value="Accept"></asp:ListItem>
+                                <asp:ListItem Text="Accept" Value="Accept"></asp:ListItem>
                                 <asp:ListItem Text="Pending" Value="Pending"></asp:ListItem>
                             </asp:DropDownList>
                         </div>
                     </div>
-                   <%-- <div class="toggle-switch">
+                    <%-- <div class="toggle-switch">
                         <label for="hideNA" class="form-label" style="font-size: 0.8rem;">Hide Customer with No Appointments:</label>
                         <input type="checkbox" id="hideNA" checked />
                     </div>--%>
@@ -1013,9 +1270,9 @@
                 <table id="AppointmentListTable" class="display" style="width: 100%">
                     <thead>
                         <tr>
-                             <th>Source</th>
-                          <th>Site Name</th>
-                               <th>Date</th>
+                            <th>Source</th>
+                            <th>Site Name</th>
+                            <th>Date</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -1027,46 +1284,54 @@
                     <div class="cust-details-left">
 
                         <h2 class="cust-details-title" id="customerName">Select a Customer</h2>
-                <!-- Customer address, beside the name -->
-                <div id="contact">
-                    <!-- Row 1: Address -->
-                    <div class="ci-row">
-                        <div class="ci-item" id="customerAddress-container" title="Customer's address on file (the job site is in the card below)">
-                            <i class="ci-icon fas fa-map-marker-alt"></i>
-                            <span class="ci-tag">Customer</span>
-                            <span class="ci-value" id="customerAddress">-</span>
+                        <!-- Customer address, beside the name -->
+                        <div id="contact">
+                            <!-- Row 1: Address -->
+                            <div class="ci-row">
+                                <div class="ci-item" id="customerAddress-container" title="Customer's address on file (the job site is in the card below)">
+                                    <i class="ci-icon fas fa-map-marker-alt"></i>
+                                    <span class="ci-tag">Customer</span>
+                                    <span class="ci-value" id="customerAddress">-</span>
+                                </div>
+                            </div>
+                            <!-- Row 2: Phone and Mobile -->
+                            <div class="ci-row">
+                                <!-- Phone -->
+                                <div class="ci-item" id="customerPhone-container">
+                                    <i class="ci-icon fas fa-phone-alt"></i>
+                                    <span class="ci-value" id="customerPhone">-</span>
+                                </div>
+                                <!-- Mobile -->
+                                <div class="ci-item" id="customerMobile-container">
+                                    <i class="ci-icon fas fa-mobile-alt"></i>
+                                    <span class="ci-value" id="customerMobile">-</span>
+                                </div>
+                            </div>
+                            <!-- Row 3: Email & Job Title -->
+                            <div class="ci-row">
+                                <div class="ci-item" id="customerEmail-container">
+                                    <i class="ci-icon fas fa-envelope"></i>
+                                    <span class="ci-value" id="customerEmail">-</span>
+                                </div>
+                                <div class="ci-item" id="customerJobTitle-container">
+                                    <i class="ci-icon fas fa-briefcase"></i>
+                                    <span class="ci-value" id="customerJobTitle">-</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <!-- Row 2: Phone and Mobile -->
-                    <div class="ci-row">
-                        <!-- Phone -->
-                        <div class="ci-item" id="customerPhone-container">
-                            <i class="ci-icon fas fa-phone-alt"></i>
-                            <span class="ci-value" id="customerPhone">-</span>
-                        </div>
-                        <!-- Mobile -->
-                        <div class="ci-item" id="customerMobile-container">
-                            <i class="ci-icon fas fa-mobile-alt"></i>
-                            <span class="ci-value" id="customerMobile">-</span>
-                        </div>
-                    </div>
-                    <!-- Row 3: Email & Job Title -->
-                    <div class="ci-row">
-                        <div class="ci-item" id="customerEmail-container">
-                            <i class="ci-icon fas fa-envelope"></i>
-                            <span class="ci-value" id="customerEmail">-</span>
-                        </div>
-                        <div class="ci-item" id="customerJobTitle-container">
-                            <i class="ci-icon fas fa-briefcase"></i>
-                            <span class="ci-value" id="customerJobTitle">-</span>
-                        </div>
-                    </div>
-                </div>
                     </div>
                     <div class="cust-details-actions">
                         <button type="button" class="cust-table-edit-btn" title="Edit Site" id="editCustomerBtn">
                             <i class="fa-solid fa-user-pen"></i>
                         </button>
+                    </div>
+                </div>
+
+                <%-- Shown over the details panel while a clicked row's data loads. --%>
+                <div class="details-loading" id="detailsLoading" aria-hidden="true">
+                    <div class="details-loading-box">
+                        <div class="details-loading-dots"><span></span><span></span><span></span></div>
+                        <div class="details-loading-text">Loading...</div>
                     </div>
                 </div>
 
@@ -1093,43 +1358,44 @@
             <h2 class="cust-modal-title">Check for Duplicate Customers</h2>
 
             <div class="dup-layout">
-            <aside class="dup-side">
-            <h4 class="dup-side-title"><i class="fas fa-user"></i> Customer</h4>
-            <div class="dup-search">
-                <label class="dup-field"><span>First Name</span><input type="text" id="dupFirstName" class="form-control form-control-sm" /></label>
-                <label class="dup-field"><span>Last Name</span><input type="text" id="dupLastName" class="form-control form-control-sm" /></label>
-                <label class="dup-field"><span>Address</span><input type="text" id="dupAddress" class="form-control form-control-sm" /></label>
-                <label class="dup-field"><span>Phone</span><input type="text" id="dupPhone" class="form-control form-control-sm" /></label>
-                <label class="dup-field"><span>Mobile</span><input type="text" id="dupMobile" class="form-control form-control-sm" /></label>
-                <label class="dup-field"><span>E-Mail</span><input type="text" id="dupEmail" class="form-control form-control-sm" /></label>
-                <button type="button" class="dup-search-btn" id="btn_SearchDuplicates"><i class="fas fa-search"></i> Search</button>
-            </div>
+                <aside class="dup-side">
+                    <h4 class="dup-side-title"><i class="fas fa-user"></i>Customer</h4>
+                    <div class="dup-search">
+                        <label class="dup-field"><span>First Name</span><input type="text" id="dupFirstName" class="form-control form-control-sm" /></label>
+                        <label class="dup-field"><span>Last Name</span><input type="text" id="dupLastName" class="form-control form-control-sm" /></label>
+                        <label class="dup-field"><span>Address</span><input type="text" id="dupAddress" class="form-control form-control-sm" /></label>
+                        <label class="dup-field"><span>Phone</span><input type="text" id="dupPhone" class="form-control form-control-sm" /></label>
+                        <label class="dup-field"><span>Mobile</span><input type="text" id="dupMobile" class="form-control form-control-sm" /></label>
+                        <label class="dup-field"><span>E-Mail</span><input type="text" id="dupEmail" class="form-control form-control-sm" /></label>
+                        <button type="button" class="dup-search-btn" id="btn_SearchDuplicates"><i class="fas fa-search"></i>Search</button>
+                    </div>
 
-            <p class="dup-help">
-                Pick the customer to <strong>keep (Primary)</strong>, then tick the <strong>Duplicate</strong> records to merge into it.
+                    <p class="dup-help">
+                        Pick the customer to <strong>keep (Primary)</strong>, then tick the <strong>Duplicate</strong> records to merge into it.
                 Their appointments and invoices move to the Primary. <strong>Secondary</strong> (optional) copies that person in as the Primary's second contact.
-            </p>
-            </aside>
+           
+                    </p>
+                </aside>
 
-            <div class="dup-table-wrap">
-                <table class="dup-table" id="DuplicateCustomerTable">
-                    <thead>
-                        <tr>
-                            <th class="dup-pick">Primary</th>
-                            <th class="dup-pick">Duplicate</th>
-                            <th class="dup-pick">Secondary</th>
-                            <th>First Name</th>
-                            <th>Last Name</th>
-                            <th>Address</th>
-                            <th>City</th>
-                            <th>Phone</th>
-                            <th>Email</th>
-                            <th>Mobile</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
+                <div class="dup-table-wrap">
+                    <table class="dup-table" id="DuplicateCustomerTable">
+                        <thead>
+                            <tr>
+                                <th class="dup-pick">Primary</th>
+                                <th class="dup-pick">Duplicate</th>
+                                <th class="dup-pick">Secondary</th>
+                                <th>First Name</th>
+                                <th>Last Name</th>
+                                <th>Address</th>
+                                <th>City</th>
+                                <th>Phone</th>
+                                <th>Email</th>
+                                <th>Mobile</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
 
             <div class="dup-footer">
@@ -1155,43 +1421,44 @@
             <h2 class="cust-modal-title">Check for Duplicate Sites</h2>
 
             <div class="dup-layout">
-            <aside class="dup-side">
-            <h4 class="dup-side-title"><i class="fas fa-map-marker-alt"></i> Site</h4>
-            <div class="dup-search">
-                <label class="dup-field"><span>Site Name</span><input type="text" id="dupSiteName" class="form-control form-control-sm" /></label>
-                <label class="dup-field"><span>Address</span><input type="text" id="dupSiteAddress" class="form-control form-control-sm" /></label>
-                <label class="dup-field"><span>City</span><input type="text" id="dupSiteCity" class="form-control form-control-sm" /></label>
-                <label class="dup-field"><span>Zip</span><input type="text" id="dupSiteZip" class="form-control form-control-sm" /></label>
-                <label class="dup-field"><span>Phone</span><input type="text" id="dupSitePhone" class="form-control form-control-sm" /></label>
-                <label class="dup-field"><span>E-Mail</span><input type="text" id="dupSiteEmail" class="form-control form-control-sm" /></label>
-                <button type="button" class="dup-search-btn" id="btn_SearchSiteDuplicates"><i class="fas fa-search"></i> Search</button>
-            </div>
+                <aside class="dup-side">
+                    <h4 class="dup-side-title"><i class="fas fa-map-marker-alt"></i>Site</h4>
+                    <div class="dup-search">
+                        <label class="dup-field"><span>Site Name</span><input type="text" id="dupSiteName" class="form-control form-control-sm" /></label>
+                        <label class="dup-field"><span>Address</span><input type="text" id="dupSiteAddress" class="form-control form-control-sm" /></label>
+                        <label class="dup-field"><span>City</span><input type="text" id="dupSiteCity" class="form-control form-control-sm" /></label>
+                        <label class="dup-field"><span>Zip</span><input type="text" id="dupSiteZip" class="form-control form-control-sm" /></label>
+                        <label class="dup-field"><span>Phone</span><input type="text" id="dupSitePhone" class="form-control form-control-sm" /></label>
+                        <label class="dup-field"><span>E-Mail</span><input type="text" id="dupSiteEmail" class="form-control form-control-sm" /></label>
+                        <button type="button" class="dup-search-btn" id="btn_SearchSiteDuplicates"><i class="fas fa-search"></i>Search</button>
+                    </div>
 
-            <p class="dup-help">
-                Pick the site to <strong>keep (Primary)</strong>, then tick the <strong>Duplicate</strong> sites to merge into it.
+                    <p class="dup-help">
+                        Pick the site to <strong>keep (Primary)</strong>, then tick the <strong>Duplicate</strong> sites to merge into it.
                 Their appointments move to the Primary site.
-            </p>
-            </aside>
+           
+                    </p>
+                </aside>
 
-            <div class="dup-table-wrap">
-                <table class="dup-table" id="DuplicateSiteTable">
-                    <thead>
-                        <tr>
-                            <th class="dup-pick">Primary</th>
-                            <th class="dup-pick">Duplicate</th>
-                            <th>Site Name</th>
-                            <th>Contact</th>
-                            <th>Address</th>
-                            <th>City</th>
-                            <th>State</th>
-                            <th>Zip</th>
-                            <th>Phone</th>
-                            <th>Email</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
+                <div class="dup-table-wrap">
+                    <table class="dup-table" id="DuplicateSiteTable">
+                        <thead>
+                            <tr>
+                                <th class="dup-pick">Primary</th>
+                                <th class="dup-pick">Duplicate</th>
+                                <th>Site Name</th>
+                                <th>Contact</th>
+                                <th>Address</th>
+                                <th>City</th>
+                                <th>State</th>
+                                <th>Zip</th>
+                                <th>Phone</th>
+                                <th>Email</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
 
             <div class="dup-footer">
@@ -1253,96 +1520,102 @@
          and the grid carries CustomerName rather than FirstName/LastName, so saving
          from here posted blank names to UpdateCustomer. Customer records are edited
          on Customer.aspx / CustomerDetails.aspx. --%>
-       <!-- SMS Modal -->
-        <div class="modal fade" id="modalSendSMS" tabindex="-1" role="dialog" aria-labelledby="modalSendSMS"
-            aria-hidden="true">
-            <div class="modal-dialog modal-dialog-scrollable" role="document">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="smsModalLongTitle">Send SMS</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row mt-3">
-                            <div class="col-12 mt-0">
-                                <label for="txtMobile" class="form-label mb-0">Phone/Mobile Number</label>
-                                <asp:TextBox ID="txtMobile" runat="server" CssClass="form-control" />
-                                <asp:HiddenField ID="txtCustomerId" runat="server" />
-                            </div>
-                        </div>
-                        <div class="row mt-2">
-                            <div class="col-12 mt-0">
-                                <label for="txtSMS" class="form-label mb-0">Text</label>
-                                <asp:TextBox ID="txtSMS" runat="server" TextMode="MultiLine" Rows="5"
-                                    CssClass="form-control" />
-                            </div>
+    <!-- SMS Modal -->
+    <div class="modal fade" id="modalSendSMS" tabindex="-1" role="dialog" aria-labelledby="modalSendSMS"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="smsModalLongTitle">Send SMS</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mt-3">
+                        <div class="col-12 mt-0">
+                            <label for="txtMobile" class="form-label mb-0">Phone/Mobile Number</label>
+                            <asp:TextBox ID="txtMobile" runat="server" CssClass="form-control" />
+                            <asp:HiddenField ID="txtCustomerId" runat="server" />
                         </div>
                     </div>
-                    <div class="modal-footer justify-content-between">
-                        <button type="button" class="btn btn-info" onclick="OpenSMSHistoryFromModal()"
-                            title="View SMS History">
-                            <i class="fas fa-history me-1"></i>View History
-                        </button>
-                        <div>
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
-                                onclick="CloseSMSPopup()">Close</button>
-                            <asp:Button ID="btnSendSms" ClientIDMode="Static" runat="server" Text="Send SMS"
-                                CssClass="btn btn-success" OnClick="btnSendSMS_Click" />
+                    <div class="row mt-2">
+                        <div class="col-12 mt-0">
+                            <label for="txtSMS" class="form-label mb-0">Text</label>
+                            <asp:TextBox ID="txtSMS" runat="server" TextMode="MultiLine" Rows="5"
+                                CssClass="form-control" />
                         </div>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <button type="button" class="btn btn-info" onclick="OpenSMSHistoryFromModal()"
+                        title="View SMS History">
+                        <i class="fas fa-history me-1"></i>View History
+                       
+                    </button>
+                    <div>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                            onclick="CloseSMSPopup()">
+                            Close</button>
+                        <asp:Button ID="btnSendSms" ClientIDMode="Static" runat="server" Text="Send SMS"
+                            CssClass="btn btn-success" OnClick="btnSendSMS_Click" />
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- MMS Modal -->
-        <div class="modal fade" id="modalSendMMS" tabindex="-1" role="dialog" aria-labelledby="modalSendMMS"
-            aria-hidden="true">
-            <div class="modal-dialog modal-dialog-scrollable" role="document">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="mmsModalLongTitle">Send MMS</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row mt-3">
-                            <div class="col-12 mt-0">
-                                <label for="txtCustMob" class="form-label mb-0">Phone/Mobile Number</label>
-                                <asp:TextBox ID="txtCustMob" runat="server" CssClass="form-control" />
-                                <asp:HiddenField ID="txtCustId" runat="server" />
-                            </div>
-                        </div>
-                        <div class="row mt-2">
-                            <div class="col-12 mt-0">
-                                <label for="txtMMSBody" class="form-label mb-0">MMS Body</label>
-                                <asp:TextBox ID="txtMMSBody" runat="server" TextMode="MultiLine" Rows="4"
-                                    CssClass="form-control" />
-                            </div>
-                        </div>
-                        <div class="row mt-3">
-                            <div class="col-12 mt-0">
-                                <label for="fuAttachment" class="form-label mb-0">Attachment</label>
-                                <asp:FileUpload ID="fuAttachment" runat="server" CssClass="form-control" />
-                                <p id="fileHint" class="text-muted small mb-0">Allowed file types: .pdf, .jpg, .jpeg,
-                                    .png (Max size: 20MB)</p>
-                                <span id="fileError" class="text-danger small"></span>
-                            </div>
+    <!-- MMS Modal -->
+    <div class="modal fade" id="modalSendMMS" tabindex="-1" role="dialog" aria-labelledby="modalSendMMS"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="mmsModalLongTitle">Send MMS</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mt-3">
+                        <div class="col-12 mt-0">
+                            <label for="txtCustMob" class="form-label mb-0">Phone/Mobile Number</label>
+                            <asp:TextBox ID="txtCustMob" runat="server" CssClass="form-control" />
+                            <asp:HiddenField ID="txtCustId" runat="server" />
                         </div>
                     </div>
-                    <div class="modal-footer justify-content-between">
-                        <button type="button" class="btn btn-info" onclick="OpenSMSHistoryFromModal()"
-                            title="View SMS History">
-                            <i class="fas fa-history me-1"></i>View History
-                        </button>
-                        <div>
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
-                                onclick="CloseMMSPopup()">Close</button>
-                            <asp:Button ID="btnSendMMS" ClientIDMode="Static" runat="server" Text="Send MMS"
-                                CssClass="btn btn-success" OnClick="btnSendMMS_Click" />
+                    <div class="row mt-2">
+                        <div class="col-12 mt-0">
+                            <label for="txtMMSBody" class="form-label mb-0">MMS Body</label>
+                            <asp:TextBox ID="txtMMSBody" runat="server" TextMode="MultiLine" Rows="4"
+                                CssClass="form-control" />
                         </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12 mt-0">
+                            <label for="fuAttachment" class="form-label mb-0">Attachment</label>
+                            <asp:FileUpload ID="fuAttachment" runat="server" CssClass="form-control" />
+                            <p id="fileHint" class="text-muted small mb-0">
+                                Allowed file types: .pdf, .jpg, .jpeg,
+                                    .png (Max size: 20MB)
+                            </p>
+                            <span id="fileError" class="text-danger small"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <button type="button" class="btn btn-info" onclick="OpenSMSHistoryFromModal()"
+                        title="View SMS History">
+                        <i class="fas fa-history me-1"></i>View History
+                       
+                    </button>
+                    <div>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                            onclick="CloseMMSPopup()">
+                            Close</button>
+                        <asp:Button ID="btnSendMMS" ClientIDMode="Static" runat="server" Text="Send MMS"
+                            CssClass="btn btn-success" OnClick="btnSendMMS_Click" />
                     </div>
                 </div>
             </div>
         </div>
+    </div>
     <div class="cust-modal" id="addSiteModal">
         <div class="cust-modal-content">
             <button class="cust-modal-close" id="closeAddSiteIcon">×</button>
@@ -1451,7 +1724,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/2.2.2/js/dataTables.min.js"></script>
     <script type="text/javascript" src="https://cdn.datatables.net/select/3.0.0/js/dataTables.select.min.js"></script>
-   
+
     <script>
 
         function OpenCustomerChatHistory(mobile, name, customerId) {
@@ -1513,5 +1786,5 @@
         }
 
     </script>
-     <script src="Scripts/AppointmentList.js?v=15"></script>
+    <script src="Scripts/AppointmentList.js?v=18"></script>
 </asp:Content>

@@ -557,9 +557,13 @@ function formatNotes(notes) {
         .replace(/^(<div class="ad-notes-gap"><\/div>)|(<div class="ad-notes-gap"><\/div>)$/g, '');
 }
 
+// Bumped on every details load; lets a response tell whether it is still the latest.
+let siteLoadSeq = 0;
+
 function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApproved, SiteId, ApptDateTime) {
 
     if (!customerId) return;
+    const seq = ++siteLoadSeq;
 
     $.ajax({
         type: "POST",
@@ -567,8 +571,21 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
         data: JSON.stringify({ customerId: customerId, SiteId: SiteId }),
         contentType: "application/json; charset=utf-8",
         dataType: "json",
+        beforeSend: function () {
+            $('#detailsLoading').addClass('is-active');
+        },
+        complete: function () {
+            // Only the latest request clears the overlay, so a quick second click keeps it up.
+            if (seq === siteLoadSeq) $('#detailsLoading').removeClass('is-active');
+        },
         success: function (response) {
+            // A slower earlier request finishing late must not overwrite the newer row's details.
+            if (seq !== siteLoadSeq) return;
             sites = response.d || [];
+            // The AHS feed writes the Dispatch ID into the note ("DispatchID: 95879269" or
+            // "Dispatch ID 95879269"); use that until the backend sends DispatchId on its own.
+            const noteDispatch = String(notes || '').match(/dispatch\s*id\s*[:#]?\s*([A-Za-z0-9-]+)/i);
+            const dispatchId = (currentRow && currentRow.DispatchId) || (noteDispatch ? noteDispatch[1] : '');
 
             const sitesHeaderContainer = $('#sites .sites-header');
             const sitesListContainer = $('#sites .sites-list');
@@ -607,6 +624,7 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                 <div class="cust-site-title-group">
                                     <h3 class="cust-site-title" title="${escapeHTML(site.SiteName)}">${escapeHTML(site.SiteName)}</h3>
                                     <span class="ad-badge ${statusClass}"><span class="ad-badge-dot"></span>${statusTitle}</span>
+                                    ${dispatchId ? `<span class="ad-dispatch" title="Dispatch ID"><i class="fas fa-hashtag"></i> Dispatch ID: <strong>${escapeHTML(dispatchId)}</strong></span>` : ''}
                                 </div>
                                 <div class="cust-site-actions">
                                     <button type="button" class="cust-site-icon-btn ahs-status-btn" title="AHS Status">
@@ -669,6 +687,7 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
             }
         },
         error: function (xhr) {
+            if (seq !== siteLoadSeq) return;
             console.error("Error loading site data: ", xhr.responseText);
             $('#sites .sites-list').html('<p class="text-danger">Failed to load site data.</p>');
         }

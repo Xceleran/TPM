@@ -1,3 +1,67 @@
+// "Any details" note in the edit-appointment modal. The feed sends plain text
+// ("FormCode: HSNA22", " - Bullet" lines, blank gaps); show it formatted, and
+// keep the textarea as the editor, which is what gets saved.
+function formatApptNote(note) {
+    const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const lines = String(note || '').split(/\r?\n|\r/).map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return '<span class="appt-note-empty">No details</span>';
+
+    // Built in the note's own order; consecutive pairs or bullets share one block.
+    const out = [];
+    let pairs = null, bullets = null;
+    const flush = () => {
+        if (pairs) { out.push(`<dl class="appt-note-pairs">${pairs.join('')}</dl>`); pairs = null; }
+        if (bullets) { out.push(`<ul class="appt-note-list">${bullets.join('')}</ul>`); bullets = null; }
+    };
+
+    lines.forEach(line => {
+        let m;
+        if ((m = line.match(/^\*{2,}\s*(.*?)\s*\**$/))) {
+            // "** DO NOT COLLECT ... ***" is an instruction, not a coverage item.
+            flush();
+            out.push(`<p class="appt-note-callout"><i class="fas fa-info-circle"></i> ${esc(m[1])}</p>`);
+        } else if ((m = line.match(/^[-•]\s*(.+)$/))) {
+            if (pairs) flush();
+            (bullets = bullets || []).push(`<li><i class="fas fa-check-circle"></i><span>${esc(m[1])}</span></li>`);
+        } else if ((m = line.match(/^([A-Za-z][\w #\/-]{0,30}?)\s*:\s*(.+)$/)) && !m[2].startsWith('//')) {
+            if (bullets) flush();
+            const value = /^dispatch\s*id$/i.test(m[1])
+                ? `<span class="dispatch-pill"><i class="fas fa-hashtag"></i> ${esc(m[2])}</span>`
+                : esc(m[2]);
+            (pairs = pairs || []).push(`<dt>${esc(m[1])}</dt><dd>${value}</dd>`);
+        } else {
+            flush();
+            out.push(`<p class="appt-note-line">${esc(line)}</p>`);
+        }
+    });
+    flush();
+
+    return out.join('');
+}
+
+// The AHS feed writes the Dispatch ID into the note ("DispatchID: 95879269" or
+// "Dispatch ID 95879269"). Used until the backend sends DispatchId on its own.
+function extractDispatchId(note) {
+    const m = String(note || '').match(/dispatch\s*id\s*[:#]?\s*([A-Za-z0-9-]+)/i);
+    return m ? m[1] : '';
+}
+
+function showApptNoteView() {
+    $('#apptNoteView').html(formatApptNote($('#editApptNote').val())).removeClass('d-none');
+    $('#editApptNote').addClass('d-none');
+    $('#btnToggleApptNote').html('<i class="fas fa-pen"></i> Edit');
+}
+
+$(document).on('click', '#btnToggleApptNote', function () {
+    if ($('#editApptNote').hasClass('d-none')) {
+        $('#apptNoteView').addClass('d-none');
+        $('#editApptNote').removeClass('d-none').trigger('focus');
+        $(this).html('<i class="fas fa-check"></i> Done');
+    } else {
+        showApptNoteView();
+    }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
 
 
@@ -1143,7 +1207,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!customerId) {
             console.error('Cannot load appointments: customerId is missing');
             console.error('customerId element:', document.getElementById('MainContent_lblCustomerId') || document.querySelector('[id$="lblCustomerId"]'));
-            $('#apptTableBody').html('<tr><td colspan="7" class="text-center text-danger">Error: Customer ID is missing. Cannot load appointments.</td></tr>');
+            $('#apptTableBody').html('<tr><td colspan="9" class="text-center text-danger">Error: Customer ID is missing. Cannot load appointments.</td></tr>');
             return;
         }
 
@@ -1151,7 +1215,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('customerId type:', typeof customerId, 'value:', JSON.stringify(customerId));
 
         // Show loading state
-        $('#apptTableBody').html('<tr><td colspan="7" class="text-center"><i class="fas fa-spinner fa-spin me-2"></i>Loading appointments...</td></tr>');
+        $('#apptTableBody').html('<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin me-2"></i>Loading appointments...</td></tr>');
 
         const requestData = { customerId: customerId.trim(), siteId: siteId };
         console.log('Sending AJAX request with data:', requestData);
@@ -1185,7 +1249,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (appointmentData.length === 0) {
                     console.warn('No appointments found for customerId:', customerId);
-                    $('#apptTableBody').html('<tr><td colspan="7" class="text-center text-muted">No appointments found for this customer.</td></tr>');
+                    $('#apptTableBody').html('<tr><td colspan="9" class="text-center text-muted">No appointments found for this customer.</td></tr>');
                 } else {
                     console.log('Rendering appointments...');
                     applyFiltersAppt();
@@ -1211,7 +1275,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 showToast(errorMsg);
-                $('#apptTableBody').html('<tr><td colspan="7" class="text-center text-danger">Error loading appointments. Please check the console for details.</td></tr>');
+                $('#apptTableBody').html('<tr><td colspan="9" class="text-center text-danger">Error loading appointments. Please check the console for details.</td></tr>');
             }
         });
     }
@@ -1592,7 +1656,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Table rendering functions
     function renderAppointmentsTable(appointments) {
         if (!appointments || appointments.length === 0) {
-            $('#apptTableBody').html('<tr><td colspan="8" class="text-center text-muted">No appointments found.</td></tr>');
+            $('#apptTableBody').html('<tr><td colspan="9" class="text-center text-muted">No appointments found.</td></tr>');
             return;
         }
 
@@ -1612,6 +1676,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${apt.AppoinmentUId || '-'}${highlightIcon}
                         </button>
                     </td>
+                    <td>${(() => {
+                        const dispatchId = apt.DispatchId || extractDispatchId(apt.Note);
+                        return dispatchId ? `<span class="dispatch-pill"><i class="fas fa-hashtag"></i> ${dispatchId}</span>` : '-';
+                    })()}</td>
                     <td>${apt.RequestDate || apt.AppoinmentDate || '-'}</td>
                     <td>${apt.TimeSlot || '-'}</td>
                     <td>${apt.ServiceType || '-'}</td>
@@ -3203,6 +3271,7 @@ window.showAppointmentDetailsModal = async function (appointmentId) {
                 }
 
                 $('#editApptNote').val(details.Note);
+                showApptNoteView();
 
                 // Reset Tabs
                 const tabTrigger = new bootstrap.Tab(document.querySelector('#editAppointmentTabs button[data-bs-target="#appointment-details"]'));
