@@ -710,21 +710,23 @@ const AHS_STATUSES = [
 
 // Click events for the AHS Submit buttons, one per status. They all call the
 // same SubmitAhsStatus() so the confirm and the API call live in one place.
-function AppointmentSet_Click() { SubmitAhsStatus($(this), 'Appointment Set'); }
-function WaitingOnCallBack_Click() { SubmitAhsStatus($(this), 'Waiting on Customer Call Back'); }
-function UnableToContact_Click() { SubmitAhsStatus($(this), 'Unable To Contact'); }
-function PartsOnOrder_Click() { SubmitAhsStatus($(this), 'In Progress with Parts on Order'); }
-function Complete_Click() { SubmitAhsStatus($(this), 'Complete (AHS)'); }
-function MissedAppointment_Click() { SubmitAhsStatus($(this), 'Customer Missed Appointment'); }
-function NeedToReplace_Click() { SubmitAhsStatus($(this), 'In Progress With Need To Replace'); }
-function PartsEquipmentStatus_Click() { SubmitAhsStatus($(this), 'Parts/Equipment Status'); }
-function CancelDispatch_Click() { SubmitAhsStatus($(this), 'Cancel Dispatch'); }
+function AppointmentSet_Click() { SubmitAhsStatus($(this), 'Appointment Set','30'); }
+function WaitingOnCallBack_Click() { SubmitAhsStatus($(this), 'Waiting on Customer Call Back','51'); }
+function UnableToContact_Click() { SubmitAhsStatus($(this), 'Unable To Contact','60'); }
+function PartsOnOrder_Click() { SubmitAhsStatus($(this), 'In Progress with Parts on Order','100'); }
+function Complete_Click() { SubmitAhsStatus($(this), 'Complete (AHS)','10'); }
+function MissedAppointment_Click() { SubmitAhsStatus($(this), 'Customer Missed Appointment','120'); }
+function NeedToReplace_Click() { SubmitAhsStatus($(this), 'In Progress With Need To Replace','110'); }
+function PartsEquipmentStatus_Click() { SubmitAhsStatus($(this), 'Parts/Equipment Status',''); }
+function CancelDispatch_Click() { SubmitAhsStatus($(this), 'Cancel Dispatch','40'); }
 
 // Asks Yes/No, then calls the AHS backend method.
-function SubmitAhsStatus(btn, status) {
+function SubmitAhsStatus(btn, status,code) {
     const row = btn.closest('.ahs-row');
     const date = row.find('.ahs-date').val();
     const apptId = $('#mdl_AhsStatus').data('appt-id');
+
+    const dispatchID = $('#mdl_AhsStatus').data('DispatchId-id');
 
     if (!date) {
         notify('warning', `Pick a date for "${status}".`);
@@ -738,7 +740,7 @@ function SubmitAhsStatus(btn, status) {
         $.ajax({
             type: "POST",
             url: AHS_STATUS_API_URL,
-            data: JSON.stringify(AHS_STATUS_API_PARAMS),
+            data: JSON.stringify({ ApptID: apptId, StatusID: code, DispatchID: dispatchID}),
             contentType: "application/json; charset=utf-8",
             dataType: "json",
             success: function () {
@@ -785,6 +787,7 @@ function openAhsStatus(row) {
 
     const saved = ahsStatusUpdates[row.ApptID] || {};
     $('#mdl_AhsStatus').data('appt-id', row.ApptID);
+    $('#mdl_AhsStatus').data('DispatchId-id', row.DispatchId);
     $('#ahsStatusSubtitle').html(row.CustomerName ? `Work order for <strong>${escapeHTML(row.CustomerName)}</strong>` : '');
 
     $('#AhsStatusList').html(AHS_STATUSES.map(({ id, status }) => {

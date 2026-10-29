@@ -555,8 +555,7 @@ namespace FSM
                 DataTable dt = new DataTable();
                 string sql = @"SELECT Id, Name 
                                FROM tbl_Resources 
-                               WHERE CompanyID = @CompanyID AND ISNULL(IsActive, 1) <> 0
-                               ORDER BY Name";
+                               WHERE CompanyID = @CompanyID AND ISNULL(IsActive, 0) = 1 ORDER BY Name";
                 db.AddParameter("@CompanyID", companyId, SqlDbType.NVarChar);
                 db.ExecuteParam(sql, out dt);
                 db.Close();

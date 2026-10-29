@@ -142,6 +142,8 @@
     <Reference Include="System.Net.Http.Formatting, Version=5.2.4.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.AspNet.WebApi.Client.5.2.4\lib\net45\System.Net.Http.Formatting.dll</HintPath>
     </Reference>
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
     <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Web.Http, Version=5.2.4.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.AspNet.WebApi.Core.5.2.4\lib\net45\System.Web.Http.dll</HintPath>
@@ -201,6 +203,12 @@
     <Content Include="AppoinementList.aspx" />
     <Content Include="Appointments.aspx" />
     <Content Include="BusinessContact.aspx" />
+    <None Include="Connected Services\AHSServices\configuration91.svcinfo" />
+    <None Include="Connected Services\AHSServices\configuration.svcinfo" />
+    <None Include="Connected Services\AHSServices\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
     <Content Include="Content\form-response.css" />
     <Content Include="Content\GearLoder.gif" />
     <Content Include="Content\settings.css" />
@@ -330,6 +338,11 @@
     <Compile Include="BusinessContact.aspx.designer.cs">
       <DependentUpon>BusinessContact.aspx</DependentUpon>
     </Compile>
+    <Compile Include="Connected Services\AHSServices\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
     <Compile Include="CustomerChatHistory.aspx.cs">
       <DependentUpon>CustomerChatHistory.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
@@ -356,6 +369,7 @@
     <Compile Include="logout.aspx.designer.cs">
       <DependentUpon>logout.aspx</DependentUpon>
     </Compile>
+    <Compile Include="Processors\AhsStatusProcessor.cs" />
     <Compile Include="Processors\AppointmentResourceProcessor.cs" />
     <Compile Include="Processors\AppointmentStatusCommunicationProcessor.cs" />
     <Compile Include="Processors\AhsStatusQueueProcessor.cs" />
@@ -555,6 +569,19 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="ItemImageUpload.ashx" />
+    <None Include="Connected Services\AHSServices\DispatchStatusUpdate.wsdl" />
+    <Content Include="Connected Services\AHSServices\TPM.AHSServices.DispatchesStatusUpdateInformation.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Content>
+    <Content Include="Connected Services\AHSServices\TPM.AHSServices.DispatchStatusUpdateInformation.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Content>
+    <Content Include="Connected Services\AHSServices\TPM.AHSServices.updateDispatchStatusResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Content>
+    <Content Include="Connected Services\AHSServices\TPM.AHSServices.updateStatusOfDispatchesResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Content>
     <None Include="packages.config" />
     <None Include="Properties\PublishProfiles\FolderProfile.pubxml" />
     <None Include="Web.Debug.config">
@@ -569,6 +596,12 @@
   </ItemGroup>
   <ItemGroup>
     <Service Include="{4A0DDDB5-7A95-4FBF-97CC-616D07737A77}" />
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Connected Services\" />
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadataStorage Include="Connected Services\AHSServices\" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>

@@ -21,6 +21,8 @@ using FSM.Processors;
 using System.IO;
 using FSM.Models.AppoinmentModel;
 using System.Text.RegularExpressions;
+using TPM.Processors;
+using System.Globalization;
 
 namespace TPM
 {
@@ -137,6 +139,10 @@ namespace TPM
                 System.Diagnostics.Debug.WriteLine($"Error loading status data: {ex.Message}");
             }
         }
+
+        
+
+
         [WebMethod(EnableSession = true)]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public static string LoadAppointments(string SearchBy = "",
@@ -242,7 +248,7 @@ namespace TPM
                         IsApproved = Convert.ToBoolean(dataRow["IsApproved"]),
                         SiteID = dataRow["SiteID"].ToString(),
                         ApptDateTime = dataRow["ApptDateTime"].ToString(),
-                        
+                        DispatchId = dataRow["DispatchId"].ToString(),
                         Mobile = dataRow["Mobile"].ToString().ToUpper().Trim()
                     });
                 }
@@ -504,6 +510,39 @@ namespace TPM
             }
             return sites;
         }
+        [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static List<CustomerSite> UpdateAhsStatus(string ApptID,string StatusID,String DispatchID)
+        {
+            var sites = new List<CustomerSite>();
+            string companyid = HttpContext.Current.Session["CompanyID"].ToString();
+            Database db = new Database();
+            DataTable dt = new DataTable();
+            try
+            {
+                AhsStatusProcessor ahsStatusProcessor = new AhsStatusProcessor();
+               bool result =   ahsStatusProcessor.SentAhsStatus(DispatchID, StatusID,
+                   DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss",
+                   CultureInfo.InvariantCulture),
+                   companyid,
+                   ApptID,
+                   "AHS");
+              
+
+            }
+            catch (Exception ex)
+            {
+                if (db.Connection.State == ConnectionState.Open) db.Close();
+                return sites;
+            }
+            finally
+            {
+                if (db.Connection.State == ConnectionState.Open) db.Close();
+            }
+            return sites;
+        }
+
+        
         public CustomerEntity GetCustomerDetails(string CustomerGuid, string customerId)
         {
             string companyid = Session["CompanyID"].ToString();

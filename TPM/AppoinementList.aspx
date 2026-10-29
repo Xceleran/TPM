@@ -1786,5 +1786,5 @@
         }
 
     </script>
-    <script src="Scripts/AppointmentList.js?v=18"></script>
+    <script src="Scripts/AppointmentList.js?v=22"></script>
 </asp:Content>

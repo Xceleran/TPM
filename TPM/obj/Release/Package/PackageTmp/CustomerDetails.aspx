@@ -10,8 +10,8 @@
         <link rel="stylesheet" type="text/css"
             href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
 
-        <link rel="stylesheet" href="Content/customerdetails.css">
-        <link rel="stylesheet" href="Content/customer.css">
+        <link rel="stylesheet" href="Content/customerdetails.css?v=1">
+        <link rel="stylesheet" href="Content/customer.css?v=6">
         <style>
             #siteAppointmentDetailsModal_PopUP .modal-dialog {
                 max-width: 95vw;
@@ -37,6 +37,119 @@
 
             .icon-btn.dropdown-toggle::after {
                 display: none !important;
+            }
+
+            /* Same look as the Dispatch ID pill on the Appointment List page. */
+            .dispatch-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                padding: 5px 10px;
+                border: 1px solid #858585;
+                border-radius: 99px;
+                background: #d3d3d3;
+                color: #0c0000;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.3px;
+                line-height: 1;
+                white-space: nowrap;
+            }
+
+                .dispatch-pill i {
+                    font-size: 10px;
+                }
+
+            .appt-note-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 6px;
+            }
+
+            .appt-note-toggle {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                padding: 3px 10px;
+                border: 1px solid #dee2e6;
+                border-radius: 6px;
+                background: transparent;
+                color: #0d6efd;
+                font-size: 12px;
+                font-weight: 500;
+            }
+
+                .appt-note-toggle:hover {
+                    background: #f1f5f9;
+                }
+
+            .appt-note-view {
+                max-height: 460px;
+                overflow-y: auto;
+                padding: 10px 12px;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                font-size: 13.5px;
+                line-height: 1.5;
+            }
+
+            .appt-note-pairs {
+                display: grid;
+                grid-template-columns: max-content minmax(0, 1fr);
+                align-items: center;
+                gap: 6px 12px;
+                margin: 0 0 8px;
+            }
+
+                .appt-note-pairs dt {
+                    color: #64748b;
+                    font-weight: 500;
+                }
+
+                .appt-note-pairs dd {
+                    margin: 0;
+                    font-weight: 600;
+                    word-break: break-word;
+                }
+
+            .appt-note-line {
+                margin: 0 0 2px;
+                font-weight: 500;
+            }
+
+            .appt-note-list {
+                margin: 8px 0 0;
+                padding: 0;
+                list-style: none;
+            }
+
+                .appt-note-list li {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 8px;
+                    padding: 3px 0;
+                }
+
+                    .appt-note-list li i {
+                        margin-top: 4px;
+                        color: #16a34a;
+                        font-size: 12px;
+                    }
+
+            .appt-note-empty {
+                color: #94a3b8;
+                font-style: italic;
+            }
+
+            .appt-note-callout {
+                margin: 6px 0 0;
+                padding: 6px 10px;
+                border-left: 3px solid #f59e0b;
+                border-radius: 4px;
+                background: #fffbeb;
+                color: #92400e;
+                font-weight: 500;
             }
         </style>
 
@@ -311,6 +424,7 @@
                                         <th scope="col" class="sortable-header" data-sort="AppoinmentId">Appointment ID
                                             <i class="fas fa-sort"></i>
                                         </th>
+                                        <th scope="col">Dispatch ID</th>
                                         <th scope="col" class="sortable-header" data-sort="RequestDate">Request Date
                                             <i class="fas fa-sort"></i>
                                         </th>
@@ -938,7 +1052,7 @@
         <!-- Site Appointment Details Modal (Refactored to Bootstrap) -->
         <div class="modal fade" id="siteAppointmentDetailsModal_PopUP" tabindex="-1"
             aria-labelledby="siteAppointmentDetailsModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable" style="max-width: 98%; width: 98%;">
                 <div class="modal-content">
                     <div
                         class="modal-header d-flex justify-content-between align-items-center bg-white shadow-sm rounded-top">
@@ -955,11 +1069,18 @@
                                             class="ms-2 badge bg-light text-dark font-monospace"
                                             style="font-size: 0.8rem; border: 1px solid #dee2e6;"></span></button>
                                 </li>
-                              
+                                <%-- id is deliberately NOT "forms-tab": the page-level Forms tab already owns
+                                     that id (see the customer tab strip above), and a duplicate would make
+                                     document.querySelector('#forms-tab') resolve to the wrong element. --%>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link-modal px-4 py-2" id="modal-forms-tab"
+                                        data-bs-toggle="tab" data-bs-target="#forms-section" type="button"
+                                        role="tab" aria-controls="forms-section" aria-selected="false"
+                                        style="font-weight: 600; color: #4b5563; background-color: white; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); transition: all 0.2s;"
+                                        onmouseover="this.style.backgroundColor='#dbeafe'; this.style.color='#1e40af';"
+                                        onmouseout="if(!this.classList.contains('active')){this.style.backgroundColor='white'; this.style.color='#4b5563';}">Forms</button>
+                                </li>
                             </ul>
-                            <div class="d-flex flex-wrap gap-2">
-                                
-                            </div>
                             <div class="ms-auto">
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"
                                     aria-label="Close modal"></button>
@@ -976,6 +1097,13 @@
                                 <!-- Appointment Details Tab -->
                                 <div class="tab-pane fade show active" id="appointment-details" role="tabpanel"
                                     aria-labelledby="appointment-tab">
+                                    <div class="mb-3">
+                                        <span class="fw-bold text-muted" style="font-size: 0.95rem;">
+                                            Appointment ID: <span id="bodyAppointmentIdDisplay"
+                                                class="badge bg-primary text-white font-monospace"
+                                                style="font-size: 0.9rem;"></span>
+                                        </span>
+                                    </div>
                                     <div class="row g-4">
                                         <!-- Column 1: Customer / Site Info (Read Only) -->
                                         <div class="col-md-4">
@@ -1121,17 +1249,38 @@
                                                 <!-- Populated via JS -->
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Any details</label>
-                                                <textarea id="editApptNote" name="note" class="form-control"
-                                                    rows="6"></textarea>
+                                                <div class="appt-note-head">
+                                                    <label class="form-label mb-0" for="editApptNote">Any details</label>
+                                                    <button type="button" class="appt-note-toggle" id="btnToggleApptNote">
+                                                        <i class="fas fa-pen"></i> Edit</button>
+                                                </div>
+                                                <%-- Formatted read view of the note; the textarea underneath is
+                                                     still what gets saved, it is just hidden until Edit. --%>
+                                                <div id="apptNoteView" class="appt-note-view"></div>
+                                                <textarea id="editApptNote" name="note" class="form-control d-none"
+                                                    rows="16"></textarea>
                                             </div>
                                             <!-- Appointment-Specific Links -->
                                             <div class="mb-3">
                                                 <h6 class="mb-2">Appointment-Specific Items</h6>
+                                                <%-- Read-only: TPM has no invoice link/unlink endpoints
+                                                     (GetCustomerInvoicesForLinking / LinkInvoiceToAppointment
+                                                     exist only in FSM). Forms are attached from the Forms tab. --%>
                                                 <div id="appointmentSpecificLinks" class="border rounded p-2"
                                                     style="min-height: 60px;">
-                                                    <small class="text-muted">No items attached to this
-                                                        appointment</small>
+                                                    <div class="mb-2">
+                                                        <label class="form-label mb-1 small text-muted">Forms</label>
+                                                        <div id="apptFormsAttachedList">
+                                                            <small class="text-muted">No forms attached</small>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label class="form-label mb-1 small text-muted">Inv/Est</label>
+                                                        <div id="apptInvoicesAttachedList">
+                                                            <small class="text-muted">No invoices or estimates
+                                                                attached</small>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1365,8 +1514,9 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
-                            onclick="openAppointmentModal()">Close</button>
+                        <%-- data-bs-dismiss already closes this; the old onclick called
+                             openAppointmentModal(), which is defined nowhere and threw. --%>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>
@@ -1736,5 +1886,49 @@
                 });
             });
         </script>
-               <script src="Scripts/customerdetails.js?v=7"></script>
+        <script>
+            // Deep-link tab / action support from Supported TP Providers actions menu
+            (function () {
+                var params = new URLSearchParams(window.location.search);
+                var tab = params.get('tab');
+                var openAction = params.get('openAction');
+                var mobileParam = params.get('mobile');
+                if (!tab && !openAction) return;
+
+                document.addEventListener('DOMContentLoaded', function () {
+                    if (tab) {
+                        var tabBtn = document.getElementById(tab + '-tab');
+                        if (tabBtn && window.bootstrap && bootstrap.Tab) {
+                            bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+                        }
+                    }
+                    if (openAction === 'sendEmail') {
+                        var emailBtn = document.getElementById('btnSendEmail');
+                        if (emailBtn) emailBtn.click();
+                    } else if (openAction === 'sendSms') {
+                        var mobile = mobileParam || '';
+                        if (!mobile) {
+                            var mobileLink = document.getElementById('<%= hlMobile.ClientID %>');
+                            mobile = mobileLink ? (mobileLink.textContent || mobileLink.innerText || '').trim() : '';
+                            if (!mobile && mobileLink && mobileLink.getAttribute('href')) {
+                                mobile = mobileLink.getAttribute('href').replace('tel:', '').trim();
+                            }
+                        }
+                        if (!mobile) {
+                            var phoneLink = document.getElementById('<%= hlPhone.ClientID %>');
+                            mobile = phoneLink ? (phoneLink.textContent || phoneLink.innerText || '').trim() : '';
+                            if (!mobile && phoneLink && phoneLink.getAttribute('href')) {
+                                mobile = phoneLink.getAttribute('href').replace('tel:', '').trim();
+                            }
+                        }
+                        var custIdEl = document.getElementById('<%= lblCustomerId.ClientID %>');
+                        var custId = custIdEl ? (custIdEl.textContent || custIdEl.innerText || '').trim() : '';
+                        if (typeof OpenSMSPopUp === 'function') {
+                            OpenSMSPopUp(mobile, custId);
+                        }
+                    }
+                });
+            })();
+        </script>
+               <script src="Scripts/customerdetails.js?v=21"></script>
     </asp:Content>

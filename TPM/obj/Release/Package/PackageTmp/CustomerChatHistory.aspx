@@ -1,4 +1,4 @@
-﻿<%@ Page Title="ChatHistory" Language="C#" MasterPageFile="~/FSM.Master" AutoEventWireup="true" CodeBehind="CustomerChatHistory.aspx.cs" Inherits="FSM.CustomerChatHistory" %>
+﻿<%@ Page Title="ChatHistory" Language="C#" MasterPageFile="~/TPM.Master" AutoEventWireup="true" CodeBehind="CustomerChatHistory.aspx.cs" Inherits="FSM.CustomerChatHistory" %>
 
 <asp:Content ID="Content1" ContentPlaceHolderID="MainContent" runat="server">
 

@@ -686,11 +686,59 @@
                         
                     </div>
                 </div>
-                <div class="col-md-6">
-                     </div>
-                <div class="col-md-6">
-                    
+
+    <!-- Portal configuration modal -->
+    <div class="modal fade" id="portalConfigModal" tabindex="-1" aria-labelledby="portalConfigModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="portalConfigModalLabel">Configure TP Portal</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
+                <div class="modal-body">
+                    <input type="hidden" id="cfgThirdPartyId" />
+                    <input type="hidden" id="cfgWarrantyId" />
+                    <div class="mb-3">
+                        <label class="form-label">Provider</label>
+                        <input type="text" id="cfgProviderName" class="form-control" readonly />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Portal URL</label>
+                        <input type="url" id="cfgPortalUrl" class="form-control" placeholder="https://portal.example.com" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">API Endpoint (optional)</label>
+                        <input type="url" id="cfgApiEndpoint" class="form-control" placeholder="https://api.example.com/status" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Submission Method</label>
+                        <select id="cfgSubmissionMethod" class="form-select">
+                            <option value="Manual">Manual — opens portal link (no queue)</option>
+                            <option value="API">API — sends to API Endpoint (failed calls go to queue)</option>
+                            <option value="RPA">RPA — queues for Process Status Queue</option>
+                        </select>
+                        <div id="cfgMethodHelp" class="form-text text-muted mt-1"></div>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="cfgIsEnabled" checked />
+                        <label class="form-check-label" for="cfgIsEnabled">Enable portal integration</label>
+                    </div>
+                    <div id="cfgQueueTestSection" class="border rounded p-2 bg-light" style="display:none;">
+                        <small class="text-muted d-block mb-2">After saving API/RPA config, queue a test status (requires at least one work order):</small>
+                        <button type="button" class="btn btn-sm btn-outline-success" id="btnQueueTestStatus">
+                            <i class="fas fa-plus-circle"></i> Queue test status
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btnSavePortalConfig">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+                <div class="col-md-6">
             </div>
         </section>
         <section class="mb-4">
@@ -739,7 +787,41 @@
   </ul>
 </div>--%>
         <section id="listView" class="card mb-4">
-            <div class="card-body p-0"> 
+            <div class="card-body p-3">
+                <div class="alert alert-info mb-3 py-2">
+                    <strong><i class="fas fa-link me-1"></i> Portal setup:</strong>
+                    Assign provider → <strong>⚙ Configure Portal</strong> → set method <strong>API</strong> or <strong>RPA</strong> → <strong>Queue test status</strong> → <strong>Process Status Queue</strong>.
+                    <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="btnProcessStatusQueue" title="Process pending API/RPA status queue">
+                        <i class="fas fa-sync"></i> Process Status Queue <span id="queuePendingBadge" class="badge bg-warning text-dark ms-1">0</span>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary ms-1" id="btnRefreshQueue">
+                        <i class="fas fa-redo"></i> Refresh
+                    </button>
+                </div>
+                <div id="statusQueuePanel" class="card mb-3" style="display:none;">
+                    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-list-alt me-1"></i> Status Queue</span>
+                        <small class="text-muted">
+                            Pending: <strong id="sqPending">0</strong> |
+                            Processed: <strong id="sqProcessed">0</strong> |
+                            Failed: <strong id="sqFailed">0</strong>
+                        </small>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped mb-0">
+                                <thead><tr>
+                                    <th>ID</th><th>Provider</th><th>Work Order</th><th>Status</th><th>Method</th><th>Queue</th><th>When</th>
+                                </tr></thead>
+                                <tbody id="statusQueueBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="statusQueueEmpty" class="text-muted text-center py-3 mb-0" style="display:none;">
+                            No queue items yet. Configure a provider as API/RPA and click <strong>Queue test status</strong> in Configure Portal.
+                        </p>
+                    </div>
+                </div>
+            <div class="p-0"> 
                 <div class="text-center ajax-loader">
                   <div class="spinner-border" role="status">
                     <span class="visually-hidden">Loading...</span>
@@ -749,13 +831,13 @@
                     <table class="bill-table table table-bordered">
                         <thead class="table-light">
                             <tr>
-                                <th style="width: 50px;">#</th>
+                                <th style="width: 60px;">Actions</th>
                                 <th style="width: 200px;">Name</th>
                                 <th style="width: 250px;">Address</th>
                                 <th style="width: 120px;">City</th>
                                 <th style="width: 100px;">State</th>
                                 <th style="width: 120px;">Zip</th>
-                                <th style="width: 100px;">Actions</th>
+                                <th style="width: 140px;">Assign / Portal</th>
                             </tr>
                         </thead>
                         <tbody id="itemList"></tbody>
@@ -957,29 +1039,20 @@
             }
             
 
+            function isProviderAssigned(item) {
+                return !!(item && (item.IsEnable === true || item.isEnable === true || item.IsAssigned === true || item.isAssigned === true));
+            }
+
             function applyFilters() {
                 const searchTerm = $('#searchBar').val().trim().toLowerCase();
-                const selectedType = $('#selectedCategory').val().toLowerCase();
-                const viewType = $('#viewToggle').val(); // all, items, groups, bundles
 
                 filteredData = itemData.filter(item => {
-                    const typeName = (itemTypes.find(t => t.Id === item.ItemTypeId)?.Name || "").toLowerCase();
-                    const matchesType = selectedType === 'all' || selectedType === "" || typeName === selectedType;
-
-                    // Filter by view type (All, Items, Groups, Bundles)
-                    let matchesView = true;
-                    if (viewType === 'items') {
-                        matchesView = item.QboType !== 8 && !item.IsGroup; // Not bundle, not group
-                    } else if (viewType === 'groups') {
-                        matchesView = item.IsGroup === true; // Is a group
-                    } else if (viewType === 'bundles') {
-                        matchesView = item.QboType === 8; // Is a bundle
-                    }
-                    // viewType === 'all' means show everything
-
-                    const combinedText = [item.ItemName, item.typeName, item.Description, item.Sku, item.Quantity, item.Price, item.Taxable].join(' ').toLowerCase();
-                    const matchesSearch = combinedText.includes(searchTerm);
-                    return matchesType && matchesSearch && matchesView;
+                    const combinedText = [
+                        item.CompanyName, item.Address, item.City, item.State, item.Zip,
+                        item.ShortName, item.CustomerID
+                    ].join(' ').toLowerCase();
+                    const matchesSearch = !searchTerm || combinedText.includes(searchTerm);
+                    return matchesSearch;
                 });
                 currentPage = 1;
                 renderItems();
@@ -1010,6 +1083,11 @@
                         const typeName = itemTypes.find(t => t.Id === item.ItemTypeId)?.Name || "";
                         const bundleItems = bundleItemsMap[item.Id] || '';
 
+                        const cid = (item.CustomerID || item.customerID || '').toString();
+                        const cguid = (item.CustomerGuid || item.customerGuid || '').toString();
+                        const cmobile = (item.Mobile || item.mobile || item.Phone || item.phone || '').toString();
+                        const cname = (item.CompanyName || item.companyName || '').replace(/"/g, '');
+
                         var rowHtml = `
             <tr>
                 <td>` + `<div class='dropdown'>
@@ -1017,23 +1095,25 @@
                                     <i class='fas fa-align-justify'></i>
                                   </button>
                                   <ul class='dropdown-menu' aria-labelledby='Action${serialNumber}'> 
-                                      <li><a class='dropdown-item' href='#'>Access Portal</a></li>
-                                      <li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId='>Create Invoice</a></li>
-                                      <li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId='>View Invoices</a></li>
-                                       <li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId='>View Files</a></li>
-                                        <li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId='>Send Email</a></li>
-                                        <li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId='>Email History</a></li>
-                                        <li><hr class='dropdown-divider'></li>
-                                        <li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId='>Send Text</a></li>
-                                        <li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId='>Send SMS</a></li>
-                                        <li><a class='dropdown-item' href='Invoice.aspx?InvNum=0&cId='>Text History</a></li>
+                                      <li><a class='dropdown-item portal-access-link' href='#' data-tp-id="${item.ThirdPartyId || 0}" data-portal-url="${item.PortalUrl || ''}"><i class="fas fa-external-link-alt"></i> Access Portal</a></li>
+                                      <li><a class='dropdown-item configure-portal-link' href='#' data-tp-id="${item.ThirdPartyId || 0}" data-warranty-id="${item.Id}" data-company-name="${(item.CompanyName || '').replace(/'/g, '')}"><i class="fas fa-cog"></i> Configure Portal</a></li>
+                                      <li><a class='dropdown-item create-invoice-link' href='#' data-warranty-id="${item.Id}" data-customer-guid="${cguid}" data-customer-id="${cid}">Create Invoice</a></li>
+                                      <li><a class='dropdown-item push-portal-status' href='#' data-tp-id="${item.ThirdPartyId || 0}">Push Status to Portal</a></li>
+                                      <li><a class='dropdown-item tp-view-invoices' href='#' data-warranty-id="${item.Id}" data-customer-id="${cid}">View Invoices</a></li>
+                                      <li><a class='dropdown-item tp-view-files' href='#' data-warranty-id="${item.Id}" data-customer-id="${cid}">View Files</a></li>
+                                      <li><a class='dropdown-item tp-send-email' href='#' data-warranty-id="${item.Id}" data-customer-id="${cid}">Send Email</a></li>
+                                      <li><a class='dropdown-item tp-email-history' href='#' data-warranty-id="${item.Id}" data-customer-id="${cid}">Email History</a></li>
+                                      <li><hr class='dropdown-divider'></li>
+                                      <li><a class='dropdown-item tp-send-sms' href='#' data-warranty-id="${item.Id}" data-customer-id="${cid}" data-mobile="${cmobile}">Send Text</a></li>
+                                      <li><a class='dropdown-item tp-send-sms' href='#' data-warranty-id="${item.Id}" data-customer-id="${cid}" data-mobile="${cmobile}">Send SMS</a></li>
+                                      <li><a class='dropdown-item tp-text-history' href='#' data-warranty-id="${item.Id}" data-customer-id="${cid}" data-mobile="${cmobile}" data-name="${cname}">Text History</a></li>
                                         <li><hr class='dropdown-divider'></li>
                                       
                     </ul></div></td>` ;
 
                         
 
-                            if (item.IsEnable) {
+                            if (isProviderAssigned(item)) {
                                                         rowHtml += `<td><a class='' href='BusinessContact.aspx?WGID=${item.WarrantyCompanyGuID}'>${item.CompanyName || ''}</a></td>`;
                                               
                                                     }
@@ -1048,13 +1128,15 @@
                 <td>${item.City || ''}</td>
                 <td>${item.State || ''}</td>
                 <td>${(item.Zip)}</td>`;
-                if (item.IsEnable) {
+                if (isProviderAssigned(item)) {
                             const rowHtmlAdd = `<td class="text-center">
-                    <div class="dropdown actions-dropdown">
-                        <a class="btn btn-primary" href="#" data-id="${item.Id}">
-                                    <i class="fa fa-check" aria-hidden="true"></i>
-                                </a>
-                    </div>
+                    <a class="btn btn-sm btn-outline-primary configure-portal-link me-1" href="#" title="Configure Portal"
+                       data-tp-id="${item.ThirdPartyId || 0}" data-warranty-id="${item.Id}" data-company-name="${(item.CompanyName || '').replace(/'/g, '')}">
+                        <i class="fas fa-cog"></i>
+                    </a>
+                    <span class="badge bg-success px-2 py-2" title="Assigned to your company">
+                        <i class="fas fa-check me-1"></i> Assigned
+                    </span>
                 </td>
             </tr>
         `;
@@ -1062,12 +1144,13 @@
                         }
                 else {
                     const rowHtmlAdd = `<td class="text-center">
-                    <div class="dropdown actions-dropdown">
-                        <a class="btn-secondary btn-AssignCompany" href="#" data-id="${item.Id}">
-                                    <i class="fa fa-arrow-right" aria-hidden="true"></i>
-
-                                </a>
-                    </div>
+                    <a class="btn btn-sm btn-outline-primary configure-portal-link me-1" href="#" title="Configure Portal"
+                       data-tp-id="${item.ThirdPartyId || 0}" data-warranty-id="${item.Id}" data-company-name="${(item.CompanyName || '').replace(/'/g, '')}">
+                        <i class="fas fa-cog"></i>
+                    </a>
+                    <a class="btn btn-success btn-sm btn-AssignCompany" href="#" data-id="${item.Id}" title="Assign provider to your company">
+                        <i class="fas fa-arrow-right" aria-hidden="true"></i> Assign
+                    </a>
                 </td>
             </tr>
         `;
@@ -1116,6 +1199,326 @@
             }
             
             
+            function updateCfgMethodHelp() {
+                var m = $('#cfgSubmissionMethod').val();
+                var help = '';
+                if (m === 'Manual') {
+                    help = 'Opens the portal URL in your browser. Does not use the status queue.';
+                    $('#cfgQueueTestSection').hide();
+                } else if (m === 'API') {
+                    help = 'Posts status to API Endpoint. If the call fails, items are added to the queue for retry.';
+                    $('#cfgQueueTestSection').show();
+                } else if (m === 'RPA') {
+                    help = 'Queues status updates for Process Status Queue (external RPA worker or manual portal step).';
+                    $('#cfgQueueTestSection').show();
+                }
+                $('#cfgMethodHelp').text(help);
+            }
+
+            function loadStatusQueue() {
+                $.ajax({
+                    url: 'ThirdPartyProviders.aspx/GetStatusQueue',
+                    type: 'POST', contentType: 'application/json', data: '{}',
+                    success: function (rs) {
+                        var d = rs.d || {};
+                        if (!d.success) return;
+                        var summary = d.summary || {};
+                        var pending = d.pendingCount || summary.Pending || 0;
+                        $('#queuePendingBadge').text(pending);
+                        $('#sqPending').text(summary.Pending || 0);
+                        $('#sqProcessed').text(summary.Processed || 0);
+                        $('#sqFailed').text(summary.Failed || 0);
+
+                        var tbody = $('#statusQueueBody');
+                        tbody.empty();
+                        var items = d.items || [];
+                        if (items.length === 0) {
+                            $('#statusQueuePanel').show();
+                            $('#statusQueueEmpty').show();
+                            return;
+                        }
+                        $('#statusQueuePanel').show();
+                        $('#statusQueueEmpty').hide();
+                        items.forEach(function (row) {
+                            var when = row.createdDate ? new Date(parseInt(String(row.createdDate).replace(/\/Date\((\d+)\)\//, '$1'))).toLocaleString() : '';
+                            var statusClass = row.status === 'Pending' ? 'warning' : (row.status === 'Processed' ? 'success' : 'danger');
+                            tbody.append('<tr><td>' + row.id + '</td><td>' + (row.thirdPartyName || '-') + '</td><td>' + (row.workOrderNumber || '-') +
+                                '</td><td>' + (row.statusCode || '-') + '</td><td>' + (row.submissionMethod || '-') +
+                                '</td><td><span class="badge bg-' + statusClass + '">' + (row.status || '') + '</span></td><td><small>' + when + '</small></td></tr>');
+                        });
+                    }
+                });
+            }
+
+            function showQueueProcessResults(d) {
+                var html = '<p>' + (d.message || '') + '</p>';
+                if (d.results && d.results.length) {
+                    html += '<ul class="mb-0">';
+                    d.results.forEach(function (r) {
+                        html += '<li>' + (r.success ? '✓' : '✗') + ' #' + r.queueId + ' ' + (r.thirdPartyName || '') +
+                            ' (' + (r.method || '') + '): ' + (r.message || '') + '</li>';
+                    });
+                    html += '</ul>';
+                }
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({ title: 'Status Queue', html: html, icon: d.processed > 0 ? 'success' : 'info' });
+                } else {
+                    alert(d.message + (d.results ? '\n' + d.results.map(function(r){ return r.message; }).join('\n') : ''));
+                }
+            }
+
+            $('#cfgSubmissionMethod').on('change', updateCfgMethodHelp);
+
+            $('#btnRefreshQueue').on('click', loadStatusQueue);
+
+            $('#btnProcessStatusQueue').on('click', function () {
+                $.ajax({
+                    url: 'ThirdPartyProviders.aspx/ProcessStatusQueue',
+                    type: 'POST', contentType: 'application/json', data: '{}',
+                    success: function (rs) {
+                        var d = rs.d || {};
+                        showQueueProcessResults(d);
+                        loadStatusQueue();
+                    },
+                    error: function () { alert('Failed to process status queue.'); }
+                });
+            });
+
+            $('#btnQueueTestStatus').on('click', function () {
+                var tpId = parseInt($('#cfgThirdPartyId').val(), 10) || 0;
+                $.ajax({
+                    url: 'ThirdPartyProviders.aspx/EnqueueTestPortalStatus',
+                    type: 'POST', contentType: 'application/json',
+                    data: JSON.stringify({ thirdPartyId: tpId, status: 'Acknowledged' }),
+                    success: function (rs) {
+                        var d = rs.d || {};
+                        alert(d.message || (d.success ? 'Queued.' : 'Failed.'));
+                        if (d.success) loadStatusQueue();
+                    },
+                    error: function () { alert('Failed to queue test status.'); }
+                });
+            });
+
+            $('#itemList').on('click', '.portal-access-link', function (e) {
+                e.preventDefault();
+                var url = $(this).data('portal-url');
+                if (url) window.open(url, '_blank');
+                else alert('Portal URL not configured. Use Actions → Configure Portal to set it.');
+            });
+
+            $('#itemList').on('click', '.configure-portal-link', function (e) {
+                e.preventDefault();
+                var tpId = parseInt($(this).data('tp-id'), 10) || 0;
+                var warrantyId = parseInt($(this).data('warranty-id'), 10) || 0;
+                var name = $(this).data('company-name') || '';
+                $('#cfgThirdPartyId').val(tpId);
+                $('#cfgWarrantyId').val(warrantyId);
+                $('#cfgProviderName').val(name);
+                $('#cfgPortalUrl, #cfgApiEndpoint').val('');
+                $('#cfgSubmissionMethod').val('Manual');
+                $('#cfgIsEnabled').prop('checked', true);
+                updateCfgMethodHelp();
+
+                if (tpId > 0) {
+                    $.ajax({
+                        url: 'ThirdPartyProviders.aspx/GetApiConfig',
+                        type: 'POST', contentType: 'application/json',
+                        data: JSON.stringify({ thirdPartyId: tpId }),
+                        success: function (rs) {
+                            var d = rs.d || {};
+                            if (d.portalUrl) $('#cfgPortalUrl').val(d.portalUrl);
+                            if (d.apiEndpoint) $('#cfgApiEndpoint').val(d.apiEndpoint);
+                            if (d.submissionMethod) $('#cfgSubmissionMethod').val(d.submissionMethod);
+                            $('#cfgIsEnabled').prop('checked', d.isEnabled !== false);
+                            updateCfgMethodHelp();
+                        },
+                        complete: function () {
+                            new bootstrap.Modal(document.getElementById('portalConfigModal')).show();
+                        }
+                    });
+                } else {
+                    updateCfgMethodHelp();
+                    new bootstrap.Modal(document.getElementById('portalConfigModal')).show();
+                }
+            });
+
+            $('#btnSavePortalConfig').on('click', function () {
+                var tpId = parseInt($('#cfgThirdPartyId').val(), 10) || 0;
+                var warrantyId = parseInt($('#cfgWarrantyId').val(), 10) || 0;
+                $.ajax({
+                    url: 'ThirdPartyProviders.aspx/SaveApiConfig',
+                    type: 'POST', contentType: 'application/json',
+                    data: JSON.stringify({
+                        thirdPartyId: tpId,
+                        warrantyCompanyId: warrantyId,
+                        portalUrl: $('#cfgPortalUrl').val(),
+                        apiEndpoint: $('#cfgApiEndpoint').val(),
+                        submissionMethod: $('#cfgSubmissionMethod').val(),
+                        isEnabled: $('#cfgIsEnabled').is(':checked')
+                    }),
+                    success: function (rs) {
+                        var d = rs.d || {};
+                        if (d.thirdPartyId) $('#cfgThirdPartyId').val(d.thirdPartyId);
+                        bootstrap.Modal.getInstance(document.getElementById('portalConfigModal')).hide();
+                        alert('Portal settings saved. ' + ($('#cfgSubmissionMethod').val() !== 'Manual'
+                            ? 'Use "Queue test status" then "Process Status Queue".' : 'Use Access Portal for manual updates.'));
+                        loadItems();
+                        loadStatusQueue();
+                    },
+                    error: function () { alert('Failed to save portal settings.'); }
+                });
+            });
+
+            function findProviderItem(warrantyId) {
+                if (!warrantyId) return null;
+                return itemData.find(function (x) {
+                    return String(x.Id || x.id || '') === String(warrantyId);
+                }) || null;
+            }
+
+            function resolveProviderContext(el) {
+                var $el = $(el);
+                var warrantyId = $el.attr('data-warranty-id') || '';
+                var item = findProviderItem(warrantyId);
+                var customerId = ($el.attr('data-customer-id') || '').trim();
+                var customerGuid = ($el.attr('data-customer-guid') || '').trim();
+                var mobile = ($el.attr('data-mobile') || '').trim();
+                var name = ($el.attr('data-name') || '').trim();
+
+                if (item) {
+                    if (!customerId) customerId = String(item.CustomerID || item.customerID || '').trim();
+                    if (!customerGuid) customerGuid = String(item.CustomerGuid || item.customerGuid || '').trim();
+                    if (!mobile) mobile = String(item.Mobile || item.mobile || item.Phone || item.phone || '').trim();
+                    if (!name) name = String(item.CompanyName || item.companyName || '').trim();
+                }
+
+                return {
+                    warrantyId: warrantyId,
+                    customerId: customerId,
+                    customerGuid: customerGuid,
+                    mobile: mobile,
+                    name: name,
+                    assigned: item ? isProviderAssigned(item) : false
+                };
+            }
+
+            function requireAssignedCustomer(customerId, customerGuid, actionLabel, isAssigned) {
+                if (customerId || customerGuid) return true;
+                if (isAssigned) {
+                    alert('This provider is assigned but the customer link is missing. Click Assign again or contact support. (' + (actionLabel || 'action') + ')');
+                    return false;
+                }
+                alert('Assign this warranty company first (green "Assigned" badge in last column), then use ' + (actionLabel || 'this action') + '.');
+                return false;
+            }
+
+            function tpCustomerDetailsUrl(customerId, tab, openAction, extraParams) {
+                var url = 'CustomerDetails.aspx?custId=' + encodeURIComponent(customerId) + '&siteId=0';
+                if (tab) url += '&tab=' + encodeURIComponent(tab);
+                if (openAction) url += '&openAction=' + encodeURIComponent(openAction);
+                if (extraParams) {
+                    for (var key in extraParams) {
+                        if (extraParams[key]) url += '&' + encodeURIComponent(key) + '=' + encodeURIComponent(extraParams[key]);
+                    }
+                }
+                return url;
+            }
+
+            $('#itemList').on('click', '.tp-view-invoices', function (e) {
+                e.preventDefault();
+                var ctx = resolveProviderContext(this);
+                if (!requireAssignedCustomer(ctx.customerId, ctx.customerGuid, 'View Invoices', ctx.assigned)) return;
+                window.location.href = tpCustomerDetailsUrl(ctx.customerId, 'invoices');
+            });
+
+            $('#itemList').on('click', '.tp-view-files', function (e) {
+                e.preventDefault();
+                var ctx = resolveProviderContext(this);
+                if (!requireAssignedCustomer(ctx.customerId, ctx.customerGuid, 'View Files', ctx.assigned)) return;
+                window.location.href = tpCustomerDetailsUrl(ctx.customerId, 'files');
+            });
+
+            $('#itemList').on('click', '.tp-send-email', function (e) {
+                e.preventDefault();
+                var ctx = resolveProviderContext(this);
+                if (!requireAssignedCustomer(ctx.customerId, ctx.customerGuid, 'Send Email', ctx.assigned)) return;
+                window.location.href = tpCustomerDetailsUrl(ctx.customerId, null, 'sendEmail');
+            });
+
+            $('#itemList').on('click', '.tp-email-history', function (e) {
+                e.preventDefault();
+                var ctx = resolveProviderContext(this);
+                if (!requireAssignedCustomer(ctx.customerId, ctx.customerGuid, 'Email History', ctx.assigned)) return;
+                $.ajax({
+                    url: 'ThirdPartyProviders.aspx/GetEmailHistoryUrl',
+                    type: 'POST', contentType: 'application/json',
+                    data: JSON.stringify({ customerId: String(ctx.customerId) }),
+                    success: function (rs) {
+                        var d = rs.d || {};
+                        if (d.success && d.url) window.open(d.url, '_blank');
+                        else alert(d.message || 'Could not open email history.');
+                    },
+                    error: function () { alert('Failed to open email history.'); }
+                });
+            });
+
+            $('#itemList').on('click', '.tp-send-sms', function (e) {
+                e.preventDefault();
+                var ctx = resolveProviderContext(this);
+                if (!requireAssignedCustomer(ctx.customerId, ctx.customerGuid, 'Send SMS', ctx.assigned)) return;
+                if (!ctx.mobile) {
+                    alert('No mobile/phone number on file for this provider. Update the contact in Business Contact first.');
+                    return;
+                }
+                window.location.href = tpCustomerDetailsUrl(ctx.customerId, null, 'sendSms', { mobile: ctx.mobile });
+            });
+
+            $('#itemList').on('click', '.tp-text-history', function (e) {
+                e.preventDefault();
+                var ctx = resolveProviderContext(this);
+                if (!requireAssignedCustomer(ctx.customerId, ctx.customerGuid, 'Text History', ctx.assigned)) return;
+                if (!ctx.mobile) {
+                    alert('No mobile/phone number on file for this provider.');
+                    return;
+                }
+                window.open('CustomerChatHistory.aspx?mobile=' + encodeURIComponent(ctx.mobile)
+                    + '&name=' + encodeURIComponent(ctx.name)
+                    + '&customerId=' + encodeURIComponent(ctx.customerId), '_blank');
+            });
+
+            $('#itemList').on('click', '.create-invoice-link', function (e) {
+                e.preventDefault();
+                var ctx = resolveProviderContext(this);
+                if (!requireAssignedCustomer(ctx.customerId, ctx.customerGuid, 'Create Invoice', ctx.assigned)) return;
+                if (!ctx.customerGuid) {
+                    alert('Customer GUID missing for this provider. Try clicking Assign again.');
+                    return;
+                }
+                window.location.href = 'InvoiceCreate.aspx?cId=' + encodeURIComponent(ctx.customerGuid) + '&InType=Invoice&InvNum=0';
+            });
+
+            $('#itemList').on('click', '.push-portal-status', function (e) {
+                e.preventDefault();
+                var woId = prompt('Enter Work Order ID to push status:');
+                if (!woId) return;
+                var parsed = parseInt(woId, 10);
+                if (!parsed || parsed <= 0) {
+                    alert('Enter a valid numeric work order ID.');
+                    return;
+                }
+                $.ajax({
+                    url: 'ThirdPartyProviders.aspx/PushStatusToPortal',
+                    type: 'POST', contentType: 'application/json',
+                    data: JSON.stringify({ workOrderId: parsed, status: 'Acknowledged' }),
+                    success: function (rs) {
+                        var d = rs.d || {};
+                        if (d.requiresManual && d.manualUrl) window.open(d.manualUrl, '_blank');
+                        alert(d.message || (d.success ? 'Status pushed.' : 'Failed to push status.'));
+                    },
+                    error: function () { alert('Failed to push status. Check work order ID and portal settings.'); }
+                });
+            });
+
                $('#itemList').on('click', '.btn-AssignCompany', function (e) {
                 e.preventDefault();
                 e.stopPropagation(); // Prevent event bubbling
@@ -1129,14 +1532,17 @@
                         data: JSON.stringify({ WarrentyCompanyID: WarrentyCompanyID }),
                         dataType: 'json',
                         success: function (rs) {
-                            const data = rs.d;
-                            alert('Customer Assigned successfully!');
-                           loadItems();
-                         
-                           
+                            const data = rs.d || {};
+                            if (data.success) {
+                                alert(data.message || 'Provider assigned successfully!');
+                                loadItems();
+                            } else {
+                                alert(data.message || 'Assign failed. Check browser console and server logs.');
+                            }
                         },
-                        error: function (error) {
-                            console.error("Error fetching item:", error);
+                        error: function (xhr, status, error) {
+                            console.error("Assign error:", error, xhr.responseText);
+                            alert('Assign request failed: ' + (error || status));
                         }
                     });
                 }
@@ -1214,6 +1620,7 @@
            
             
             loadItems();
+            loadStatusQueue();
 
         });
 </script>

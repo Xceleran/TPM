@@ -599,6 +599,6 @@
             initializeSelectPicker();
         });
     </script>
-    <script src="Scripts/BusinessContact.js?v=10" type="text/javascript"></script>
+    <script src="Scripts/BusinessContact.js?v=11" type="text/javascript"></script>
    
 </asp:Content>

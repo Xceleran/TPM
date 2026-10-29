@@ -825,3 +825,14 @@
 .dropdown-menu {
     width: 100%;
 }
+
+/* Notes list: clamp to two rendered lines instead of cutting at a fixed character count,
+   which on this column is barely one line. syncNoteReadMore() in customerdetails.js measures
+   scrollHeight vs clientHeight to show "Read More" only where a note actually overflows. */
+.note-text.clamped {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}

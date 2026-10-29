@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wsdl:definitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:tns="http://www.openuri.org/" xmlns:ns1="http://schemas.xmlsoap.org/soap/http" name="DispatchStatusUpdate.jws" targetNamespace="http://www.openuri.org/" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+  <wsdl:types>
+    <xs:schema elementFormDefault="unqualified" targetNamespace="http://www.openuri.org/" version="1.0" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+      <xs:element name="updateDispatchStatus" type="tns:updateDispatchStatus" />
+      <xs:element name="updateDispatchStatusResponse" type="tns:updateDispatchStatusResponse" />
+      <xs:element name="updateStatusOfDispatches" type="tns:updateStatusOfDispatches" />
+      <xs:element name="updateStatusOfDispatchesResponse" type="tns:updateStatusOfDispatchesResponse" />
+      <xs:complexType name="updateStatusOfDispatches">
+        <xs:sequence>
+          <xs:element minOccurs="0" form="qualified" name="dispatchIds" type="tns:ArrayOfString" />
+          <xs:element minOccurs="0" form="qualified" name="dispatchStatusCodes" type="tns:ArrayOfString" />
+          <xs:element minOccurs="0" form="qualified" name="dispatchStatusTimestamps" type="tns:ArrayOfString" />
+          <xs:element minOccurs="0" form="qualified" name="dispatchStatusTimeTypes" type="tns:ArrayOfString" />
+        </xs:sequence>
+      </xs:complexType>
+      <xs:complexType name="ArrayOfString">
+        <xs:sequence>
+          <xs:element minOccurs="0" maxOccurs="unbounded" form="qualified" name="String" nillable="true" type="xs:string" />
+        </xs:sequence>
+      </xs:complexType>
+      <xs:complexType name="updateStatusOfDispatchesResponse">
+        <xs:sequence>
+          <xs:element minOccurs="0" form="qualified" name="updateStatusOfDispatchesResult" type="tns:DispatchesStatusUpdateInformation" />
+        </xs:sequence>
+      </xs:complexType>
+      <xs:complexType name="DispatchesStatusUpdateInformation">
+        <xs:sequence>
+          <xs:element minOccurs="0" form="qualified" name="NumberOfDispatchesProcessed" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="NumberOfDispatchesUpdated" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="NumberOfDispatchesErroredOut" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="BatchErrorFlag" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="TotalProcessingTime" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="BatchErrorMessage" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="DispatchStatusUpdateInformations">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element minOccurs="0" maxOccurs="unbounded" form="qualified" name="DispatchStatusUpdateInformation" nillable="true" type="tns:DispatchStatusUpdateInformation" />
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+        </xs:sequence>
+      </xs:complexType>
+      <xs:complexType name="DispatchStatusUpdateInformation">
+        <xs:sequence>
+          <xs:element minOccurs="0" form="qualified" name="DispatchStatusUpdate" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="ErrorFlag" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="ErrorMessage" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="SentDispatchId" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="SentStatusCode" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="SentStatusTimestamp" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="SentTimeType" type="xs:string" />
+        </xs:sequence>
+      </xs:complexType>
+      <xs:complexType name="updateDispatchStatus">
+        <xs:sequence>
+          <xs:element minOccurs="0" form="qualified" name="dispatchId" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="dispatchStatusCode" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="dispatchStatusTimestamp" type="xs:string" />
+          <xs:element minOccurs="0" form="qualified" name="dispatchStatusTimeType" type="xs:string" />
+        </xs:sequence>
+      </xs:complexType>
+      <xs:complexType name="updateDispatchStatusResponse">
+        <xs:sequence>
+          <xs:element minOccurs="0" form="qualified" name="updateDispatchStatusResult" type="tns:DispatchStatusUpdateInformation" />
+        </xs:sequence>
+      </xs:complexType>
+    </xs:schema>
+  </wsdl:types>
+  <wsdl:message name="updateStatusOfDispatches">
+    <wsdl:part name="parameters" element="tns:updateStatusOfDispatches" />
+  </wsdl:message>
+  <wsdl:message name="updateDispatchStatusResponse">
+    <wsdl:part name="parameters" element="tns:updateDispatchStatusResponse" />
+  </wsdl:message>
+  <wsdl:message name="updateStatusOfDispatchesResponse">
+    <wsdl:part name="parameters" element="tns:updateStatusOfDispatchesResponse" />
+  </wsdl:message>
+  <wsdl:message name="updateDispatchStatus">
+    <wsdl:part name="parameters" element="tns:updateDispatchStatus" />
+  </wsdl:message>
+  <wsdl:portType name="DispatchStatusUpdateSoap">
+    <wsdl:operation name="updateStatusOfDispatches">
+      <wsdl:input name="updateStatusOfDispatches" message="tns:updateStatusOfDispatches" />
+      <wsdl:output name="updateStatusOfDispatchesResponse" message="tns:updateStatusOfDispatchesResponse" />
+    </wsdl:operation>
+    <wsdl:operation name="updateDispatchStatus">
+      <wsdl:input name="updateDispatchStatus" message="tns:updateDispatchStatus" />
+      <wsdl:output name="updateDispatchStatusResponse" message="tns:updateDispatchStatusResponse" />
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:binding name="DispatchStatusUpdate.jwsSoapBinding" type="tns:DispatchStatusUpdateSoap">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" />
+    <wsdl:operation name="updateStatusOfDispatches">
+      <soap:operation soapAction="http://www.openuri.org/updateStatusOfDispatches" style="document" />
+      <wsdl:input name="updateStatusOfDispatches">
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output name="updateStatusOfDispatchesResponse">
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="updateDispatchStatus">
+      <soap:operation soapAction="http://www.openuri.org/updateDispatchStatus" style="document" />
+      <wsdl:input name="updateDispatchStatus">
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output name="updateDispatchStatusResponse">
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:service name="DispatchStatusUpdate.jws">
+    <wsdl:port name="DispatchStatusUpdateSoap" binding="tns:DispatchStatusUpdate.jwsSoapBinding">
+      <soap:address location="http://127.0.1.1:8080/externalWebServices/dispatch/DispatchStatusUpdate.jws" />
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>

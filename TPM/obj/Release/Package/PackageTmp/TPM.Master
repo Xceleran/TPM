@@ -1,4 +1,4 @@
-﻿<%@ Master Language="C#" AutoEventWireup="true" CodeBehind="TPMMaster.Master.cs" Inherits="FSM.TPMMaster" %>
+<%@ Master Language="C#" AutoEventWireup="true" CodeBehind="TPMMaster.Master.cs" Inherits="FSM.TPMMaster" %>
 
 <%@ Register Assembly="System.Web.Optimization" Namespace="System.Web.Optimization" TagPrefix="webopt" %>
 
@@ -24,6 +24,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -179,6 +182,7 @@
         }
         /* Advanced Settings Buttons */
     </style>
+    <link rel="stylesheet" href="Content/fsm-loading.css?v=1">
 </head>
 <body runat="server" id="bodyTag">
     <form runat="server">
@@ -225,26 +229,35 @@
                         </li>
                         
                               
-                         <li id="TpList-link" class="sidebar-nav-item">
-                                <a href="TpList.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Third Party Providers">
-                                    <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                    </svg>
-                                    <span class="sidebar-text">Third Party Providers</span>
-                                </a>
-                            </li>
+                        <li id="TpList-link" class="sidebar-nav-item">
+                            <a href="TpList.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Third Party Providers">
+                                <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                                <span class="sidebar-text">Third Party Providers</span>
+                            </a>
+                        </li>
                         <li id="customers-link" class="sidebar-nav-item">
                             <a href="Customer.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Service Locations">
                                 <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
                                 </svg>
                                 <span class="sidebar-text">Service Locations</span>
                             </a>
                         </li>
-                           <li id="item-link" class="sidebar-nav-item">
-                            <a href="Dashboard.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Policy Holder Portal">
+                        <li id="tp-inquiry-link" class="sidebar-nav-item">
+                            <a href="TPInquiry.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="TP Inquiry Portal">
                                 <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01m-.01 4h.01"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                </svg>
+                                <span class="sidebar-text">TP Inquiry</span>
+                            </a>
+                        </li>
+                        <li id="policy-holder-link" class="sidebar-nav-item">
+                            <a href="PolicyHolderInquiry.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Policy Holder Portal">
+                                <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
                                 </svg>
                                 <span class="sidebar-text">Policy Holder Portal</span>
                             </a>
@@ -262,18 +275,16 @@
                      
 
 
-                             <li id="SupportedTPProviders-link" class="sidebar-nav-item">
-                                   <a href="ThirdPartyProviders.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Supported TP Providers">
-                                <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01m-.01 4h.01"></path>
-                                </svg>
-                                <span class="sidebar-text">Supported TP Providers</span>
-                            </a>
+                              <li id="SupportedTPProviders-link" class="sidebar-nav-item">
+                             <a href="ThirdPartyProviders.aspx" class="sidebar-nav-link" data-bs-toggle="tooltip" data-bs-placement="right" title="Supported TP Providers">
+                                 <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                                 </svg>
+                                 <span class="sidebar-text">Supported TP Providers</span>
+                             </a>
+                         </li>
 
-                        </li>
-
-
-                      <%--  
+                      <%--
                          <li id="settings-link" class="sidebar-nav-item menu-item hover-trigger">
                             <div class="d-flex flex-column w-100">
                                 <div class="submenu-toggle d-flex align-items-center w-100 cursor-pointer" onclick="toggleSubmenu(this)">
@@ -343,7 +354,7 @@
 
             <div class="content-wrapper">
                 <div class="header-container">
-                    <button type="button" id="toggleSidebar" class="toggle-btn">☰</button>
+                   <button type="button" id="toggleSidebar" class="toggle-btn"><i class="fas fa-bars"></i></button>
                     <span class="page-header"></span>
                 </div>
                 <asp:ContentPlaceHolder ID="MainContent" runat="server">
@@ -351,10 +362,151 @@
                 </asp:ContentPlaceHolder>
                 <hr />
                 <footer class="footer">
-                    <p>© <%: DateTime.Now.Year %> - All rights reserved by <a href="https://xceleran.com" target="_blank">Xceleran</a></p>
+                    <p>&copy; <%: DateTime.Now.Year %> - All rights reserved by <a href="https://xceleran.com" target="_blank">Xceleran</a></p>
                 </footer>
             </div>
         </div>
+
+
+            <div class="modal fade" id="m_Staus" tabindex="-1" role="dialog"  aria-labelledby="replyModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-scrollable" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="replyModalLabel">Status</h5>
+                                </div>
+                                <div class="modal-body">
+
+            <table width="400px" style="text-align:center">
+                
+                <tr>
+                    <td align="left" colspan="2">
+                        
+                    </td>
+                </tr>
+                <tr>
+                    <td align="center">
+                        <asp:Label ID="Label1" runat="server" Font-Size="15px" Font-Bold="true" Text="Status" Font-Names="Arial"></asp:Label>
+                    </td>
+                    <td align="center">                        
+                        <asp:Label ID="Label2" runat="server" Font-Size="15px" Text="Timestamp" Font-Bold="true" Font-Names="Arial"></asp:Label>
+                        
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        &nbsp;
+                    </td>
+                    <td>
+                        &nbsp;
+                    </td>
+                </tr>
+                <tr>
+                    <td valign="top">
+                        <asp:Button ID="btnInRoute1" runat="server" Text="In Route" Width="210px" 
+                            OnClientClick="return UserMessage(this)" />
+                    </td>
+                    <td align="center" valign="top">
+                       <nobr><asp:Label ID="lblInRoute1" runat="server" Font-Names="Arial" Font-Size="15px"></asp:Label></nobr>
+                    </td>
+                </tr>
+                <tr>
+                    <td valign="top">
+                        <asp:Button ID="btnArrived" runat="server" Text="Arrived" Width="210px" 
+                            OnClientClick="return UserMessage(this)" />
+                    </td>
+                    <td align="center" valign="top">
+                        &nbsp;
+                        <nobr>
+                        <asp:Label ID="lblArrived1" runat="server" Font-Names="Arial" 
+                            Font-Size="15px"></asp:Label></nobr>
+                    </td>
+                </tr>
+                <tr>
+                    <td valign="top">
+                        <asp:Button ID="btnComplete1" runat="server" 
+                            OnClientClick="return UserMessage(this)" Text="Complete" Width="210px" />
+                    </td>
+                    <td align="center" valign="top">
+                        <nobr>
+                        <asp:Label ID="lblComplete1" runat="server" Font-Names="Arial" Font-Size="15px"></asp:Label>
+                        </nobr>
+                    </td>
+                </tr>
+                <tr>
+                    <td valign="top">
+                        <asp:Button ID="btnInProgressNeedParts" runat="server" 
+                             OnClientClick="return UserMessage(this)" 
+                            Text="In Progress: Needs  Parts" Width="210px" />
+                    </td>
+                    <td align="center" valign="top">
+                        <nobr>
+                        <asp:Label ID="lblInProgParts" runat="server" Font-Names="Arial" 
+                            Font-Size="15px"></asp:Label>
+                        </nobr>
+                    </td>
+                </tr>
+                <tr>
+                    <td valign="top">
+                        <asp:Button ID="btnReplace1" runat="server" 
+                            OnClientClick="return UserMessage(this)" Text="In Progress: Need to Replace" 
+                            Width="210px" />
+                    </td>
+                    <td align="center" valign="top">
+                        <nobr>
+                        <asp:Label ID="lblInProgReplace" runat="server" Font-Names="Arial" 
+                            Font-Size="15px"></asp:Label>
+                        </nobr>
+                    </td>
+                </tr>
+                <tr>
+                    <td valign="top">
+                        <asp:Button ID="btnMissedApp" runat="server"  
+                            OnClientClick="return UserMessage(this)" Text="Customer Missed Appointment" 
+                            Width="210px"  />
+                    </td>
+                    <td align="center" valign="top">
+                        <nobr>
+                        <asp:Label ID="lblMissedApp" runat="server" Font-Names="Arial" Font-Size="15px"></asp:Label>
+                        </nobr>
+                    </td>
+                </tr>
+                <tr style ="display:none;">
+                    <td  valign="top">
+                        <asp:Button ID="btnWaiting" runat="server" 
+                            OnClientClick="return UserMessage(this)" Text="Waiting on Customer Call Back" 
+                            Width="210px"  Visible="False" />
+                    </td>
+                    <td align="right" valign="top">
+                        <nobr>
+                        <asp:Label ID="lblWaiting" runat="server" Font-Names="Arial" 
+                            Font-Size="15px"></asp:Label>
+                        </nobr>
+                    </td>
+                </tr>
+                <tr style ="display:none;">
+                    <td  valign="top">
+                        <asp:Button ID="btnContractor" runat="server" 
+                            OnClientClick="return UserMessage(this)" Text="Contractor Missed Appointment" 
+                            Width="210px"  Visible="False" />
+                    </td>
+                    <td align="right" valign="top">
+                        <nobr>
+                        <asp:Label ID="lblContractor" runat="server" Font-Names="Arial" 
+                            Font-Size="15px"></asp:Label>
+                        &nbsp;</nobr></td>
+                </tr>
+              
+            </table>
+   
+                                </div>
+                                <div class="modal-footer justify-content-lg-end">
+                                    <hr />
+                                    <button type="button" id="btnCloseModal" class="btn btn-warning justify-content-lg-start" data-dismiss="modal">Close</button>
+                                   
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
         <!-- Timeout Modal -->
         <div id="timeoutModal" style="display: none;">
@@ -430,6 +582,10 @@
         function resetTitle() {
             document.title = "<%: Page.Title %> - TPM";
         }
+        
+        $("#btnCloseModal").click(function () {
+            $("#m_Staus").modal("hide");
+        });
 
         // Function to show the timeout modal
         function showTimeoutModal() {
@@ -607,7 +763,7 @@
             try {
                 localStorage.clear();
                 sessionStorage.clear();
-                window.location.href = '/Login/Logout';
+                window.location.href = 'logout.aspx';
             } catch (error) {
                 console.error('Error in confirmSidebarLogout:', error);
             }
@@ -775,14 +931,17 @@
                
                 const navItems = {
                     'dashboard': { id: 'dashboard-link', title: 'Dashboard' },
-                    'AppoinementList': { id: 'AppoinementList-link', title: 'New Work Orders' },
-                    'customer': { id: 'customers-link', title: 'Customer Service Locations' },
-                    'customerdetails': { id: 'customers-link', title: 'Customer Service Locations' },
-                    'invoicecreate': { id: 'customers-link', title: 'Customer Service Locations' },
+                    'appoinementlist': { id: 'AppoinementList-link', title: 'New Work Orders' },
+                    'customer': { id: 'customers-link', title: 'Service Locations' },
+                    'customerdetails': { id: 'customers-link', title: 'Service Locations' },
+                    'invoicecreate': { id: 'customers-link', title: 'Service Locations' },
+                    'tplist': { id: 'TpList-link', title: 'Third Party Providers' },
+                    'tpdetail': { id: 'TpList-link', title: 'Third Party Providers' },
+                    'thirdpartyproviders': { id: 'SupportedTPProviders-link', title: 'Supported TP Providers' },
+                    'tpinquiry': { id: 'tp-inquiry-link', title: 'TP Inquiry' },
+                    'policyholderinquiry': { id: 'policy-holder-link', title: 'Policy Holder Portal' },
                     'forms': { id: 'forms-link', title: 'Forms' },
-                    /* 'invoice': { id: 'invoices-link', title: 'Invoices/Estimates' }, */
                     'dispatch': { id: 'dispatch-link', title: 'Dispatch' },
-                    'billableitems': { id: 'item-link', title: 'Billable Items' },
                     'settings': { id: 'settings-link', title: 'Settings' }
                 };
 
@@ -803,19 +962,7 @@
                 }
                 const pageHeader = document.querySelector('.page-header');
                 if (pageHeader) {
-                     
                     pageHeader.textContent = activeNav.title;
-                    if (pageName == 'appoinementlist') {
-                         pageHeader.textContent = 'New Work Orders';
-                    }
-                     if (pageName == 'thirdpartyproviders') {
-                         pageHeader.textContent = 'Third Party Providers';
-                    }
-                   
-                    if (pageName == 'tplist') {
-                         pageHeader.textContent = 'Third Party Providers';
-                    }
-                    
                 }
 
                 // Sidebar toggle functionality
@@ -838,7 +985,7 @@
                         if (isMobile()) {
                             sidebarTexts.forEach(text => text.style.display = 'inline');
                             sidebarIcons.forEach(icon => icon.style.display = 'inline');
-                            toggleButton.textContent = isHidden ? '☰' : '✕';
+                            toggleButton.textContent = isHidden ? '\u2630' : '\u2715';
                             toggleButton.classList.remove('collapsed');
                             headerContainer.classList.toggle('visible', !isHidden);
                             headerContainer.classList.toggle('hidden', isHidden);
@@ -847,7 +994,7 @@
                                 text.style.display = isCollapsed ? 'none' : 'inline';
                             });
                             sidebarIcons.forEach(icon => icon.style.display = 'inline');
-                            toggleButton.textContent = isExpanded ? '➤' : '☰';
+                            toggleButton.textContent = isExpanded ? '\u27A4' : '\u2630';
                             toggleButton.classList.toggle('collapsed', isCollapsed);
                             headerContainer.classList.toggle('collapsed', isCollapsed);
                             headerContainer.classList.toggle('hidden', false);
@@ -997,6 +1144,12 @@
             })
         });
     </script>
+
+    <%-- The branded loading overlay (Scripts/fsm-loading.js). A .js file cannot call ResolveUrl
+         itself, and TPM does not always sit at the same relative path to /images/ across
+         environments, so the master page resolves and publishes the logo URL here. --%>
+    <script>window.FSM_BRAND_LOGO = '<%= ResolveUrl("~/images/TPM.png") %>';</script>
+    <script src="<%= ResolveUrl("~/Scripts/fsm-loading.js") %>?v=1"></script>
 
 </body>
 </html>

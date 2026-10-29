@@ -1,6 +1,26 @@
-﻿<%@ Page Title="" Language="C#" MasterPageFile="~/TPM.Master" AutoEventWireup="true" CodeBehind="Invoice.aspx.cs" Inherits="TPM.Invoice" %>
+<%@ Page Title="" Language="C#" MasterPageFile="~/TPM.Master" AutoEventWireup="true" CodeBehind="Invoice.aspx.cs" Inherits="TPM.Invoice" %>
 
 <asp:Content ID="Content1" ContentPlaceHolderID="MainContent" runat="server">
+
+    <!-- Initial page-load loader (hidden once the page finishes loading) -->
+    <div id="pageInitLoader" style="position:fixed;inset:0;z-index:2000000000000000;background:#fff;display:flex;align-items:center;justify-content:center;">
+        <div style="display:flex;flex-direction:column;align-items:center;">
+            <div style="width:54px;height:54px;border:6px solid #d4d6db;border-top-color:#007bff;border-radius:50%;animation:pageInitSpin .8s linear infinite;"></div>
+            <div style="margin-top:12px;font-family:Arial;color:#333;">Loading�</div>
+        </div>
+    </div>
+    <style>@keyframes pageInitSpin { to { transform: rotate(360deg); } }</style>
+    <script type="text/javascript">
+        (function () {
+            function hidePageInitLoader() {
+                var l = document.getElementById('pageInitLoader');
+                if (l) { l.style.display = 'none'; }
+            }
+            window.addEventListener('load', hidePageInitLoader);
+            // safety: never leave the loader stuck
+            setTimeout(hidePageInitLoader, 12000);
+        })();
+    </script>
 
 
     <style type="text/css">
@@ -308,27 +328,28 @@
                         </div>
                     </div>
 
-                    <asp:HiddenField ID="CustomerID" ClientIDMode="Static"  runat="server" />
-                    <asp:HiddenField ID="IsDataSaving" ClientIDMode="Static" Value="0" runat="server" />
-                    <asp:HiddenField ID="EnableSaveOnly" ClientIDMode="Static" Value="0" runat="server" />
-                    <asp:HiddenField ID="_CC" ClientIDMode="Static" runat="server" />
-                    <asp:HiddenField ID="_InvoiceNo" ClientIDMode="Static" runat="server" />
-                    <asp:HiddenField ID="hf_CustomerQboID" ClientIDMode="Static" Value="0" runat="server" />
+                    <asp:HiddenField ID="CustomerID" runat="server" />
+                    <asp:HiddenField ID="IsDataSaving" Value="0" runat="server" />
+                    <asp:HiddenField ID="EnableSaveOnly" Value="0" runat="server" />
+                    <asp:HiddenField ID="_CC" runat="server" />
+                    <asp:HiddenField ID="_InvoiceNo" runat="server" />
+                    <asp:HiddenField ID="hf_CustomerQboID" Value="0" runat="server" />
                     <asp:HiddenField ID="hf_CurrentPdfType" ClientIDMode="Static" Value="AsaInvoice" runat="server" />
+                    <asp:HiddenField ID="hf_ContinueWithoutLink" ClientIDMode="Static" Value="" runat="server" />
                     <%--Added to check that loggeed in user is lhg OR NOT --%>
                     <asp:HiddenField ID="isLHG" ClientIDMode="Static" Value="" runat="server" />
                     <asp:HiddenField ID="IsDeposit" ClientIDMode="Static" Value="0" runat="server" />
                     <asp:HiddenField ID="IsPCS" ClientIDMode="Static" Value="False" runat="server" />
-                    <asp:HiddenField ID="FromInvList"  runat="server" ClientIDMode="Static" />
-                    <asp:HiddenField ID="FromInvoices" ClientIDMode="Static" runat="server" />
-                    <asp:HiddenField ID="FromCustomer" ClientIDMode="Static" runat="server" />
-                    <asp:HiddenField ID="FormType" ClientIDMode="Static" runat="server" />
+                    <asp:HiddenField ID="FromInvList" runat="server" ClientIDMode="Static" />
+                    <asp:HiddenField ID="FromInvoices" runat="server" />
+                    <asp:HiddenField ID="FromCustomer" runat="server" />
+                    <asp:HiddenField ID="FormType" runat="server" />
 
                     <div class="row mt-0">
                         <div class="col-12 mt-0">
                             <label for="_To" class="col-form-label">To</label>
                             <div class="col-lg-12">
-                                <input type="text" id="_To" name="_To" ClientIDMode="Static" runat="server" class="form-control" />
+                                <input type="text" id="_To" name="_To" runat="server" class="form-control" />
                             </div>
                         </div>
                     </div>
@@ -337,7 +358,7 @@
                         <div class="col-12 mt-0">
                             <label for="_BCC" class="col-form-label">Bcc</label>
                             <div class="col-lg-12">
-                                <input type="text" id="_BCC" name="BCC" ClientIDMode="Static" runat="server" class="form-control" />
+                                <input type="text" id="_BCC" name="BCC" runat="server" class="form-control" />
                             </div>
                         </div>
                     </div>
@@ -345,7 +366,7 @@
                         <div class="col-12 mt-0">
                             <label for="EmailSubject" class="col-form-label">Subject</label>
                             <div class="col-lg-12">
-                                <input type="text" id="_EmailSubject" name="EmailSubject" ClientIDMode="Static" runat="server" class="form-control col-6" max="500" />
+                                <input type="text" id="_EmailSubject" name="EmailSubject" runat="server" class="form-control col-6" max="500" />
                             </div>
                         </div>
                     </div>
@@ -354,11 +375,11 @@
                             <div class="col-lg-12">
                                 <div class="custom-file">
 
-                                    <asp:FileUpload ID="file" ClientIDMode="Static"  runat="server" AllowMultiple="true" MaxLength="100" CssClass="custom-file-input" onchange="javascript:updateList()" />
+                                    <asp:FileUpload ID="file" ClientIDMode="Static" runat="server" AllowMultiple="true" MaxLength="100" CssClass="custom-file-input" onchange="javascript:updateList()" />
 
                                     <label class="custom-file-label" for="file">
-                                        <span class="fa fa-paperclip"></span>Attach Files</label><br />
-                                    <span class="remove-list fa fa-check"></span><span id="fixAttachment"></span>
+                                        <span class="fas fa-paperclip"></span>Attach Files</label><br />
+                                    <span class="remove-list fas fa-check"></span><span id="fixAttachment"></span>
                                     <ul id="fileList" class="file-list">
                                     </ul>
                                 </div>
@@ -372,9 +393,9 @@
                                     <input type="radio" checked="checked" name="imgbackground" id="img1" class="d-none imgbgchk" value="AsaInvoice">
                                     <label for="img1">
                                         Template 1
-                                        <img src="images/AsaInvoice.jpg" alt="Invocie 1" id="invImg" ClientIDMode="Static" runat="server">
+                                        <img src="images/AsaInvoice.jpg" alt="Invocie 1" id="invImg" runat="server">
                                         <div class="tick_container">
-                                            <div class="tick"><i class="fa fa-check"></i></div>
+                                            <div class="tick"><i class="fas fa-check"></i></div>
                                         </div>
                                     </label>
                                 </div>
@@ -384,7 +405,7 @@
                                         Template 2
                                         <img src="images/AsaQuote.jpg" alt="Estimate 1">
                                         <div class="tick_container">
-                                            <div class="tick"><i class="fa fa-check"></i></div>
+                                            <div class="tick"><i class="fas fa-check"></i></div>
                                         </div>
                                     </label>
                                 </div>
@@ -394,7 +415,7 @@
                                         Template 3
                                         <img src="images/Invoice.jpg" alt="Image 3">
                                         <div class="tick_container">
-                                            <div class="tick"><i class="fa fa-check"></i></div>
+                                            <div class="tick"><i class="fas fa-check"></i></div>
                                         </div>
                                     </label>
                                 </div>
@@ -404,7 +425,7 @@
                                         Template 4
                                         <img src="images/InvWithoutDis.PNG" alt="Image 3">
                                         <div class="tick_container">
-                                            <div class="tick"><i class="fa fa-check"></i></div>
+                                            <div class="tick"><i class="fas fa-check"></i></div>
                                         </div>
                                     </label>
                                 </div>
@@ -412,9 +433,9 @@
                                     <input type="radio" title="Template 5" name="imgbackground" id="img4" class="d-none imgbgchk" value="Estimate">
                                     <label for="img4">
                                         Template 5
-                                        <img src="images/Estimate.jpg" alt="Image 4" id="estImg" ClientIDMode="Static" runat="server">
+                                        <img src="images/Estimate.jpg" alt="Image 4" id="estImg" runat="server">
                                         <div class="tick_container">
-                                            <div class="tick"><i class="fa fa-check"></i></div>
+                                            <div class="tick"><i class="fas fa-check"></i></div>
                                         </div>
                                     </label>
                                 </div>
@@ -426,7 +447,7 @@
                         <div class="col-12 mt-0">
                             <label for="EmailBody" class="col-form-label"><span>Email Body</span></label>
                             <div class="col-lg-12">
-                                <textarea id="EmailBody" name="EmailBody" rows="8" ClientIDMode="Static" runat="server" class="form-control"></textarea>
+                                <textarea id="EmailBody" name="EmailBody" rows="8" runat="server" class="form-control"></textarea>
                                 <p for="validationCustom01" class=" text-warning mb-0">Please Save first before you sent mail.</p>
                             </div>
                         </div>
@@ -434,7 +455,7 @@
                     <div class="row mt-2">
                         <div class="col-12 mt-0" id="IsSendPaymentLinkDIV">
                             <div class="form-check form-check-xl">
-                                <input type="checkbox" class="form-check-input" id="IsSendPaymentLink" style="width: 1.5em; height: 1.5em;" ClientIDMode="Static" runat="server">
+                                <input type="checkbox" class="form-check-input" id="IsSendPaymentLink" style="width: 1.5em; height: 1.5em;" runat="server">
                                 <label class="form-check-label" for="exampleCheckbox" style="font-size: 1.3em;">Include Payment Link</label>
                             </div>
                         </div>
@@ -442,29 +463,28 @@
                         </div>
                     </div>
                     <div>
-                        <label for="txt_ReqDepo" style="float: left;" class="col-form-label">Requested Deposit/Invoice Payment Amount:</label>
+                        <label for="txt_ReqDepo" style="float: left;" class="col-form-label">Requested Deposit/Invoice Payment�Amount:</label>
                         <div class="col-sm-12">
                             <input type="text" id="txt_ReqDepo" name="txt_ReqDepo" readonly class="form-control" />
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer justify-content-between">
-                    <button type="button" class="btn btn-secondary  btn-block ml-1" data-dismiss="modal" onclick="ClosePopup()" style="float: left">Close</button>
-                    <asp:Button ID="btn_PrintPdf" ClientIDMode="Static" runat="server" Text="Print" CssClass="btn btn-secondary text-nowrap" OnClick="btn_PrintPdf_Click" />&nbsp;&nbsp;
-                    
-                    <input type="button" ClientIDMode="Static" runat="server" id="btnMMS" value="Send MMS" class="btn btn-success text-nowrap" onclick="OpenMMSPopup()" />
-                    &nbsp;
-
-                    <asp:Button ID="btnSendProposalMail" ClientIDMode="Static" runat="server" Text="Send Email" CssClass="btn btn-success text-nowrap" OnClientClick="return sendProposal();" OnClick="btnSendProposalMail_Click" />
-                    <asp:Button ID="btnSendInvoiceMail" ClientIDMode="Static" runat="server" Text="Send Email" CssClass="btn btn-success text-nowrap" OnClientClick="return sendInvoice();" OnClick="btnSendInvoiceMail_Click" />
+                <div class="modal-footer d-flex justify-content-between align-items-center">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="ClosePopup()">Close</button>
+                    <div class="d-flex align-items-center" style="gap:8px;flex-wrap:wrap;">
+                        <asp:Button ID="btn_PrintPdf" ClientIDMode="Static" runat="server" Text="Print" CssClass="btn btn-secondary text-nowrap" OnClientClick="ShowPdfGenLoader();" OnClick="btn_PrintPdf_Click" />
+                        <input type="button" runat="server" id="btnMMS" value="Send MMS" class="btn btn-success text-nowrap" onclick="OpenMMSPopup()" />
+                        <asp:Button ID="btnSendProposalMail" runat="server" UseSubmitBehavior="false" Text="Send Email" CssClass="btn btn-success text-nowrap" OnClientClick="ShowPdfGenLoader(); document.getElementById('btn_PrintPdf').click(); return false;" OnClick="btnSendProposalMail_Click" />
+                        <asp:Button ID="btnSendInvoiceMail" runat="server" UseSubmitBehavior="false" Text="Send Email" CssClass="btn btn-success text-nowrap" OnClientClick="ShowPdfGenLoader(); document.getElementById('btn_PrintPdf').click(); return false;" OnClick="btnSendInvoiceMail_Click" />
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <asp:HiddenField ID="_Type" ClientIDMode="Static" runat="server" />
+    <asp:HiddenField ID="_Type" runat="server" />
     <%--End Proposal Modal  --%>
-    <div class="row m-3">
+    <div class="d-flex flex-column-fluid home-1stsec">
         <div class="container">
             <div class="row">
                 <div class="col-12 mb-3">
@@ -476,32 +496,35 @@
 
                         <div class="col-12 cnttop">
 
-                            <asp:HiddenField ID="hdCompanyID" Value="" ClientIDMode="Static"  runat="server" />
-                            <asp:HiddenField ID="hdCompanyName" Value="" ClientIDMode="Static" runat="server" />
-                            <asp:HiddenField ID="hdCompanyTag" Value="" ClientIDMode="Static" runat="server" />
-                            <asp:HiddenField ID="PrvTotal" runat="server" Value="" ClientIDMode="Static" />
+                            <asp:HiddenField ID="hdCompanyID"   ClientIDMode="Static" runat="server" />
+                            <asp:HiddenField ID="hdCompanyName"  ClientIDMode="Static" runat="server" />
+                            <asp:HiddenField ID="hdCompanyTag"  ClientIDMode="Static" runat="server" />
+                            <asp:HiddenField ID="PrvTotal" runat="server" ClientIDMode="Static" />
 
-                            <asp:HiddenField ID="hdCompanyGUID" Value="" ClientIDMode="Static" runat="server" />
-                            <asp:HiddenField ID="SV_CustomeID" Value="" ClientIDMode="Static" runat="server" />
+                            <asp:HiddenField ID="hdCompanyGUID"  ClientIDMode="Static" runat="server" />
+                            <asp:HiddenField ID="SV_CustomeID"  ClientIDMode="Static" runat="server" />
 
-                            <asp:HiddenField ID="AppointmentID" Value="" ClientIDMode="Static" runat="server" />
-                            <asp:HiddenField ID="Indicator" Value="" ClientIDMode="Static" runat="server" />
-                            <asp:HiddenField ID="hd_IsQuickBookEnabled" Value="False" runat="server" />
+                            <asp:HiddenField ID="AppointmentID"  ClientIDMode="Static" runat="server" />
+                            <asp:HiddenField ID="Indicator"  ClientIDMode="Static" runat="server" />
+                            <asp:HiddenField ID="hd_IsQuickBookEnabled"  ClientIDMode="Static" Value="False" runat="server" />
 
-                            <asp:HiddenField ID="HdInvoiceId" Value="" ClientIDMode="Static" runat="server" />
-                            <asp:HiddenField ID="HdQboId" Value="" ClientIDMode="Static" runat="server" />
-                            <asp:HiddenField ID="hf_QboEstimateId" Value="" ClientIDMode="Static" runat="server" />
-                            <asp:HiddenField ID="customerPhone" Value="" ClientIDMode="Static" runat="server" />
+                            <asp:HiddenField ID="HdInvoiceId"  ClientIDMode="Static" runat="server" />
+                            <asp:HiddenField ID="HdQboId"  ClientIDMode="Static" runat="server" />
+                            <asp:HiddenField ID="hf_QboEstimateId"  ClientIDMode="Static" runat="server" />
+                            <asp:HiddenField ID="customerPhone"  ClientIDMode="Static" runat="server" />
+                             <asp:HiddenField ID="customerMobile" ClientIDMode="Static" runat="server" />
                             <div class="row">
                                 <div class="col-12">
                                     <div class="row">
                                         <div class="col-12 mt-0">
-                                            <asp:Label ID="lblmessage" ClientIDMode="Static" runat="server" Visible="False" ForeColor="#339966"></asp:Label>
+                                            <asp:Label ID="lblmessage" runat="server" Visible="False" ForeColor="#339966"></asp:Label>
                                         </div>
 
                                         <div class="col-12">
                                             <h1 class="poppinsbold">
-                                                <asp:Label ForeColor="#566A98" ID="PageTitle" ClientIDMode="Static" runat="server"></asp:Label></h1>
+                                                <asp:Label ForeColor="#566A98" ID="PageTitle" runat="server"></asp:Label>
+                                                <%-- Kept outside PageTitle: the email modal reads PageTitle's text as the document type. --%>
+                                                <asp:Label ID="lblWarranty" runat="server" Visible="false" CssClass="badge align-middle ms-2" style="font-size: 0.9rem;"></asp:Label></h1>
                                             <hr />
 
                                             <div class="row">
@@ -509,26 +532,58 @@
                                                     <label for="Date">Invoice Date :</label>
                                                     <asp:TextBox ID="Date" ClientIDMode="Static" runat="server" class="form-control datefield "></asp:TextBox>
                                                 </div>
-                                                <div class="col-lg-2 " id="div_Expirationdate" ClientIDMode="Static" runat="server">
+                                                <div class="col-lg-2 " id="div_Expirationdate" runat="server">
                                                     <label for="ExpirationDate">Expiration Date :</label>
-                                                    <asp:TextBox ID="ExpirationDate" ClientIDMode="Static"  runat="server" class="form-control datefield "></asp:TextBox>
+                                                    <asp:TextBox ID="ExpirationDate" ClientIDMode="Static" runat="server" class="form-control datefield "></asp:TextBox>
                                                 </div>
-                                                <div class="col-lg-2">
+                                             
+                                                <div class="col-lg-2" style="width: 260px;">
                                                     <label for="txt_InvocieNumber">Number:</label>
-                                                    <asp:TextBox ID="txt_InvocieNumber" ClientIDMode="Static" ReadOnly  runat="server" class="form-control "></asp:TextBox>
+                                                    <div class="input-group mb-3">
+                                                        <asp:TextBox ID="txt_InvocieNumber" Width="130px" ClientIDMode="Static" ReadOnly runat="server" class="form-control "></asp:TextBox>
+                                                        
+                                                             <button class="btn btn-secondary" onclick="Do_Clone()" runat="server" type="button" id="btn_Clone">
+                                                               <i class="fas fa-clone" aria-hidden="true"></i> Clone
+                                                              </button>
+                                               
                                                 </div>
+                                                     </div>
                                                 <div class="col-lg-2">
                                                 </div>
-                                                <div id="divLocation" ClientIDMode="Static" runat="server" class="col-lg-2">
+                                              
+                                            </div>
+                                             <div class="col-12 mt-4">
+                                            <h5 class="poppinsbold">
+                                                <asp:Label ForeColor="#566A98" ID="txtFirstName" runat="server"></asp:Label></h5>
+                                            <asp:Label ID="Address" runat="server" Style="font-size: 15px;"></asp:Label>
+                                            <br />
+                                            <asp:Label ID="Contact" runat="server" Style="font-size: 15px;"></asp:Label>
+                                        </div>
+                                              <div id="div1" runat="server" class="col-12 mt-2">
+                                            <div class="row">
+                                               <div id="divLocation" runat="server" class="col-md-6">
                                                     <label for="qboLocation">Location:</label>
-                                                    <select id="qboLocation" ClientIDMode="Static" runat="server" class="form-select"></select>
+                                                    <select id="qboLocation" runat="server" class="form-select"></select>
                                                 </div>
 
-                                                <div id="divClass" ClientIDMode="Static" runat="server" class="col-lg-2">
+                                                <div id="divClass" runat="server" class="col-lg-6">
                                                     <label for="qboClass">Class:</label>
-                                                    <select id="qboClass" ClientIDMode="Static" runat="server" class="form-select"></select>
+                                                    <select id="qboClass" runat="server" class="form-select"></select>
                                                 </div>
                                             </div>
+                                                     <div id="divBillToShipTo" runat="server" class="col-12 mt-3"   >
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <label for="BillToAddress" class="form-label poppinsmed mb-1">Bill to:</label>
+                                                    <asp:TextBox ID="BillToAddress" ClientIDMode="Static" runat="server" TextMode="MultiLine" Rows="4" CssClass="form-control"></asp:TextBox>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label for="ShipToAddress" class="form-label poppinsmed mb-1">Ship to:</label>
+                                                    <asp:TextBox ID="ShipToAddress" ClientIDMode="Static" runat="server" TextMode="MultiLine" Rows="4" CssClass="form-control"></asp:TextBox>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        </div>
                                             <br />
                                             <div class="row g-2  align-items-center">
                                             </div>
@@ -539,17 +594,11 @@
                                                     <label for="validationCustom01" class="form-label mb-0">Quantitation Number</label>
                                                 </div>
                                                 <div class="col-auto">
-                                                    <asp:TextBox ID="Number" ClientIDMode="Static"  runat="server" class="form-control  "></asp:TextBox>
+                                                    <asp:TextBox ID="Number" runat="server" class="form-control  "></asp:TextBox>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-12 mt-4">
-                                            <h5 class="poppinsbold">
-                                                <asp:Label ForeColor="#566A98" ID="txtFirstName" ClientIDMode="Static" runat="server"></asp:Label></h5>
-                                            <asp:Label ID="Address" ClientIDMode="Static" runat="server" Style="font-size: 15px;"></asp:Label>
-                                            <br />
-                                            <asp:Label ID="Contact" ClientIDMode="Static" runat="server" Style="font-size: 15px;"></asp:Label>
-                                        </div>
+                                       
 
                                         <div class="col-12 mt-0">
 
@@ -581,33 +630,33 @@
                                                                 <h6 class="poppinsmed m-0" style="color: #41464b;">Sub Total</h6>
                                                             </td>
                                                             <td align='center' style="border: 0px">
-                                                                <input type='text' id='invSubTotal' runat="server" ClientIDMode="Static" readonly style="width: 100px; text-align: right;" class="form-control" value='' />
+                                                                <input type='text' id='invSubTotal' runat="server" readonly style="width: 100px; text-align: right;" class="form-control" value='' />
                                                             </td>
                                                             <td colspan="2" style="border: 0px"></td>
                                                         </tr>
                                                         <tr style="border: 0px;">
                                                             <td colspan="5" align='right' style="border: 0px;">
-                                                                <select id="optDiscount" ClientIDMode="Static" runat="server" style="width: 150px" class="form-select" onchange='CalDiscount()'>
+                                                                <select id="optDiscount" runat="server" style="width: 150px" class="form-select" onchange='CalDiscount()'>
                                                                     <option value="1">Discount(%)</option>
                                                                     <option value="2">Discount($)</option>
                                                                 </select>
                                                             </td>
                                                             <td align='center' style="border: 0px">
-                                                                <input type='text' id='invDiscountRate' name="invDiscountRate" ClientIDMode="Static" runat="server" style="width: 60px; text-align: right;" class="form-control" value='' onchange='CalDiscount()' />
+                                                                <input type='text' id='invDiscountRate' runat="server" style="width: 60px; text-align: right;" class="form-control" value='' onchange='CalDiscount()' />
                                                             </td>
                                                             <td align='center' style="border: 0px">
-                                                                <input type='text' id='invDiscountVal' ClientIDMode="Static" runat="server" style="width: 100px; text-align: right;" class="form-control" value='' />
+                                                                <input type='text' id='invDiscountVal' runat="server" style="width: 100px; text-align: right;" class="form-control" value='' />
                                                             </td>
                                                             <td colspan="2" style="border: 0px"></td>
                                                         </tr>
                                                         <tr align='right' style="border: 0px">
                                                             <td colspan="5" style="border: 0px">
-                                                                <select id="optTaxRate" ClientIDMode="Static" runat="server" style="width: 150px" class="form-select" onchange='FillTaxRate(this.value)'></select></td>
+                                                                <select id="optTaxRate" runat="server" style="width: 150px" class="form-select" onchange='FillTaxRate(this.value)'></select></td>
                                                             <td align='center' style="border: 0px">
-                                                                <input type='text' id='invTaxRate' readonly ClientIDMode="Static" runat="server" style="width: 60px; text-align: right;" class="form-control" value='' />
+                                                                <input type='text' id='invTaxRate' readonly runat="server" style="width: 60px; text-align: right;" class="form-control" value='' />
                                                             </td>
                                                             <td align='center' style="border: 0px">
-                                                                <input type='text' id='invTaxTotal' ClientIDMode="Static" readonly runat="server" style="width: 100px; text-align: right;" class="form-control" value='' />
+                                                                <input type='text' id='invTaxTotal' readonly runat="server" style="width: 100px; text-align: right;" class="form-control" value='' />
                                                             </td>
                                                             <td colspan="2" style="border: 0px"></td>
                                                         </tr>
@@ -616,7 +665,7 @@
                                                                 <h6 class="poppinsmed m-0" style="color: black">Total</h6>
                                                             </td>
                                                             <td align='center' style="border: 0px">
-                                                                <input type='text' id='invTotal' runat="server" ClientIDMode="Static"  readonly style="width: 100px; text-align: right;" class="form-control" value='' />
+                                                                <input type='text' id='invTotal' runat="server" readonly style="width: 100px; text-align: right;" class="form-control" value='' />
                                                             </td>
                                                             <td colspan="2" style="border: 0px"></td>
                                                         </tr>
@@ -625,7 +674,7 @@
                                                                 <h6 class="poppinsmed m-0" style="color: black">Payment</h6>
                                                             </td>
                                                             <td align='center' style="border: 0px">
-                                                                <input type='text' id='txt_Deposit' runat="server" ClientIDMode="Static" readonly style="width: 100px; text-align: right;" class="form-control" value='' />
+                                                                <input type='text' id='txt_Deposit' runat="server" readonly style="width: 100px; text-align: right;" class="form-control" value='' />
                                                             </td>
                                                             <td style="border: 0px">
                                                                 <input class="btn btn-secondary" width="20px;" onclick="ViewDepositList()" type="button" value="..." /></td>
@@ -636,7 +685,7 @@
                                                                 <h6 class="poppinsmed m-0" style="color: black">Due</h6>
                                                             </td>
                                                             <td align='center' style="border: 0px">
-                                                                <input type='text' id='txt_Due' runat="server"  ClientIDMode="Static" readonly style="width: 100px; text-align: right;" class="form-control" value='' />
+                                                                <input type='text' id='txt_Due' runat="server" readonly style="width: 100px; text-align: right;" class="form-control" value='' />
                                                             </td>
                                                             <td colspan="2" style="border: 0px"></td>
                                                         </tr>
@@ -645,30 +694,29 @@
                                             </div>
                                             <div class="col-12 mt-4">
 
-                                                <label for="lblPONO">PO :</label>
-                                                <%--<asp:Label ID="lblPONO"  runat="server" ></asp:Label>--%>
-                                                <asp:Label ID="lblPONO" ClientIDMode="Static" runat="server" Style="font-size: 15px;"></asp:Label>
+                                                <label for="txt_PONO">PO :</label>
+                                                <asp:TextBox ID="txt_PONO" ClientIDMode="Static" runat="server" CssClass="form-control" Style="width: 250px; display: inline-block;"></asp:TextBox>
                                             </div>
                                             <div class="col-12 col-sm-12 col-md-8 mt-5">
                                                 <h5 class="poppinsmed">
                                                     <label for="dtfrom">Notes :</label>
                                                 </h5>
-                                                <asp:TextBox ID="Note" TextMode="MultiLine" ClientIDMode="Static" runat="server" class="form-control mb-5" Rows="4"></asp:TextBox>
+                                                <asp:TextBox ID="Note" TextMode="MultiLine" runat="server" class="form-control mb-5" Rows="4"></asp:TextBox>
                                             </div>
 
                                             <table>
                                                 <tr style="border: 0px;">
                                                     <td colspan="5" align='right' style="border: 0px;">
-                                                        <select id="ddlReqPer" ClientIDMode="Static" runat="server" style="width: 360px" class="form-select" onchange='CalRequestedDepoAmount()'>
-                                                            <option value="1">Requested Deposit/Invoice Payment Amount:(%)</option>
+                                                        <select id="ddlReqPer" runat="server" style="width: 360px" class="form-select" onchange='CalRequestedDepoAmount()'>
+                                                            <option value="1">Requested Deposit/Invoice Payment�Amount:(%)</option>
                                                             <option value="2">Requested Deposit/Invoice Payment Amount:($)</option>
                                                         </select>
                                                     </td>
                                                     <td align='center' style="border: 0px">
-                                                        <input type='text' id='txtReqPercent' ClientIDMode="Static" runat="server" style="width: 60px; text-align: right;" class="form-control" value='' onchange='CalRequestedDepoAmount()' />
+                                                        <input type='text' id='txtReqPercent' runat="server" style="width: 60px; text-align: right;" class="form-control" value='' onchange='CalRequestedDepoAmount()' />
                                                     </td>
                                                     <td align='center' style="border: 0px">
-                                                        <asp:TextBox ID="txtDepoReq" ClientIDMode="Static" runat="server" Style="width: 100px; text-align: right;" class="form-control"></asp:TextBox>
+                                                        <asp:TextBox ID="txtDepoReq" runat="server" Style="width: 100px; text-align: right;" class="form-control"></asp:TextBox>
 
                                                     </td>
                                                     <td colspan="2" style="border: 0px"></td>
@@ -676,21 +724,38 @@
                                             </table>
 
                                             <div class="col-12 mt-5">
-                                                <div id="invPermission" ClientIDMode="Static" runat="server" class="row">
+                                                <div id="invPermission" runat="server" class="row">
                                                     <div class="col-lg-12 mt-2 text-warning text-lg-start ">
                                                         <h4>You do not have permission to Add/Edit Invoice.</h4>
                                                     </div>
                                                 </div>
+                                                 <div class="col-lg-12 mt-2">
+                                                        <div class="container">
+                                                          <div class="row">
+                                                            <div class="col-md-4" style="width:180px;">
+                                                              <!-- Content for the first div -->
+                                                               <label class="form-check-label" for="flexSwitchCheckDefault">Save To Quick Books:</label>
+                                                            </div>
+                                                            <div class="col-md-8">
+                                                              <!-- Content for the second div -->
+                                                             <div class="form-check form-switch">
+                                                                                                        <input class="form-check-input" runat="server" type="checkbox" id="chk_QBOSync">
+                                                                                                    </div>
+                                                            </div>
+                                                          </div>
+                                                        </div>
+                                                    </div>
                                                 <div class="row">
                                                     <div class="col-lg-2 mt-2">
-                                                        <input type="button" ClientIDMode="Static" runat="server" id="_SubmitInvoice" value="Save" class="btn btn-secondary btn-transparentdark mt-3 w-100" onclick="submitInvoice()" />
+                                                        <input type="button" runat="server" id="_SubmitInvoice" value="Save" class="btn btn-secondary btn-transparentdark mt-3 w-100" onclick="submitInvoice()" />
                                                     </div>
+                                                   
                                                     <div class="col-lg-2 mt-2">
-                                                        <input type="button" ClientIDMode="Static" runat="server" id="SendMail" value="E-Mail/Print/MMS" class="btn btn-success btn-transparentdark mt-3 w-100" onclick="OpenMailPopUp()" />
+                                                        <input type="button" runat="server" id="SendMail" value="E-Mail/Print/MMS" class="btn btn-success btn-transparentdark mt-3 w-100" onclick="OpenMailPopUp()" />
                                                     </div>
 
                                                     <div class="col-lg-2 mt-2">
-                                                        <asp:Button ID="btnBack" ClientIDMode="Static" runat="server" Text="Back" OnClick="btnBack_Click" class="btn btn-secondary btn-transparentdark mt-3 w-100" />
+                                                        <asp:Button ID="btnBack" runat="server" Text="Back" OnClick="btnBack_Click" class="btn btn-secondary btn-transparentdark mt-3 w-100" />
                                                     </div>
 
                                                     <%--<div class="col-lg-2 mt-2">
@@ -700,17 +765,17 @@
 
                                                     <div class="col-lg-2 mt-2">
                                                         <p style="display: none" id="ProgressGIF">
-                                                            <img id="imgProcess" src="images/Rolling.gif" />
+                                                            <img id="imgProcess" src="./images/Rolling.gif" />
                                                         </p>
                                                     </div>
                                                     <div class="col-lg-2 mt-2" id="CreateOf">
-                                                        <asp:Button ID="btn_ConvertToInvocie" ClientIDMode="Static" runat="server" Text="Convert to Invoice" OnClick="btnSave_Click_ConvertToInvoice" class="btn btn-secondary btn-transparentdark mt-3 w-100" />
+                                                        <asp:Button ID="btn_ConvertToInvocie" runat="server" Text="Convert to Invoice" OnClick="btnSave_Click_ConvertToInvoice" class="btn btn-secondary btn-transparentdark mt-3 w-100" />
                                                     </div>
                                                 </div>
                                             </div>
                                             <br />
                                             <br />
-                                            <div id="wisetackSignup" ClientIDMode="Static" runat="server" class="row content-box">
+                                            <div id="wisetackSignup" runat="server" class="row content-box">
                                                 <img src="images/wisetack_white_logo.png" style="float: left" class="col-1" />
                                                 <p style="height: 50%; text-align: left">
                                                     <br />
@@ -787,14 +852,14 @@
                         <div class="col-12 mt-0">
                             <label for="mmsNumber" class="col-form-label"><span>Mobile no:</span></label>
                             <div class="col-lg-12">
-                                <input id="mmsPhone" name="EmailBody" ClientIDMode="Static" runat="server" class="form-control" />
+                                <input id="mmsPhone" name="EmailBody" runat="server" class="form-control" />
 
                             </div>
                         </div>
                         <div class="col-12 mt-0">
                             <label for="EmailBody" class="col-form-label"><span>MMS Body</span></label>
                             <div class="col-lg-12">
-                                <textarea id="txtMMSBody" name="EmailBody" rows="10" ClientIDMode="Static" runat="server" class="form-control"></textarea>
+                                <textarea id="txtMMSBody" name="EmailBody" rows="10" runat="server" class="form-control"></textarea>
 
                             </div>
                         </div>
@@ -804,34 +869,18 @@
                 <div class="modal-footer justify-content-between">
                     <button type="button" class="btn btn-warning  btn-block ml-1" data-dismiss="modal" onclick="CloseMMSPopup()" style="float: left">Close</button>
 
-                    <asp:Button ID="btn_SendMMS" ClientIDMode="Static" runat="server" Text="Send" CssClass="btn btn-success text-nowrap" OnClick="btn_SendMMS_Click" />
+                    <asp:Button ID="btn_SendMMS" runat="server" Text="Send" CssClass="btn btn-success text-nowrap" OnClick="btn_SendMMS_Click" />
                 </div>
             </div>
         </div>
     </div>
 
 
-    <script src="Scripts/InvoiceList.js?v=19" type="text/javascript"></script>
+    <script src="js/InvoiceList.js?v=19" type="text/javascript"></script>
     <script type="text/javascript">
-        let isFormChanged = false;
+      
 
-        window.addEventListener('input', function () {
-            isFormChanged = true;
-        });
-
-
-        window.addEventListener('beforeunload', function (e) {
-            if (isFormChanged) {
-
-                e.preventDefault();
-                e.returnValue = '';
-            }
-        });
-
-
-        function onFormSubmit() {
-            isFormChanged = false;
-        }
+      
         $(function () {
             $('#txtDepoReq').attr('disabled', true);
 
@@ -900,14 +949,14 @@
         });
 
 
-  
+       // alert(_InvsId);
         if (_InvsId == "")
             FillQItemData();
         else
             ViewInvoice(_InvsId)
 
         function ViewInvoice(ivId) {
-        
+
             $.ajax({
                 type: "POST",
                 url: "Invoice.aspx/GetInvoiceDetailsById",
@@ -1070,27 +1119,20 @@
             $('#tblNewInvoice tr').each(function () {
                 var cId = $(this).find('td:eq(0)').text();
                 var _Amount = parseFloat($('#id_Amount' + cId).val() || '0');
-                 
                 vAmount = vAmount + _Amount;
-                
             })
-           
+
             $("#invSubTotal").val(vAmount.toFixed(2));
             $("#invTotal").val(vAmount.toFixed(2));
-           
+
+            CalDiscount();
             // CalTax();
             //Modified By Munem
             var taxAmount = $("#invTaxTotal").val();
             var _invTotal = parseFloat($("#invTotal").val());
             var _txt_Deposit = parseFloat($("#txt_Deposit").val())
             var _Due = _invTotal - _txt_Deposit;
-         
-
-           
-                CalDiscount();
-          
-
-            // 
+            //  $("#invTotal").val(_invTotal);
             $("#txt_Due").val(_Due.toFixed(2));
 
             //setTimeout(function () {
@@ -1126,7 +1168,6 @@
         }
 
         function CalDiscount() {
-             
             if ($("#invDiscountRate").val()) {
                 var _SubTotal = parseFloat($("#invSubTotal").val())
                 if (isNaN(_SubTotal)) _SubTotal = 0;
@@ -1143,12 +1184,9 @@
                 if (TotalAmount < 0) TotalAmount = 0;
                 $("#invDiscountVal").val(TotalAmount.toFixed(2));
 
-             
                 var _Total = _SubTotal - TotalAmount;
-              
-
                 $("#invTotal").val(_Total.toFixed(2));
-                
+
                 CalTax();
 
 
@@ -1373,6 +1411,7 @@
             //  alert('_ExpirationDate = ' + _ExpirationDate);
             var _Date = $("#Date").val();
             var _Note = $("#Note").val();
+            var _PONO = $("#txt_PONO").val();
             var _CompanyId = $("#hdCompanyID").val();
             var _Paid = "0";// $("#invPaid").val();
             var _Indicator = $("#Indicator").val();
@@ -1405,11 +1444,17 @@
             // Define proceedWithSave function first
             function proceedWithSave() {
                 var isNewTotal = false;
+                 var IsQBOSync = false;
+                
                 var prvtotal = $("#PrvTotal").val();
                 var newtotal = $("#invTotal").val();
                 console.log(prvtotal)
                 console.log(newtotal)
-
+                
+                 if($("#chk_QBOSync").prop('checked') == true){
+                     IsQBOSync = true;
+                    }
+               
                 if (prvtotal != null) {
                     if (prvtotal != newtotal) {
                         isNewTotal = true;
@@ -1418,9 +1463,9 @@
                 param = {
                     'pId': AllPId, 'pName': AllPName, 'sDate': AllSDate, 'pQty': AllQty, 'AllTaxable': AllTax, 'pRate': AllRate, 'pDes': AllDes, 'CustomerId': cID, 'CustomerQboID': $("#hf_CustomerQboID").val(), 'qNum': qNum,
                     'subTotal': subTotal, 'discountOpt': discountOpt, 'disRt': disRt, 'disAmt': disAmnt, 'TaxTp': TaxTp, 'taxAmt': taxAmt, 'TotalAmount': TotalAmount, '_ExpirationDate': _ExpirationDate, '_Date': _Date,
-                    '_Note': _Note, '_CompanyId': _CompanyId, '_Paid': _Paid, '_Indicator': _Indicator, '_AppointmentID': _AppointmentID, 'InvoiceID': InvoiceID, '_QboId': _QboId, 'isNewTotal': isNewTotal, 'reqDepoAmt': reqDepoAmt, 'reqDepoPercent': reqDepoPercent, 'requestedAmtType': reqDepoAmtType, 'QboClassId': qboClassId, 'QboLocationId': qboLocationId
+                    '_Note': _Note, '_CompanyId': _CompanyId, '_Paid': _Paid, '_Indicator': _Indicator, '_AppointmentID': _AppointmentID, 'InvoiceID': InvoiceID, '_QboId': _QboId, 'isNewTotal': isNewTotal, 'reqDepoAmt': reqDepoAmt, 'reqDepoPercent': reqDepoPercent, 'requestedAmtType': reqDepoAmtType, 'QboClassId': qboClassId, 'QboLocationId': qboLocationId,'IsQBOSync':IsQBOSync, '_PONO': _PONO
                 }
-                console.log(param);
+
                 var prgBar = document.getElementById("ProgressGIF");
                 prgBar.style.display = "block";
 
@@ -1449,7 +1494,7 @@
                         $.alert({
                             title: 'Xceleran',
                             content: data.d,
-                            icon: 'fa fa-info-circle',
+                            icon: 'fas fa-info-circle',
                             animation: 'scale',
                             closeAnimation: 'scale',
                             opacity: 0.5,
@@ -1458,7 +1503,7 @@
                                     text: 'okay',
                                     btnClass: 'btn-blue',
                                     action: function () {
-                                        isFormChanged = false;
+                          
                                         if (_Indicator == "Invoice") {
                                             //if (_AppointmentID == "") {
                                             //    window.location.href = "InvoiceList.aspx?Id=" + cID + "&Type=" + _Indicator;                                              
@@ -1570,8 +1615,8 @@
             var output = document.getElementById('fileList');
             var children = "";
             for (var i = 0; i < input.files.length; ++i) {
-                // children += '<li>' + input.files.item(i).name + '<span class="remove-list fa fa-check" onclick="return this.parentNode.remove()"></span>' + '</li>'
-                children += '<li><span class="remove-list fa fa-check"></span>' + input.files.item(i).name + '</li>';
+                // children += '<li>' + input.files.item(i).name + '<span class="remove-list fas fa-check" onclick="return this.parentNode.remove()"></span>' + '</li>'
+                children += '<li><span class="remove-list fas fa-check"></span>' + input.files.item(i).name + '</li>';
 
                 // input.files.item(i).parent().remove();
             }
@@ -1594,7 +1639,10 @@
             $("#Collect_deposit").modal('hide');
         }
         function ShowPopup() {
-
+            // Fresh email session: clear any previous "continue without payment link" decision so the
+            // Virtual Terminal popup is shown again on the next preview generation.
+            var hcw = document.getElementById('hf_ContinueWithoutLink');
+            if (hcw) { hcw.value = ''; }
             $("#modalCustomerMail").modal('show');
         }
         function ClosePopup() {
@@ -1692,7 +1740,7 @@
                         $("#_To").val(data.EmailTo);
                         $("#file").val();
                         $("#fileList").empty();
-                        // document.getElementById('fileList').innerHTML='<li><span class="remove-list fa fa-check"></span>Proposal.pdf</li>';
+                        // document.getElementById('fileList').innerHTML='<li><span class="remove-list fas fa-check"></span>Proposal.pdf</li>';
                         $("#_InvoiceNo").val(InvoiceNo);
 
                     }
@@ -1705,7 +1753,6 @@
 
         }
         function sendProposal() {
-            isFormChanged = false;
             evt.preventDefault();
             Swal.fire({
                 title: 'Are you sure you want to send  email?',
@@ -1733,8 +1780,96 @@
             })
 
         }
+         function Do_Clone() {
+
+
+             var _Indicator = $("#Indicator").val();
+             var InvoiceID = $("#HdInvoiceId").val();
+           
+             var cID = $("#SV_CustomeID").val();
+            var returnedData= "";
+           var  param = {'InvID': InvoiceID,'Indicator':_Indicator ,'CustomerID':cID }
+
+             $.alert({
+                    title: 'Xceleran',
+                    content: "<div id='contentArea' class='float-start'><p>Cloning is in progress.<img width='30' height='30' src='images/Rolling.gif' /><br><strong>Please Do not close this window.</strong></p></div>",
+                    icon: 'fas fa-info-circle',
+                    animation: 'scale',
+                    closeAnimation: 'scale',
+                    opacity: 0.5,
+                    onContentReady: function () {
+                        var returnvalue = false;
+                         $.ajax({
+                    type: "POST",
+                    url: "Invoice.aspx/Clone_Invoice",
+                    data: JSON.stringify(param),
+                    contentType: "application/json",
+                    dataType: "json",
+                             success: function (data) {
+
+                                 var jsonString = JSON.stringify(data.d);
+                                 console.log(jsonString);
+
+
+                                  returnedData = JSON.parse(jsonString);
+                                  
+                                 console.log(returnedData.Status);
+ 
+                         $("#contentArea").html(returnedData.Message);
+                         $("#contentArea").append('<br>You can close this window now.');
+                        returnvalue = true;
+
+                        prgBar.style.display = "none";
+
+                        isFormChanged = false;
+                         
+                             },
+                            error: function (XMLHttpRequest, textStatus, errorThrown) {
+                                $("#contentArea").append('<br>Unexpected Error.');
+                                returnvalue = true;
+                            }
+                });
+                      
+                    },
+                    buttons: {
+                        moreButtons: {
+                            text: 'Close',
+                            action: function () {
+                                console.log('CLONE CLOSE ');
+                                console.log(returnedData);
+                                console.log(returnedData.Status);
+                                if (returnedData.Status) {
+                                    if (_Indicator == "Invoice") {
+                                        var href = "Invoice.aspx?InvNum=" + returnedData.ID + "&cId=" + returnedData.CID + "&FromInvList=0&FromInvoices=0&FromCustomer=0&FormType=0&InType=Invoice&AppID=0";
+                                        console.log('href' + href);
+                                        window.location.href = href;
+                                    }
+                                    else if (_Indicator == "Proposal" || _Indicator == 'Estimate') {
+                                        window.location.href = "Invoice.aspx?InvNum=" + returnedData.ID + "&cId=" + returnedData.CID + "&FromInvList=0&FromInvoices=0&FromCustomer=0&FormType=0&InType=Proposal&AppID=0";
+                                    }
+
+                                }
+                                else {
+                                    if (_Indicator == "Invoice") {
+                                                 window.location.href = "Invoice.aspx?InvoiceNumber=" + $('#txt_InvocieNumber').val() + "&cId=" + cID + "&FromInvList=" + $('#FromInvList').val() + "&FromInvoices=" + $('#FromInvoices').val() + "&FromCustomer=" + $('#FromCustomer').val() + "&FormType=" + $('#FormType').val() + "&InType=Invoice&AppID=0";
+                                            }
+                                            else if (_Indicator == "Proposal" || _Indicator == 'Estimate') {
+                                                 
+                                                window.location.href = "Invoice.aspx?InvoiceNumber=" + $('#txt_InvocieNumber').val() + "&cId=" + cID + "&FromInvList=" + $('#FromInvList').val() + "&FromInvoices=" + $('#FromInvoices').val() + "&FromCustomer=" + $('#FromCustomer').val() + "&FormType=" + $('#FormType').val() + "&InType=Proposal&AppID=0";
+
+                                }
+                                }
+                                 
+
+                               
+                            }
+                        }
+                    }
+                            });
+
+
+        }
         function sendInvoice() {
-            isFormChanged = false;
             evt.preventDefault();
             Swal.fire({
                 title: 'Are you sure you want to send  email?',
@@ -1764,11 +1899,34 @@
         }
 
         function OpenMMSPopup() {
-            var text = $("#EmailBody").val();
+            //var text = $("#EmailBody").val();
             var phone = $("#customerPhone").val();
-            $("#txtMMSBody").val(text);
-            $("#mmsPhone").val(phone);
-            $('#showMMSBody').modal('show');
+            var _Indicator = $("#Indicator").val();
+            var customerName =$("#txtFirstName").text();
+            //$("#txtMMSBody").val(text);
+            //$("#mmsPhone").val(phone);
+            //$('#showMMSBody').modal('show');
+            $.ajax({
+                type: "POST",
+                url: "Invoice.aspx/GetTextTemp",
+                data: JSON.stringify({ type: _Indicator , customerName: customerName}),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function (response) {
+
+                    if (response.d != "0") {
+
+                        var text = JSON.parse(response.d);
+
+                        $("#txtMMSBody").val(text.textTemplate);
+                        $("#mmsPhone").val(phone);
+                        $('#showMMSBody').modal('show');
+                    }
+                },
+                error: function (err) {
+                    console.log(err);
+                }
+            });
         }
         function CloseMMSPopup() {
             $("#txtMMSBody").val('');
@@ -1795,6 +1953,79 @@
         });
 
 
+    </script>
+
+    <!-- Loader shown while the PDF is being generated on the server -->
+    <div id="pdfGenLoader" style="display:none;position:fixed;inset:0;z-index:1000000000000020;background:rgba(255,255,255,.6);align-items:center;justify-content:center;">
+        <div style="display:flex;flex-direction:column;align-items:center;">
+            <div style="width:54px;height:54px;border:6px solid #d4d6db;border-top-color:#007bff;border-radius:50%;animation:pdfGenSpin .8s linear infinite;"></div>
+            <div style="margin-top:12px;font-family:Arial;color:#333;">Generating PDF�</div>
+        </div>
+    </div>
+    <style>@keyframes pdfGenSpin { to { transform: rotate(360deg); } }</style>
+
+    <!-- PDF Preview modal: shown before printing/emailing an invoice or estimate -->
+    <div id="pdfPreviewOverlay" style="display:none;position:fixed;inset:0;z-index:1000000000000010;background:rgba(0,0,0,.5);">
+        <div style="background:#fff;width:92%;max-width:920px;height:88vh;margin:3vh auto;border-radius:8px;display:flex;flex-direction:column;overflow:hidden;">
+            <div style="padding:10px 16px;border-bottom:1px solid #e5e5e5;font-weight:600;">PDF Preview</div>
+            <div style="flex:1;min-height:0;">
+                <iframe id="pdfPreviewFrame" src="" style="width:100%;height:100%;border:0;"></iframe>
+            </div>
+            <div style="padding:10px 16px;border-top:1px solid #e5e5e5;text-align:right;">
+                <button type="button" class="btn btn-secondary bg-warning" onclick="ClosePdfPreview()">Close</button>&nbsp;
+                <button type="button" class="btn btn-secondary" onclick="PrintPreviewPdf()">Print</button>&nbsp;
+                <button type="button" class="btn btn-success" onclick="EmailPreviewPdf()">Email</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        function ShowPdfGenLoader() {
+            var l = document.getElementById('pdfGenLoader');
+            if (l) { l.style.display = 'flex'; }
+        }
+        function HidePdfGenLoader() {
+            var l = document.getElementById('pdfGenLoader');
+            if (l) { l.style.display = 'none'; }
+        }
+        // Open the preview with the generated PDF (called from btn_PrintPdf_Click)
+        function OpenPdfPreview(url) {
+            HidePdfGenLoader();
+            var f = document.getElementById('pdfPreviewFrame');
+            if (f) { f.src = url; }
+            var o = document.getElementById('pdfPreviewOverlay');
+            if (o) { o.style.display = 'block'; }
+        }
+        function ClosePdfPreview() {
+            var o = document.getElementById('pdfPreviewOverlay');
+            if (o) { o.style.display = 'none'; }
+            var f = document.getElementById('pdfPreviewFrame');
+            if (f) { f.src = 'about:blank'; }
+        }
+        function PrintPreviewPdf() {
+            var f = document.getElementById('pdfPreviewFrame');
+            try {
+                f.contentWindow.focus();
+                f.contentWindow.print();
+            } catch (e) {
+                window.open(f.src, '_blank');
+            }
+        }
+        // Email the previewed doc: trigger the correct server-side send (invoice vs proposal)
+        function EmailPreviewPdf() {
+            ShowPdfGenLoader();
+            // Post back to whichever send button is actually rendered for this document type
+            // (only one of the two is Visible). Both server handlers honor hf_CurrentPdfType,
+            // so targeting the rendered button generates the correct PDF and avoids posting to
+            // an unrendered control (which would fail event validation).
+            var invBtn = document.getElementById('<%= btnSendInvoiceMail.ClientID %>');
+            var target = invBtn ? '<%= btnSendInvoiceMail.UniqueID %>' : '<%= btnSendProposalMail.UniqueID %>';
+            __doPostBack(target, '');
+        }
+        // Safety: hide the loader after any async postback completes
+        if (typeof Sys !== 'undefined' && Sys.WebForms && Sys.WebForms.PageRequestManager) {
+            Sys.WebForms.PageRequestManager.getInstance().add_endRequest(function () { HidePdfGenLoader(); });
+        }
     </script>
 
 </asp:Content>
