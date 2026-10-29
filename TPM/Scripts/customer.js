@@ -169,19 +169,6 @@ $(document).ready(function () {
     loadCustomers();
     loadSiteApptStatuses();
 
-    $('.cust-section-toggle').on('click', function () {
-        const sectionId = $(this).data('section');
-        const content = $('#' + sectionId);
-        const isActive = content.is(':visible');
-
-        $('.cust-section-content').slideUp();
-        $('.cust-section-toggle').removeClass('active');
-
-        if (!isActive) {
-            content.slideDown();
-            $(this).addClass('active');
-        }
-    });
     loadDropdownDataForModal();
     $(document).on('click', '.cust-appt-row', function () {
         const siteId = $(this).data('site-id');
@@ -196,8 +183,7 @@ $(document).ready(function () {
     });
 
     $('#customerTable tbody').on('click', 'tr', function () {
-        $('#contact, #sites').slideDown();
-        $('#contactBtn, #sitesBtn').addClass('active');
+        $('#contact').slideDown();
     });
 
     // SMS from the appointment modal. FSM opens its own apptSmsModal backed by
@@ -322,10 +308,28 @@ $(document).ready(function () {
 
     function updateStates(country, selectedState) {
         const stateDropdown = $('#state');
-        stateDropdown.empty().append((statesData[country] || []).map(state => new Option(state, state)));
+        const states = statesData[country] || [];
+        // A blank first option, so a site with no state saves no state rather than "Alabama".
+        stateDropdown.empty().append(new Option('Select', ''), states.map(state => new Option(state, state)));
         if (selectedState) {
+            // A stored state the list doesn't know is kept as its own option instead of
+            // silently falling back to the first state.
+            if (!states.includes(selectedState)) stateDropdown.append(new Option(selectedState, selectedState));
             stateDropdown.val(selectedState);
         }
+    }
+
+    // "US"/"United States" count as USA; any other unknown country is kept as its own option.
+    function setSiteCountry(value) {
+        let country = String(value || '').trim();
+        if (!country || /^(us|u\.s\.a?\.?|united states( of america)?)$/i.test(country)) country = 'USA';
+        else if (/^(ca|can)$/i.test(country)) country = 'Canada';
+        $('#country option.is-extra').remove();
+        if (!$('#country option').filter((_, o) => o.value === country).length) {
+            $('#country').append($('<option class="is-extra">').val(country).text(country));
+        }
+        $('#country').val(country);
+        return country;
     }
 
     function updateZipLabel(country) {
@@ -341,13 +345,22 @@ $(document).ready(function () {
 
 
     $('#sites').on('click', '#addSiteBtn', function () {
-        $('#addSiteForm')[0].reset();
-        $('.cust-modal-title').text('Add Site');
-        $('.cust-modal-submit').text('Save');
+        // The button now sits in the filter bar all the time, not only once a customer's sites load.
+        if (!$('#CustomerID').val()) {
+            alert('Select a customer first.');
+            return;
+        }
+
+        // Cleared field by field: the popup's <form> is nested in the master page's server
+        // form, so the browser drops it and $('#addSiteForm')[0].reset() threw here.
+        // Only the visible fields: the hidden CustomerID/CustomerGuid inputs live in this popup too.
+        $('#addSiteModal').find('input.cust-modal-input, textarea.cust-modal-input').val('');
+        $('#siteName').prop('readonly', false).removeClass('bg-light');
+        $('#addSiteModal .cust-modal-title').text('Add Site');
+        $('#addSiteModal .cust-modal-submit').text('Save');
         $('#SiteId').val(0);
 
-        const defaultCountry = 'USA';
-        $('#country').val(defaultCountry);
+        const defaultCountry = setSiteCountry('USA');
         updateStates(defaultCountry);
         updateZipLabel(defaultCountry);
 
@@ -456,8 +469,8 @@ $(document).ready(function () {
             return;
         }
 
-        $('.cust-modal-title').text(isDefault ? 'Edit Default Site (Customer Info)' : 'Edit Site');
-        $('.cust-modal-submit').text('Update');
+        $('#addSiteModal .cust-modal-title').text(isDefault ? 'Edit Default Site (Customer Info)' : 'Edit Site');
+        $('#addSiteModal .cust-modal-submit').text('Update');
 
         // For default site, disable Site Name editing or make it read-only
         if (isDefault) {
@@ -476,12 +489,12 @@ $(document).ready(function () {
         $('#phoneNumber').val(site.PhoneNumber || '');
         $('#email').val(site.Email || '');
         $('#address').val(site.Address || '');
+        $('#siteCity').val(site.City || '');
         $('#zip').val(site.Zip || '');
         $('#note').val(site.Note || '');
         $('#isActive').prop('checked', !!site.IsActive);
 
-        const country = site.Country || 'USA';
-        $('#country').val(country);
+        const country = setSiteCountry(site.Country);
         updateStates(country, site.State);
         updateZipLabel(country);
 
@@ -624,8 +637,8 @@ function loadCustomers() {
 
     sitesHeaderContainer.empty();
     sitesListContainer.empty();
-
-    sitesHeaderContainer.append('<h4 class="cust-details-title" >Select a Customer to view sites.</h4>');
+    // No "Select a Customer to view sites." heading here any more: the first customer is
+    // picked automatically, so it only ever showed up during loading, under a customer's name.
 
     // Restore search text / page from the previous visit (e.g. returning from CustomerDetails).
     var savedState = getFilterState();
@@ -874,6 +887,9 @@ function loadCustomerSiteData(customerId) {
                     alert("Error loading customers: " + json.error);
                     return [];
                 }
+                // Replaced on every draw, so the edit popup never opens with a stale copy
+                // of a site that was just saved.
+                sites = json.data || [];
                 return json.data;
             }
         },
@@ -890,7 +906,6 @@ function loadCustomerSiteData(customerId) {
                     // 'data' is the value from the 'myDataField' of the data source
                     // You can append HTML elements as needed
                     var site = row;
-                    sites.push(site);
                     const isDefaultSite = site.Id === 0;
                     const statusClass = site.IsActive ? 'active' : 'inactive';
                     const statusTitle = site.IsActive ? 'Active' : 'Inactive';
@@ -936,8 +951,10 @@ function loadCustomerSiteData(customerId) {
                         ].filter(Boolean).join(', ') || notProvided}
                                </p>
                                 <p class="cust-site-info"> <i class="fas fa-user fa-fw"></i> ${escapeHTML([site.FirstName, site.LastName].filter(Boolean).join(' ')) || notProvided}</p>
-                                <p class="cust-site-info"> <i class="fas fa-envelope fa-fw"></i> ${site.Email ? `<a href="mailto:${site.Email}">${escapeHTML(site.Email)}</a>` : notProvided}</p>
-                                <p class="cust-site-info"><i class="fas fa-phone-alt fa-fw"></i> ${site.PhoneNumber ? `<a href="tel:${site.PhoneNumber}">${escapeHTML(site.PhoneNumber)}</a>` : notProvided}</p>
+                                <div class="cust-site-info-pair">
+                                    <p class="cust-site-info" title="${escapeHTML(site.Email || '')}"><i class="fas fa-envelope fa-fw"></i> ${site.Email ? `<a href="mailto:${site.Email}">${escapeHTML(site.Email)}</a>` : notProvided}</p>
+                                    <p class="cust-site-info"><i class="fas fa-phone-alt fa-fw"></i> ${site.PhoneNumber ? `<a href="tel:${site.PhoneNumber}">${escapeHTML(site.PhoneNumber)}</a>` : notProvided}</p>
+                                </div>
                             </div>
                             <div class="cust-site-footer">
                                 <button class="cust-site-appts-toggle" data-site-id="${site.Id}">
@@ -963,16 +980,11 @@ function loadCustomerSiteData(customerId) {
 
             siteAppointmentsCache = {};
 
-            const sitesHeaderContainer = $('#sites .sites-header');
-
-
-            sitesHeaderContainer.empty();
-
-            sitesHeaderContainer.append('<button id="addSiteBtn" type="button">+ Add Site</button>');
-
-
+            // "+ Add Site" now lives in the filter bar markup, beside Clear.
+            $('#sites .sites-header').empty();
 
             var api = this.api();
+            renderSiteSortButton(api);
             if (api.rows({ page: 'current' }).count() > 0 && !$('#customerTable tbody tr.selected').length) {
                 //   selectFirstVisibleRow(); // Re-added this line
                 IsSiteDataLoading = false;
@@ -980,6 +992,25 @@ function loadCustomerSiteData(customerId) {
         }
     });
 
+}
+
+// The site list's sort control, shown next to "entries per page" instead of in the
+// (hidden) column header. The table is rebuilt per customer, so it is re-added on draw.
+function renderSiteSortButton(api) {
+    const dir = ((api.order()[0] || [])[1]) || 'asc';
+    let btn = $('#siteSortBtn');
+    if (!btn.length) {
+        btn = $('<button type="button" id="siteSortBtn" class="site-sort-btn" title="Sort sites by name"></button>');
+        btn.on('click', function () {
+            const table = $('#customerSiteTable').DataTable();
+            const current = ((table.order()[0] || [])[1]) || 'asc';
+            table.order([0, current === 'asc' ? 'desc' : 'asc']).draw();
+        });
+        $('#customerSiteTable_wrapper .dt-length').after(btn);
+    }
+    btn.html(dir === 'asc'
+        ? '<i class="fas fa-arrow-down-a-z"></i> Site name: A–Z'
+        : '<i class="fas fa-arrow-down-z-a"></i> Site name: Z–A');
 }
 
 function loadAppointmentCount(customerId, siteId) {
@@ -1020,7 +1051,7 @@ function saveSite(event) {
     event.preventDefault();
     if (validateSiteForm()) {
         const siteId = parseInt($('#SiteId').val());
-        const isDefaultSite = siteId === 0 && $('.cust-modal-title').text().includes('Default');
+        const isDefaultSite = siteId === 0 && $('#addSiteModal .cust-modal-title').text().includes('Default');
 
         const site = {
             Id: siteId,
@@ -1032,6 +1063,7 @@ function saveSite(event) {
             PhoneNumber: $('#phoneNumber').val().trim(),
             Email: $('#email').val().trim(),
             Address: $('#address').val().trim(),
+            City: $('#siteCity').val().trim(),
             Country: $('#country').val(),
             State: $('#state').val(),
             Zip: $('#zip').val().trim(),

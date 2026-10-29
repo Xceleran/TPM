@@ -11,6 +11,261 @@
     <%-- The custom-fields chip tooltip styles moved to Content/customer.css so CustomerDetails.aspx,
          which renders the same chips in its appointment modal, picks them up too. --%>
     <style>
+        /* Site cards two per row. The list is a one-column DataTable, so its body is turned
+           into a grid and each row/cell into a plain block holding one card. */
+        #customerSiteTable,
+        #customerSiteTable tbody {
+            display: block;
+            width: 100% !important;
+        }
+
+            #customerSiteTable tbody {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                /* Cards keep their own height, so opening one card's appointments
+                   doesn't stretch the card beside it. */
+                align-items: start;
+                gap: 14px;
+                padding-top: 10px;
+            }
+
+                /* Same selector shape as customer.css so this wins on order, not lose on specificity. */
+                #customerSiteTable > tbody > tr,
+                #customerSiteTable > tbody > tr > td {
+                    display: block;
+                    padding: 0 !important;
+                    border: 0 !important;
+                    background: transparent !important;
+                    box-shadow: none !important;
+                }
+
+                    /* "No sites" / "Loading" message spans both columns. */
+                    #customerSiteTable > tbody > tr > td.dt-empty,
+                    #customerSiteTable > tbody > tr > td.dataTables_empty {
+                        padding: 16px !important;
+                        text-align: center;
+                    }
+
+                #customerSiteTable tbody tr:has(td.dt-empty),
+                #customerSiteTable tbody tr:has(td.dataTables_empty) {
+                    grid-column: 1 / -1;
+                }
+
+            #customerSiteTable .cust-site-card {
+                margin-bottom: 0;
+            }
+
+        @media (max-width: 900px) {
+            #customerSiteTable tbody { grid-template-columns: 1fr; }
+        }
+
+        /* Card body: one column, with email and phone sharing a line. */
+        #customerSiteTable .cust-site-body {
+            grid-template-columns: 1fr;
+        }
+
+        .cust-site-info-pair {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+            gap: 8px 16px;
+        }
+
+            /* A long email cuts off with "..." (full address on hover) instead of wrapping. */
+            #customerSiteTable .cust-site-info-pair .cust-site-info {
+                min-width: 0;
+                word-break: normal;
+            }
+
+                #customerSiteTable .cust-site-info-pair .cust-site-info > a,
+                #customerSiteTable .cust-site-info-pair .cust-site-info > span {
+                    min-width: 0;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+
+        /* Name and address on one line in the header, without the grey box. */
+        .cust-details-container .cust-details-header {
+            flex-direction: row;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0px;
+        }
+
+        .cust-details-container .cust-details-left {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px 16px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .cust-details-header div#contact {
+            margin: 0;
+            padding: 0;
+            background: none;
+            border: none;
+            min-width: 0;
+        }
+
+            .cust-details-header div#contact .ci-row {
+                display: inline-flex;
+                flex-wrap: wrap;
+                gap: 4px 16px;
+                margin: 0 16px 0 0;
+            }
+
+                .cust-details-header div#contact .ci-row:not(:has(.ci-item:not(.is-empty))) {
+                    display: none;
+                }
+
+            .cust-details-header div#contact .ci-item {
+                min-width: 0;
+                align-items: center;
+            }
+
+        /* Address parts inline, comma separated, instead of one per line. */
+        .cust-details-header #customerAddress-container .ci-value > span {
+            display: inline;
+            font-weight: 400;
+        }
+
+            .cust-details-header #customerAddress-container .ci-value > span:empty {
+                display: none;
+            }
+
+            .cust-details-header #customerAddress-container .ci-value > span:not(:empty) ~ span:not(:empty)::before {
+                content: ", ";
+            }
+
+        .cust-details-header #customerAddress-container .ci-icon {
+            margin-top: 0;
+        }
+
+        /* Add Site sits in the filter bar next to Clear. */
+        .sites-filter-bar #addSiteBtn {
+            border: none;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .sites-header:empty {
+            display: none;
+        }
+
+        /* Sort control: a button beside "entries per page" (see renderSiteSortButton in
+           customer.js). The one-column header it replaces is hidden. */
+        #customerSiteTable > thead {
+            display: none;
+        }
+
+        /* Entries / sort / search row: wraps as whole pieces when the panel is narrow (e.g. 150%
+           zoom) instead of squeezing each label onto two lines. */
+        #customerSiteTable_wrapper .dt-layout-row:first-child {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px 16px;
+        }
+
+            #customerSiteTable_wrapper .dt-layout-row:first-child > .dt-layout-cell {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 10px;
+                padding: 0;
+                margin: 0;
+            }
+
+        #customerSiteTable_wrapper .dt-length {
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+            #customerSiteTable_wrapper .dt-length label {
+                white-space: nowrap;
+            }
+
+        #customerSiteTable_wrapper .dt-search {
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+            #customerSiteTable_wrapper .dt-search input {
+                width: 220px;
+                max-width: 100%;
+            }
+
+        .site-sort-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            height: 34px;
+            padding: 0 14px;
+            white-space: nowrap;
+            border: 1px solid #c7d2fe;
+            border-radius: 8px;
+            background: #eef2ff;
+            color: #3730a3;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+
+            .site-sort-btn:hover {
+                background: #e0e7ff;
+                border-color: #a5b4fc;
+            }
+
+        [data-theme="dark"] .site-sort-btn {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: rgba(129, 140, 248, 0.4);
+            color: #c7d2fe;
+        }
+
+        /* Filter bar without its own box, so it reads as part of the panel. */
+        #sites .sites-filter-bar {
+            padding: 0;
+            background: none;
+            border: none;
+            box-shadow: none;
+        }
+
+        /* Site card header: name and icons on one centred line, and the arrow link the
+           same size and colour as the icon buttons beside it. */
+        #customerSiteTable .cust-site-header {
+            align-items: center;
+        }
+
+        #customerSiteTable .cust-site-title {
+            line-height: 1.3;
+        }
+
+        #customerSiteTable .cust-site-actions {
+            align-items: center;
+        }
+
+            #customerSiteTable .cust-site-actions > .cust-site-icon-btn {
+                color: #64748b;
+                font-size: 14px;
+                text-decoration: none;
+            }
+
+                #customerSiteTable .cust-site-actions > .cust-site-icon-btn svg {
+                    width: 16px;
+                    height: 16px;
+                }
+
+        /* Add Site popup spacing. Its <form> is nested in the master page's server form, so the
+           browser drops it and .cust-modal-form's gap never applies; space the rows directly. */
+        #addSiteModal .form-row + .form-row { margin-top: 16px; }
+        #addSiteModal .cust-modal-field { gap: 8px; }
+
         .cust-action-btns {
             display: flex;
             gap: 10px;
@@ -144,18 +399,8 @@
             <div class="cust-details-container">
                 <div class="cust-details-header">
                     <div class="cust-details-left">
-
                         <h2 class="cust-details-title" id="customerName">Select a Customer</h2>
-                    </div>
-                    <div class="cust-details-actions">
-
-                        <button class="cust-table-edit-btn" title="Edit Customer" id="editCustomerBtn">
-                            <i class="fa-solid fa-user-pen"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- This is the moved section -->
+                        <%-- Customer address and contact details, on the same line as the name. --%>
                 <div id="contact">
                     <!-- Row 1: Address -->
                     <div class="ci-row">
@@ -196,13 +441,19 @@
                         </div>
                     </div>
                 </div>
-                <!-- End of moved section -->
+                    </div>
+                    <div class="cust-details-actions">
+
+                        <button type="button" class="cust-table-edit-btn" title="Edit Customer" id="editCustomerBtn">
+                            <i class="fa-solid fa-user-pen"></i>
+                        </button>
+                    </div>
+                </div>
+
 
                 <div class="cust-details-content">
-                    <!-- Note: The original cust-section-block wrappers have been removed as requested -->
                     <div class="cust-section-block">
-                        <button class="cust-section-toggle" data-section="sites" id="sitesBtn">Sites & Locations</button>
-                        <div class="cust-section-content" id="sites">
+                        <div id="sites">
                             <div class="sites-header">
                             </div>
                             <div class="sites-filter-bar" id="sitesFilterBar">
@@ -231,6 +482,7 @@
                                 </div>
                                 <button type="button" id="siteFilterSearchBtn" class="sites-filter-btn"><i class="fas fa-search" style="margin-right:5px;"></i>Search</button>
                                 <button type="button" id="siteFilterClearBtn" class="sites-filter-btn sites-filter-clear-btn"><i class="fas fa-times" style="margin-right:5px;"></i>Clear</button>
+                                <button type="button" id="addSiteBtn"><i class="fas fa-plus"></i> Add Site</button>
                             </div>
                              <div class="loading-overlay" id="loading-spinner">
                                 <div class="spinner-border text-primary" role="status">
@@ -622,7 +874,7 @@
 
     <div class="cust-modal" id="addSiteModal">
         <div class="cust-modal-content">
-            <button class="cust-modal-close" id="closeAddSiteIcon">×</button>
+            <button type="button" class="cust-modal-close" id="closeAddSiteIcon">×</button>
             <h2 class="cust-modal-title">Add New Site</h2>
 
             <!-- Hidden fields for IDs -->
@@ -636,7 +888,9 @@
                 <div class="form-row">
                     <div class="cust-modal-field full-width">
                         <label for="siteName" class="cust-modal-label">Site Name</label>
-                        <input type="text" id="siteName" name="siteName" class="cust-modal-input" required />
+                        <%-- No HTML5 "required"/type="email" here: this popup sits inside the master
+                             page's server form. saveSite() validates the required fields itself. --%>
+                        <input type="text" id="siteName" name="siteName" class="cust-modal-input" />
                     </div>
                 </div>
 
@@ -660,7 +914,7 @@
                     </div>
                     <div class="cust-modal-field half-width">
                         <label for="email" class="cust-modal-label">Email</label>
-                        <input type="email" id="email" name="email" class="cust-modal-input" />
+                        <input type="text" inputmode="email" id="email" name="email" class="cust-modal-input" />
                     </div>
                 </div>
 
@@ -668,9 +922,13 @@
 
                 <!-- Address -->
                 <div class="form-row">
-                    <div class="cust-modal-field full-width">
+                    <div class="cust-modal-field half-width">
                         <label for="address" class="cust-modal-label">Street Address</label>
-                        <input type="text" id="address" name="address" class="cust-modal-input" required />
+                        <input type="text" id="address" name="address" class="cust-modal-input" />
+                    </div>
+                    <div class="cust-modal-field half-width">
+                        <label for="siteCity" class="cust-modal-label">City</label>
+                        <input type="text" id="siteCity" name="siteCity" class="cust-modal-input" />
                     </div>
                 </div>
 
@@ -726,7 +984,7 @@
     
       <div class="cust-modal" id="mdl_CheckDuplicate">
         <div class="cust-modal-content">
-            <button class="cust-modal-close" id="close_mdl_CheckDuplicate">×</button>
+            <button type="button" class="cust-modal-close" id="close_mdl_CheckDuplicate">×</button>
             <h2 class="cust-modal-title">Duplicate Check</h2>
                 <!-- Site Name -->
                 <div class="form-row">
@@ -974,5 +1232,5 @@
         </div>
     </div>
 
-      <script src="Scripts/customer.js?v=24"></script>
+      <script src="Scripts/customer.js?v=28"></script>
 </asp:Content>

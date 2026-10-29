@@ -293,6 +293,11 @@
             box-shadow: none;
         }
 
+        /* Edit Site popup spacing. Its inner <form> is nested in the page's server form, so the
+           browser drops it and .cust-modal-form's gap never applies; space the rows directly. */
+        #addSiteModal .form-row + .form-row { margin-top: 16px; }
+        #addSiteModal .cust-modal-field { gap: 8px; }
+
         /* Loading overlay for the details panel, styled like the table's own "Loading..." dots. */
         .cust-details-container { position: relative; }
 
@@ -441,7 +446,12 @@
             color: var(--ad-text);
         }
 
+        /* Site name, Appt ID and Dispatch ID above the status list. */
         .ahs-subtitle {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
             margin: -4px 0 16px;
             color: var(--ad-muted);
             font-size: 13px;
@@ -450,6 +460,33 @@
             .ahs-subtitle strong {
                 color: var(--ad-text);
             }
+
+        .ahs-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border: 1px solid var(--ad-border);
+            border-radius: 99px;
+            font-size: 12px;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+            .ahs-info i { font-size: 11px; }
+
+        .ahs-site-name {
+            flex-basis: 100%;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--ad-text);
+        }
+
+        .ahs-no-dispatch {
+            color: #b45309;
+            font-size: 12px;
+            font-weight: 600;
+        }
 
         .ahs-list {
             border: 1px solid var(--ad-border);
@@ -497,12 +534,23 @@
                 color: #16a34a;
             }
 
-        .ahs-date {
-            width: 150px;
-            flex-shrink: 0;
-            border-radius: 8px;
-            font-size: 13px;
+        /* Row states from tbl_StatusBuffer: submitted and approved (green) or not yet approved (yellow). */
+        .ahs-row.is-approved,
+        .ahs-row.is-approved:hover {
+            background: #ecfdf3;
         }
+
+        .ahs-row.is-pending,
+        .ahs-row.is-pending:hover {
+            background: #fefce8;
+        }
+
+        [data-theme="dark"] .ahs-row.is-approved { background: rgba(34, 197, 94, 0.12); }
+        [data-theme="dark"] .ahs-row.is-pending { background: rgba(234, 179, 8, 0.12); }
+
+            .ahs-row.is-pending .ahs-row-meta.is-saved {
+                color: #a16207;
+            }
 
         .ahs-submit-btn {
             flex-shrink: 0;
@@ -525,6 +573,14 @@
             .ahs-submit-btn:disabled {
                 opacity: 0.6;
                 cursor: wait;
+            }
+
+            /* Already submitted: a grey, inert "Submitted" button rather than a busy one. */
+            .ahs-row.is-approved .ahs-submit-btn,
+            .ahs-row.is-pending .ahs-submit-btn {
+                background: #94a3b8;
+                opacity: 0.8;
+                cursor: not-allowed;
             }
 
         .ahs-row-danger .ahs-row-title {
@@ -1193,20 +1249,6 @@
                     flex: 1;
                 }
 
-            .ahs-row {
-                flex-wrap: wrap;
-            }
-
-            .ahs-date {
-                order: 3;
-                width: 100%;
-            }
-
-            .ahs-date {
-                flex: 1;
-                width: auto;
-            }
-
             .ahs-footer .ahs-btn {
                 width: 100%;
             }
@@ -1618,7 +1660,7 @@
     </div>
     <div class="cust-modal" id="addSiteModal">
         <div class="cust-modal-content">
-            <button class="cust-modal-close" id="closeAddSiteIcon">×</button>
+            <button type="button" class="cust-modal-close" id="closeAddSiteIcon">×</button>
             <h2 class="cust-modal-title">Add New Site</h2>
 
             <!-- Hidden fields for IDs -->
@@ -1632,7 +1674,10 @@
                 <div class="form-row">
                     <div class="cust-modal-field full-width">
                         <label for="siteName" class="cust-modal-label">Site Name</label>
-                        <input type="text" id="siteName" name="siteName" class="cust-modal-input" required />
+                        <%-- No HTML5 "required"/type="email" in this popup: it sits inside the page's
+                             server form, and an empty or invalid hidden field blocks Send SMS/MMS.
+                             validateSiteForm() checks the required fields on save instead. --%>
+                        <input type="text" id="siteName" name="siteName" class="cust-modal-input" />
                     </div>
                 </div>
 
@@ -1656,17 +1701,20 @@
                     </div>
                     <div class="cust-modal-field half-width">
                         <label for="email" class="cust-modal-label">Email</label>
-                        <input type="email" id="email" name="email" class="cust-modal-input" />
+                        <input type="text" inputmode="email" id="email" name="email" class="cust-modal-input" />
                     </div>
                 </div>
 
-                <hr class="form-divider" />
 
                 <!-- Address -->
                 <div class="form-row">
-                    <div class="cust-modal-field full-width">
+                    <div class="cust-modal-field half-width">
                         <label for="address" class="cust-modal-label">Street Address</label>
-                        <input type="text" id="address" name="address" class="cust-modal-input" required />
+                        <input type="text" id="address" name="address" class="cust-modal-input" />
+                    </div>
+                    <div class="cust-modal-field half-width">
+                        <label for="siteCity" class="cust-modal-label">City</label>
+                        <input type="text" id="siteCity" name="siteCity" class="cust-modal-input" />
                     </div>
                 </div>
 
@@ -1689,7 +1737,6 @@
                     </div>
                 </div>
 
-                <hr class="form-divider" />
 
                 <!-- Note -->
                 <div class="form-row">
@@ -1786,5 +1833,5 @@
         }
 
     </script>
-    <script src="Scripts/AppointmentList.js?v=22"></script>
+    <script src="Scripts/AppointmentList.js?v=26"></script>
 </asp:Content>

@@ -542,7 +542,56 @@ namespace TPM
             return sites;
         }
 
-        
+        // Reads back what UpdateAhsStatus wrote to tbl_StatusBuffer for one appointment, so the
+        // AHS Status popup can show each status as submitted (approved or not) after it reopens.
+        [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static List<object> GetAhsStatusBuffer(string ApptID, string DispatchID)
+        {
+            var rows = new List<object>();
+            string companyid = HttpContext.Current.Session?["CompanyID"]?.ToString();
+            if (string.IsNullOrEmpty(companyid) || string.IsNullOrEmpty(ApptID) || string.IsNullOrEmpty(DispatchID)) return rows;
+
+            Database db = new Database();
+            DataTable dt = new DataTable();
+            try
+            {
+                db.Open();
+                string sql = @"SELECT StatusCode, IsApproved, SentDate
+                               FROM [msSchedulerV3].dbo.[tbl_StatusBuffer]
+                               WHERE CompanyID = @CompanyID AND ApptID = @ApptID AND DispatchID = @DispatchID
+                               ORDER BY SentDate";
+                db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+                db.AddParameter("@ApptID", ApptID, SqlDbType.NVarChar);
+                db.AddParameter("@DispatchID", DispatchID, SqlDbType.NVarChar);
+                db.ExecuteParam(sql, out dt);
+
+                foreach (DataRow dr in dt.Rows)
+                {
+                    object sent = dr["SentDate"];
+                    rows.Add(new
+                    {
+                        StatusCode = dr["StatusCode"]?.ToString() ?? "",
+                        IsApproved = dr["IsApproved"]?.ToString() ?? "",
+                        // One fixed format whether the column is datetime or text.
+                        SentDate = sent is DateTime sentDate
+                            ? sentDate.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
+                            : sent?.ToString() ?? ""
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("GetAhsStatusBuffer: " + ex.Message);
+            }
+            finally
+            {
+                if (db.Connection.State == ConnectionState.Open) db.Close();
+            }
+            return rows;
+        }
+
+
         public CustomerEntity GetCustomerDetails(string CustomerGuid, string customerId)
         {
             string companyid = Session["CompanyID"].ToString();
@@ -797,7 +846,13 @@ namespace TPM
                             SiteName = "Customer Location (Default)",
                             FirstName = cust["FirstName"].ToString(),
                             LastName = cust["LastName"].ToString(),
-                            Address = string.Join(", ", new[] { cust["Address1"].ToString(), cust["City"].ToString(), cust["State"].ToString(), cust["ZipCode"].ToString() }.Where(s => !string.IsNullOrEmpty(s))),
+                            // Kept as separate fields: the edit popup saves them back one by one, and a
+                            // joined "street, city, state, zip" line used to be written into Address1.
+                            Address = cust["Address1"].ToString(),
+                            City = cust["City"].ToString(),
+                            State = LocationHelper.GetFullName(cust["State"].ToString()),
+                            Zip = cust["ZipCode"].ToString(),
+                            Country = customerDt.Columns.Contains("Country") ? cust["Country"].ToString() : "",
                             PhoneNumber = cust["Phone"].ToString(),
                             Email = cust["Email"].ToString(),
                             IsActive = true,
@@ -1066,8 +1121,8 @@ namespace TPM
                 db.Open();
 
                 string strSQL = @"INSERT INTO [msSchedulerV3].dbo.tbl_CustomerSite
-        (CompanyID, CustomerID, CustomerGuid, SiteName, FirstName, LastName, PhoneNumber, Email, Contact, Address, Country, State, Zip, Note, IsActive) output INSERTED.ID
-        VALUES (@CompanyID, @CustomerID, @CustomerGuid, @SiteName, @FirstName, @LastName, @PhoneNumber, @Email, @Contact, @Address, @Country, @State, @Zip, @Note, @IsActive)";
+        (CompanyID, CustomerID, CustomerGuid, SiteName, FirstName, LastName, PhoneNumber, Email, Contact, Address, City, Country, State, Zip, Note, IsActive) output INSERTED.ID
+        VALUES (@CompanyID, @CustomerID, @CustomerGuid, @SiteName, @FirstName, @LastName, @PhoneNumber, @Email, @Contact, @Address, @City, @Country, @State, @Zip, @Note, @IsActive)";
 
                 db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
                 db.AddParameter("@CustomerID", site.CustomerID, SqlDbType.NVarChar);
@@ -1079,6 +1134,7 @@ namespace TPM
                 db.AddParameter("@Email", site.Email, SqlDbType.NVarChar);
                 db.AddParameter("@Contact", site.Contact, SqlDbType.NVarChar);
                 db.AddParameter("@Address", site.Address, SqlDbType.NVarChar);
+                db.AddParameter("@City", site.City ?? "", SqlDbType.NVarChar);
                 db.AddParameter("@Country", site.Country, SqlDbType.NVarChar);
                 db.AddParameter("@State", site.State, SqlDbType.NVarChar);
                 db.AddParameter("@Zip", site.Zip, SqlDbType.NVarChar);
@@ -1119,11 +1175,12 @@ namespace TPM
                     Email = @Email,
                     Contact = @Contact,
                     Address = @Address,
+                    City = @City,
                     Country = @Country,
                     State = @State,
                     Zip = @Zip,
                     Note = @Note,
-                    IsActive = @IsActive 
+                    IsActive = @IsActive
                   WHERE Id=@Id and CustomerID = @CustomerID";
                 // The db.AddParameter calls
                 db.AddParameter("@SiteName", site.SiteName, SqlDbType.NVarChar);
@@ -1133,6 +1190,7 @@ namespace TPM
                 db.AddParameter("@Email", site.Email, SqlDbType.NVarChar);
                 db.AddParameter("@Contact", site.Contact, SqlDbType.NVarChar);
                 db.AddParameter("@Address", site.Address, SqlDbType.NVarChar);
+                db.AddParameter("@City", site.City ?? "", SqlDbType.NVarChar);
                 db.AddParameter("@Country", site.Country, SqlDbType.NVarChar);
                 db.AddParameter("@State", site.State, SqlDbType.NVarChar);
                 db.AddParameter("@Zip", site.Zip, SqlDbType.NVarChar);
@@ -1232,16 +1290,19 @@ namespace TPM
         {
             bool success = false;
             string companyid = HttpContext.Current.Session["CompanyID"].ToString();
+            // tbl_Customer stores the abbreviation ("OH"), the popup sends the full name.
+            site.State = LocationHelper.GetAbbreviation(site.State);
             Database db = new Database();
             try
             {
                 db.Open();
-                string strSQL = @"UPDATE [msSchedulerV3].dbo.tbl_Customer SET 
+                string strSQL = @"UPDATE [msSchedulerV3].dbo.tbl_Customer SET
                                             FirstName = @FirstName,
                                             LastName = @LastName,
                                             Phone = @PhoneNumber,
                                             Email = @Email,
                                             Address1 = @Address,
+                                            City = @City,
                                             Country = @Country,
                                             State = @State,
                                             ZipCode = @Zip
@@ -1252,6 +1313,7 @@ namespace TPM
                 db.AddParameter("@PhoneNumber", site.PhoneNumber, SqlDbType.NVarChar);
                 db.AddParameter("@Email", site.Email, SqlDbType.NVarChar);
                 db.AddParameter("@Address", site.Address, SqlDbType.NVarChar);
+                db.AddParameter("@City", site.City ?? "", SqlDbType.NVarChar);
                 db.AddParameter("@Country", site.Country, SqlDbType.NVarChar);
                 db.AddParameter("@State", site.State, SqlDbType.NVarChar);
                 db.AddParameter("@Zip", site.Zip, SqlDbType.NVarChar);

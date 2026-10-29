@@ -1398,7 +1398,7 @@ namespace FSM
             try
             {
                 //db.Open();
-                string strSQL = @"SELECT st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.MobileNumber,st.LastName,st.Address,st.Country,st.State,st.Zip,st.Contact,st.Email,st.PhoneNumber,st.Note,COUNT(appt.CompanyID) AS appointment_count 
+                string strSQL = @"SELECT st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.MobileNumber,st.LastName,st.Address,st.City,st.Country,st.State,st.Zip,st.Contact,st.Email,st.PhoneNumber,st.Note,st.IsActive,COUNT(appt.CompanyID) AS appointment_count
                             FROM [msSchedulerV3].dbo.tbl_CustomerSite st LEFT JOIN [msSchedulerV3].[dbo].[tbl_Appointment] appt 
                     ON  appt.CompanyID = st.CompanyID and appt.siteid = st.id and  appt.CustomerID = st.CustomerID      WHERE st.CompanyID='" + companyid + "' AND st.CustomerID='" + customerId + "' ";
 
@@ -1420,7 +1420,7 @@ namespace FSM
                     strSQL += $" AND appt.status = '{appointmentStatus}' ";
                 }
 
-                strSQL += $" GROUP BY st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.LastName,st.Address,st.Country,st.State,st.Zip,st.MobileNumber,st.Contact,st.Email,st.PhoneNumber,st.Note ";
+                strSQL += $" GROUP BY st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.LastName,st.Address,st.City,st.Country,st.State,st.Zip,st.MobileNumber,st.Contact,st.Email,st.PhoneNumber,st.Note,st.IsActive ";
                 strSQL += $" ORDER BY st.SiteName {sortDirection} OFFSET {start} ROWS FETCH NEXT {length} ROWS ONLY;";
 
 
@@ -1472,12 +1472,15 @@ namespace FSM
                             FirstName = dr["FirstName"].ToString() ?? "",
                             LastName = dr["LastName"].ToString() ?? "",
                             Address = dr["Address"].ToString() ?? "",
+                            City = dr["City"].ToString() ?? "",
                             Country = dr["Country"].ToString() ?? "",
                             State = LocationHelper.GetFullName(dr["State"].ToString() ?? ""),
                             Zip = dr["Zip"].ToString() ?? "",
                             Contact = dr["Contact"].ToString() ?? "",
                             Email = dr["Email"].ToString() ?? "",
-                            IsActive = true,
+                            // Was hard-coded true, so a deactivated site showed as active and
+                            // saving it from the edit popup switched it back on.
+                            IsActive = dr["IsActive"] == DBNull.Value || Convert.ToBoolean(dr["IsActive"]),
                             PhoneNumber = Common.GetFormatedPhoneNumber(dr["PhoneNumber"].ToString()) ,
                             MobileNumber = Common.GetFormatedPhoneNumber(dr["MobileNumber"].ToString()),
                             TotalAppointment = Convert.ToInt32(dr["appointment_count"]),
@@ -1507,7 +1510,13 @@ namespace FSM
                             SiteName = "Customer Location (Default)",
                             FirstName = cust["FirstName"].ToString(),
                             LastName = cust["LastName"].ToString(),
-                            Address = string.Join(", ", new[] { cust["Address1"].ToString(), cust["City"].ToString(), cust["State"].ToString(), cust["ZipCode"].ToString() }.Where(s => !string.IsNullOrEmpty(s))),
+                            // Kept as separate fields: the edit popup saves them back one by one, and a
+                            // joined "street, city, state, zip" line used to be written into Address1.
+                            Address = cust["Address1"].ToString(),
+                            City = cust["City"].ToString(),
+                            State = LocationHelper.GetFullName(cust["State"].ToString()),
+                            Zip = cust["ZipCode"].ToString(),
+                            Country = customerDt.Columns.Contains("Country") ? cust["Country"].ToString() : "",
                             PhoneNumber = Common.GetFormatedPhoneNumber(cust["Phone"].ToString()),
                             MobileNumber = Common.GetFormatedPhoneNumber(cust["Mobile"].ToString()),
 
@@ -1635,8 +1644,8 @@ namespace FSM
                 db.Open();
 
                 string strSQL = @"INSERT INTO [msSchedulerV3].dbo.tbl_CustomerSite
-        (CompanyID, CustomerID, CustomerGuid, SiteName, FirstName, LastName, PhoneNumber, Email, Contact, Address, Country, State, Zip, Note, IsActive) output INSERTED.ID
-        VALUES (@CompanyID, @CustomerID, @CustomerGuid, @SiteName, @FirstName, @LastName, @PhoneNumber, @Email, @Contact, @Address, @Country, @State, @Zip, @Note, @IsActive)";
+        (CompanyID, CustomerID, CustomerGuid, SiteName, FirstName, LastName, PhoneNumber, Email, Contact, Address, City, Country, State, Zip, Note, IsActive) output INSERTED.ID
+        VALUES (@CompanyID, @CustomerID, @CustomerGuid, @SiteName, @FirstName, @LastName, @PhoneNumber, @Email, @Contact, @Address, @City, @Country, @State, @Zip, @Note, @IsActive)";
 
                 db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
                 db.AddParameter("@CustomerID", site.CustomerID, SqlDbType.NVarChar);
@@ -1648,6 +1657,7 @@ namespace FSM
                 db.AddParameter("@Email", site.Email, SqlDbType.NVarChar);
                 db.AddParameter("@Contact", site.Contact, SqlDbType.NVarChar);
                 db.AddParameter("@Address", site.Address, SqlDbType.NVarChar);
+                db.AddParameter("@City", site.City ?? "", SqlDbType.NVarChar);
                 db.AddParameter("@Country", site.Country, SqlDbType.NVarChar);
                 db.AddParameter("@State", site.State, SqlDbType.NVarChar);
                 db.AddParameter("@Zip", site.Zip, SqlDbType.NVarChar);
@@ -1765,11 +1775,12 @@ namespace FSM
                     Email = @Email,
                     Contact = @Contact,
                     Address = @Address,
+                    City = @City,
                     Country = @Country,
                     State = @State,
                     Zip = @Zip,
                     Note = @Note,
-                    IsActive = @IsActive 
+                    IsActive = @IsActive
                   WHERE Id=@Id and CustomerID = @CustomerID";
                 // The db.AddParameter calls
                 db.AddParameter("@SiteName", site.SiteName, SqlDbType.NVarChar);
@@ -1779,6 +1790,7 @@ namespace FSM
                 db.AddParameter("@Email", site.Email, SqlDbType.NVarChar);
                 db.AddParameter("@Contact", site.Contact, SqlDbType.NVarChar);
                 db.AddParameter("@Address", site.Address, SqlDbType.NVarChar);
+                db.AddParameter("@City", site.City ?? "", SqlDbType.NVarChar);
                 db.AddParameter("@Country", site.Country, SqlDbType.NVarChar);
                 db.AddParameter("@State", site.State, SqlDbType.NVarChar);
                 db.AddParameter("@Zip", site.Zip, SqlDbType.NVarChar);
@@ -1878,16 +1890,19 @@ namespace FSM
                                 {
                                     bool success = false;
                                     string companyid = HttpContext.Current.Session["CompanyID"].ToString();
+                                    // tbl_Customer stores the abbreviation ("OH"), the popup sends the full name.
+                                    site.State = LocationHelper.GetAbbreviation(site.State);
                                     Database db = new Database();
                                     try
                                     {
                                         db.Open();
-                                        string strSQL = @"UPDATE [msSchedulerV3].dbo.tbl_Customer SET 
+                                        string strSQL = @"UPDATE [msSchedulerV3].dbo.tbl_Customer SET
                                             FirstName = @FirstName,
                                             LastName = @LastName,
                                             Phone = @PhoneNumber,
                                             Email = @Email,
                                             Address1 = @Address,
+                                            City = @City,
                                             Country = @Country,
                                             State = @State,
                                             ZipCode = @Zip
@@ -1898,6 +1913,7 @@ namespace FSM
                                         db.AddParameter("@PhoneNumber", site.PhoneNumber, SqlDbType.NVarChar);
                                         db.AddParameter("@Email", site.Email, SqlDbType.NVarChar);
                                         db.AddParameter("@Address", site.Address, SqlDbType.NVarChar);
+                                        db.AddParameter("@City", site.City ?? "", SqlDbType.NVarChar);
                                         db.AddParameter("@Country", site.Country, SqlDbType.NVarChar);
                                         db.AddParameter("@State", site.State, SqlDbType.NVarChar);
                                         db.AddParameter("@Zip", site.Zip, SqlDbType.NVarChar);

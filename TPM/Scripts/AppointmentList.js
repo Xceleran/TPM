@@ -85,8 +85,13 @@ $(document).ready(function () {
 
     function updateStates(country, selectedState) {
         const stateDropdown = $('#state');
-        stateDropdown.empty().append((statesData[country] || []).map(state => new Option(state, state)));
+        const states = statesData[country] || [];
+        // A blank first option, so a site with no state saves no state rather than "Alabama".
+        stateDropdown.empty().append(new Option('Select', ''), states.map(state => new Option(state, state)));
         if (selectedState) {
+            // A stored state the list doesn't know (typo, odd abbreviation) is kept as its own
+            // option instead of silently falling back to the first state.
+            if (!states.includes(selectedState)) stateDropdown.append(new Option(selectedState, selectedState));
             stateDropdown.val(selectedState);
         }
     }
@@ -117,11 +122,19 @@ $(document).ready(function () {
         $('#phoneNumber').val(site.PhoneNumber || '');
         $('#email').val(site.Email || '');
         $('#address').val(site.Address || '');
+        $('#siteCity').val(site.City || '');
         $('#zip').val(site.Zip || '');
         $('#note').val(site.Note || '');
         $('#isActive').prop('checked', !!site.IsActive);
 
-        const country = site.Country || 'USA';
+        // "US"/"United States" and the like map onto USA; anything else unknown is kept as its own option.
+        let country = String(site.Country || '').trim();
+        if (!country || /^(us|u\.s\.a?\.?|united states( of america)?)$/i.test(country)) country = 'USA';
+        else if (/^(ca|can)$/i.test(country)) country = 'Canada';
+        $('#country option.is-extra').remove();
+        if (!$('#country option').filter((_, o) => o.value === country).length) {
+            $('#country').append($('<option class="is-extra">').val(country).text(country));
+        }
         $('#country').val(country);
         updateStates(country, site.State);
         updateZipLabel(country);
@@ -600,15 +613,15 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                     const statusTitle = site.IsActive ? 'Active' : 'Inactive';
 
                     const editButton = `
-                        <button class="cust-site-icon-btn cust-site-edit-btn" title="Edit Site" data-site-id="${escapeHTML(site.Id)}" data-is-default="${isDefaultSite}">
+                        <button type="button" class="cust-site-icon-btn cust-site-edit-btn" title="Edit Site" data-site-id="${escapeHTML(site.Id)}" data-is-default="${isDefaultSite}">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg>
                         </button>`;
 
                     const smsButton = `
-                        <button class="cust-site-icon-btn cust-site-SMS-btn" title="Send SMS" data-site-id="${escapeHTML(site.Id)}" data-customer-id="${escapeHTML(site.CustomerID)}" data-MobileNumber-id="${escapeHTML(site.MobileNumber)}" data-is-default="${isDefaultSite}">
+                        <button type="button" class="cust-site-icon-btn cust-site-SMS-btn" title="Send SMS" data-site-id="${escapeHTML(site.Id)}" data-customer-id="${escapeHTML(site.CustomerID)}" data-MobileNumber-id="${escapeHTML(site.MobileNumber)}" data-is-default="${isDefaultSite}">
                             <i class="fa-solid fa-message"></i></button>`;
                     const mmsButton = `
-                        <button class="cust-site-icon-btn cust-site-MMS-btn" title="Send MMS" data-site-id="${escapeHTML(site.Id)}" data-customer-id="${escapeHTML(site.CustomerID)}" data-MobileNumber-id="${escapeHTML(site.MobileNumber)}" data-is-default="${isDefaultSite}">
+                        <button type="button" class="cust-site-icon-btn cust-site-MMS-btn" title="Send MMS" data-site-id="${escapeHTML(site.Id)}" data-customer-id="${escapeHTML(site.CustomerID)}" data-MobileNumber-id="${escapeHTML(site.MobileNumber)}" data-is-default="${isDefaultSite}">
                             <i class="fa-solid fa-photo-film"></i></button>`;
                     const mapQuery = [site.Address, site.City, site.State, site.Zip].filter(Boolean).join(', ');
                     const detailRow = (icon, label, value) => `
@@ -633,7 +646,7 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                         <i class="fas fa-users"></i></button>
                                     <button type="button" class="cust-site-icon-btn site-dup-btn" title="Site Duplicates" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
                                         <i class="fas fa-map-marker-alt"></i></button>
-                                    <button class="cust-site-icon-btn cust-site-msgview-btn" title="View Original Message" data-site-id="${escapeHTML(ApptID)}" data-is-default="${isDefaultSite}">
+                                    <button type="button" class="cust-site-icon-btn cust-site-msgview-btn" title="View Original Message" data-site-id="${escapeHTML(ApptID)}" data-is-default="${isDefaultSite}">
                                         <i class="fa fa-envelope-open-text"></i></button>
                                     ${editButton}
                                     ${smsButton}
@@ -695,88 +708,120 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
 }
 
 // The AHS statuses offered in the AHS Status modal, in the order shown, with
-// the id of each row's Submit button.
+// the id of each row's Submit button and the AHS status code it sends.
 const AHS_STATUSES = [
-    { id: 'btn_AhsAppointmentSet', status: 'Appointment Set' },
-    { id: 'btn_AhsWaitingOnCallBack', status: 'Waiting on Customer Call Back' },
-    { id: 'btn_AhsUnableToContact', status: 'Unable To Contact' },
-    { id: 'btn_AhsPartsOnOrder', status: 'In Progress with Parts on Order' },
-    { id: 'btn_AhsComplete', status: 'Complete (AHS)' },
-    { id: 'btn_AhsMissedAppointment', status: 'Customer Missed Appointment' },
-    { id: 'btn_AhsNeedToReplace', status: 'In Progress With Need To Replace' },
-    { id: 'btn_AhsPartsEquipmentStatus', status: 'Parts/Equipment Status' },
-    { id: 'btn_AhsCancelDispatch', status: 'Cancel Dispatch' }
+    { id: 'btn_AhsAppointmentSet', status: 'Appointment Set', code: '30' },
+    { id: 'btn_AhsWaitingOnCallBack', status: 'Waiting on Customer Call Back', code: '51' },
+    { id: 'btn_AhsUnableToContact', status: 'Unable To Contact', code: '60' },
+    { id: 'btn_AhsPartsOnOrder', status: 'In Progress with Parts on Order', code: '100' },
+    { id: 'btn_AhsComplete', status: 'Complete (AHS)', code: '10' },
+    { id: 'btn_AhsMissedAppointment', status: 'Customer Missed Appointment', code: '120' },
+    { id: 'btn_AhsNeedToReplace', status: 'In Progress With Need To Replace', code: '110' },
+    { id: 'btn_AhsPartsEquipmentStatus', status: 'Parts/Equipment Status', code: '' },
+    { id: 'btn_AhsCancelDispatch', status: 'Cancel Dispatch', code: '40' }
 ];
 
 // Click events for the AHS Submit buttons, one per status. They all call the
 // same SubmitAhsStatus() so the confirm and the API call live in one place.
-function AppointmentSet_Click() { SubmitAhsStatus($(this), 'Appointment Set','30'); }
-function WaitingOnCallBack_Click() { SubmitAhsStatus($(this), 'Waiting on Customer Call Back','51'); }
-function UnableToContact_Click() { SubmitAhsStatus($(this), 'Unable To Contact','60'); }
-function PartsOnOrder_Click() { SubmitAhsStatus($(this), 'In Progress with Parts on Order','100'); }
-function Complete_Click() { SubmitAhsStatus($(this), 'Complete (AHS)','10'); }
-function MissedAppointment_Click() { SubmitAhsStatus($(this), 'Customer Missed Appointment','120'); }
-function NeedToReplace_Click() { SubmitAhsStatus($(this), 'In Progress With Need To Replace','110'); }
-function PartsEquipmentStatus_Click() { SubmitAhsStatus($(this), 'Parts/Equipment Status',''); }
-function CancelDispatch_Click() { SubmitAhsStatus($(this), 'Cancel Dispatch','40'); }
+function AppointmentSet_Click() { SubmitAhsStatus($(this), 'Appointment Set', '30'); }
+function WaitingOnCallBack_Click() { SubmitAhsStatus($(this), 'Waiting on Customer Call Back', '51'); }
+function UnableToContact_Click() { SubmitAhsStatus($(this), 'Unable To Contact', '60'); }
+function PartsOnOrder_Click() { SubmitAhsStatus($(this), 'In Progress with Parts on Order', '100'); }
+function Complete_Click() { SubmitAhsStatus($(this), 'Complete (AHS)', '10'); }
+function MissedAppointment_Click() { SubmitAhsStatus($(this), 'Customer Missed Appointment', '120'); }
+function NeedToReplace_Click() { SubmitAhsStatus($(this), 'In Progress With Need To Replace', '110'); }
+function PartsEquipmentStatus_Click() { SubmitAhsStatus($(this), 'Parts/Equipment Status', ''); }
+function CancelDispatch_Click() { SubmitAhsStatus($(this), 'Cancel Dispatch', '40'); }
+
+// UpdateAhsStatus sends the status to AHS and writes the result to tbl_StatusBuffer.
+// GetAhsStatusBuffer(ApptID, DispatchID) reads those rows back for one dispatch, as a
+// list of { StatusCode, IsApproved, SentDate } -- one row per submit, newest last.
+const AHS_STATUS_API_URL = "AppoinementList.aspx/UpdateAhsStatus";
+const AHS_STATUS_BUFFER_URL = "AppoinementList.aspx/GetAhsStatusBuffer";
 
 // Asks Yes/No, then calls the AHS backend method.
-function SubmitAhsStatus(btn, status,code) {
-    const row = btn.closest('.ahs-row');
-    const date = row.find('.ahs-date').val();
+function SubmitAhsStatus(btn, status, code) {
+    if (btn.closest('.ahs-row').is('.is-approved, .is-pending')) return;
+
     const apptId = $('#mdl_AhsStatus').data('appt-id');
+    const dispatchID = $('#mdl_AhsStatus').data('dispatch-id');
 
-    const dispatchID = $('#mdl_AhsStatus').data('DispatchId-id');
-
-    if (!date) {
-        notify('warning', `Pick a date for "${status}".`);
+    if (!dispatchID) {
+        notify('warning', 'No Dispatch ID on this work order.', 'The status cannot be sent to AHS without one.');
         return;
     }
 
-    confirmYesNo(`Submit "${status}"?`, `Date: ${formatIsoDate(date)}`).then(yes => {
+    confirmYesNo(`Submit "${status}"?`, `Dispatch ID: ${dispatchID}`).then(yes => {
         if (!yes) return;
 
         btn.prop('disabled', true).text('Saving…');
         $.ajax({
             type: "POST",
             url: AHS_STATUS_API_URL,
-            data: JSON.stringify({ ApptID: apptId, StatusID: code, DispatchID: dispatchID}),
+            data: JSON.stringify({ ApptID: apptId, StatusID: code, DispatchID: dispatchID }),
             contentType: "application/json; charset=utf-8",
             dataType: "json",
             success: function () {
-                (ahsStatusUpdates[apptId] = ahsStatusUpdates[apptId] || {})[status] = date;
-                row.find('.ahs-row-meta').addClass('is-saved')
-                    .html(`<i class="fas fa-check-circle"></i> Submitted ${escapeHTML(formatIsoDate(date))}`);
                 notify('success', `${status} submitted`);
+                // The buffer row says whether AHS approved it; until it is read back,
+                // show the row as submitted and not yet approved.
+                markAhsRow(btn.closest('.ahs-row'), { IsApproved: false, SentDate: '' });
+                loadAhsStatusBuffer(apptId);
             },
             error: function (xhr) {
                 console.error("Error submitting AHS status: ", xhr.responseText);
                 notify('error', 'Could not submit the status.', 'Please try again.');
-            },
-            complete: function () {
                 btn.prop('disabled', false).text('Submit');
             }
         });
     });
 }
 
-// Every Submit calls this one backend method. Its two parameters are static
-// placeholders for now; the backend will tell us what to send in them.
-const AHS_STATUS_API_URL = "AppoinementList.aspx/UpdateAhsStatus";
-const AHS_STATUS_API_PARAMS = { Param1: "1", Param2: "1" };
+// Puts one row into its submitted state: button disabled, "Submitted", and
+// green when AHS approved it or yellow when it did not.
+function markAhsRow(row, entry) {
+    const approved = /^(1|true)$/i.test(String(entry.IsApproved));
+    const when = formatAhsDate(entry.SentDate);
 
-// Remembers each successful submit per appointment until the page reloads,
-// so the row can show "Submitted <date>".
-const ahsStatusUpdates = {};
-
-function todayIso() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    row.removeClass('is-approved is-pending').addClass(approved ? 'is-approved' : 'is-pending')
+        .attr('title', approved ? 'Approved by AHS' : 'Not approved by AHS');
+    row.find('.ahs-row-meta').addClass('is-saved')
+        .html(`<i class="fas ${approved ? 'fa-check-circle' : 'fa-clock'}"></i> Submitted${when ? ' ' + escapeHTML(when) : ''}`);
+    row.find('.ahs-submit-btn').prop('disabled', true).text('Submitted');
 }
 
-function formatIsoDate(iso) {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
-    return m ? `${m[2]}/${m[3]}/${m[1]}` : iso;
+// Reads tbl_StatusBuffer for the appointment and marks every status already sent.
+function loadAhsStatusBuffer(apptId) {
+    $.ajax({
+        type: "POST",
+        url: AHS_STATUS_BUFFER_URL,
+        data: JSON.stringify({ ApptID: apptId, DispatchID: String($('#mdl_AhsStatus').data('dispatch-id') || '') }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            // The popup may have moved on to another work order meanwhile.
+            if ($('#mdl_AhsStatus').data('appt-id') !== apptId) return;
+
+            // Latest row per status code wins.
+            const latest = {};
+            (response.d || []).forEach(entry => { latest[String(entry.StatusCode)] = entry; });
+
+            AHS_STATUSES.forEach(({ id, code }) => {
+                if (code && latest[code]) markAhsRow($('#' + id).closest('.ahs-row'), latest[code]);
+            });
+        },
+        error: function (xhr) {
+            console.error("Error loading AHS status buffer: ", xhr.responseText);
+        }
+    });
+}
+
+// SentDate comes back as "yyyy-MM-dd HH:mm:ss" or as an ASP.NET "/Date(ms)/".
+function formatAhsDate(value) {
+    if (!value) return '';
+    const ms = /\/Date\((-?\d+)\)\//.exec(value);
+    const d = ms ? new Date(Number(ms[1])) : new Date(String(value).replace(' ', 'T'));
+    return isNaN(d) ? String(value) : d.toLocaleDateString('en-US');
 }
 
 function openAhsStatus(row) {
@@ -785,26 +830,32 @@ function openAhsStatus(row) {
         return;
     }
 
-    const saved = ahsStatusUpdates[row.ApptID] || {};
+    const noteDispatch = String(row.Notes || '').match(/dispatch\s*id\s*[:#]?\s*([A-Za-z0-9-]+)/i);
     $('#mdl_AhsStatus').data('appt-id', row.ApptID);
-    $('#mdl_AhsStatus').data('DispatchId-id', row.DispatchId);
-    $('#ahsStatusSubtitle').html(row.CustomerName ? `Work order for <strong>${escapeHTML(row.CustomerName)}</strong>` : '');
+    $('#mdl_AhsStatus').data('dispatch-id', row.DispatchId || (noteDispatch ? noteDispatch[1] : ''));
+    const siteName = row.SiteName || (sites && sites[0] && sites[0].SiteName) || '';
+    const ahsDispatchId = $('#mdl_AhsStatus').data('dispatch-id');
+    $('#ahsStatusSubtitle').html(`
+        ${siteName ? `<span class="ahs-site-name"><i class="fas fa-map-marker-alt"></i> ${escapeHTML(siteName)}</span>` : ''}
+        <span class="ahs-info" title="Appointment ID">Appt ID: <strong>${escapeHTML(row.ApptID)}</strong></span>
+        ${ahsDispatchId
+            ? `<span class="ad-dispatch" title="Dispatch ID"><i class="fas fa-hashtag"></i> Dispatch ID: <strong>${escapeHTML(ahsDispatchId)}</strong></span>`
+            : `<span class="ahs-no-dispatch"><i class="fas fa-exclamation-triangle"></i> No Dispatch ID</span>`}`);
 
     $('#AhsStatusList').html(AHS_STATUSES.map(({ id, status }) => {
-        const date = saved[status];
         const danger = status === 'Cancel Dispatch' ? ' ahs-row-danger' : '';
         return `
             <div class="ahs-row${danger}" data-status="${escapeHTML(status)}">
                 <div class="ahs-row-text">
                     <div class="ahs-row-title">${escapeHTML(status)}</div>
-                    <div class="ahs-row-meta${date ? ' is-saved' : ''}">${date ? `<i class="fas fa-check-circle"></i> Submitted ${escapeHTML(formatIsoDate(date))}` : 'Not submitted'}</div>
+                    <div class="ahs-row-meta">Not submitted</div>
                 </div>
-                <input type="date" class="form-control ahs-date" aria-label="${escapeHTML(status)} date" value="${escapeHTML(date || todayIso())}" />
                 <button type="button" class="ahs-submit-btn" id="${id}">Submit</button>
             </div>`;
     }).join(''));
 
     openModal('mdl_AhsStatus');
+    loadAhsStatusBuffer(row.ApptID);
 }
 
 // Yes/No confirm; Swal comes from the master page, confirm() is the fallback.
@@ -1223,6 +1274,7 @@ function saveSite(event) {
             PhoneNumber: $('#phoneNumber').val().trim(),
             Email: $('#email').val().trim(),
             Address: $('#address').val().trim(),
+            City: $('#siteCity').val().trim(),
             Country: $('#country').val(),
             State: $('#state').val(),
             Zip: $('#zip').val().trim(),
@@ -1242,7 +1294,7 @@ function saveSite(event) {
                     if (response.d) {
                         closeModal('addSiteModal');
                         notify('success', 'Customer information updated');
-                        if (currentRow) generateCustomerDetails(currentRow);
+                        refreshAfterSiteSave();
                     } else {
                         notify('error', 'Update failed', 'Something went wrong while updating the customer information.');
                     }
@@ -1263,7 +1315,7 @@ function saveSite(event) {
                     if (response.d) {
                         closeModal('addSiteModal');
                         notify('success', `Site ${site.Id > 0 ? 'updated' : 'saved'}`);
-                        if (currentRow) generateCustomerDetails(currentRow);
+                        refreshAfterSiteSave();
                     } else {
                         notify('error', 'Save failed', 'Something went wrong while saving the site.');
                     }
@@ -1274,6 +1326,18 @@ function saveSite(event) {
                 }
             });
         }
+    }
+}
+
+// After a site save the table row (site name) and the header (customer name and
+// address) are both stale, so reload the grid on the same page and reselect the row.
+function refreshAfterSiteSave() {
+    if (!currentRow) return;
+    const apptId = currentRow.ApptID;
+    if (table) {
+        table.ajax.reload(function () { selectRowAfterLoad(apptId); }, false);
+    } else {
+        generateCustomerDetails(currentRow);
     }
 }
 
