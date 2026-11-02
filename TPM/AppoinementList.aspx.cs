@@ -247,6 +247,7 @@ namespace TPM
                         ApptID = dataRow["ApptID"].ToString(),
                         IsApproved = Convert.ToBoolean(dataRow["IsApproved"]),
                         SiteID = dataRow["SiteID"].ToString(),
+                        WarrentyCompanyID = dataRow["WarrentyCompanyID"].ToString(),
                         ApptDateTime = dataRow["ApptDateTime"].ToString(),
                         DispatchId = dataRow["DispatchId"].ToString(),
                         Mobile = dataRow["Mobile"].ToString().ToUpper().Trim()
