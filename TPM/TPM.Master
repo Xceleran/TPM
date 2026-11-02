@@ -937,6 +937,7 @@
                     'invoicecreate': { id: 'customers-link', title: 'Service Locations' },
                     'tplist': { id: 'TpList-link', title: 'Third Party Providers' },
                     'tpdetail': { id: 'TpList-link', title: 'Third Party Providers' },
+                    'businesscontact': { id: 'TpList-link', title: 'Business Contact' },
                     'thirdpartyproviders': { id: 'SupportedTPProviders-link', title: 'Supported TP Providers' },
                     'tpinquiry': { id: 'tp-inquiry-link', title: 'TP Inquiry' },
                     'policyholderinquiry': { id: 'policy-holder-link', title: 'Policy Holder Portal' },

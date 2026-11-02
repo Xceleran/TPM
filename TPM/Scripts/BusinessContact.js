@@ -25,7 +25,26 @@ function isNumberKey(evt) {
     return true;
 }
 
+function showBusinessDetailsTab() {
+    var tab = document.getElementById('bc-details-tab');
+    if (tab) tab.click();
+}
+
+function updateBusinessHeader() {
+    var name = ($('[id$="txt_BusinessName"]').val() || '').trim();
+    var contact = (($('[id$="txt_FirstName"]').val() || '') + ' ' + ($('[id$="txt_LastName"]').val() || '')).trim();
+    $('#bcHeaderName').text(name || 'New Business Contact');
+    $('#bcHeaderSub').text(contact || (isSavedBusiness() ? 'Business Contact' : 'Enter the details below, then Save.'));
+}
+
+function isSavedBusiness() {
+    var customerId = getBusinessCustomerId();
+    return !!customerId && customerId !== '0' && !!getBusinessGuid();
+}
+
 function SaveCustomer() {
+    // Required fields live on the Details tab, so it must be showing for validation to reach them.
+    showBusinessDetailsTab();
     if (ValidateData()) {
         if (document.getElementById('<%=BusinessID.ClientID%>').value == "0") {
             document.getElementById("<%=hdMode.ClientID%>").value = "Add"
@@ -371,6 +390,25 @@ function LoadCurrentProject() {
     });
     return false;
 }
+
+$(function () {
+    // Totals and the record tabs only mean something once the business exists.
+    if (isSavedBusiness()) {
+        $('#bcStats').removeClass('d-none');
+    } else {
+        $('#bc-linked-tab, #bc-invoices-tab, #bc-files-tab')
+            .prop('disabled', true)
+            .addClass('disabled')
+            .closest('li').attr('title', 'Save the business contact first');
+    }
+
+    updateBusinessHeader();
+    $('[id$="txt_BusinessName"], [id$="txt_FirstName"], [id$="txt_LastName"]').on('input', updateBusinessHeader);
+    $('#bcLinkedEmpty').toggleClass('d-none', $('#example tbody tr').length > 0);
+
+    document.getElementById('bc-invoices-tab').addEventListener('shown.bs.tab', LoadProjectList);
+    document.getElementById('bc-files-tab').addEventListener('shown.bs.tab', LoadCurrentProject);
+});
 
 $("#email").focusout(function () {
     var input = $("#email").val()
