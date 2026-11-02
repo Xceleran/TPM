@@ -1534,6 +1534,22 @@
         </div>
     </div>
 
+    <%-- Service Bench Status: same layout and flow as AHS Status, with the Service Bench
+         statuses. Rows are built by openServiceBenchStatus() in AppointmentList.js. --%>
+    <div class="cust-modal" id="mdl_ServiceBenchStatus">
+        <div class="cust-modal-content ahs-modal-content">
+            <button type="button" class="cust-modal-close" id="close_mdl_ServiceBenchStatus">×</button>
+            <h2 class="cust-modal-title">Service Bench Status</h2>
+            <p class="ahs-subtitle" id="serviceBenchStatusSubtitle"></p>
+
+            <div class="ahs-list" id="ServiceBenchStatusList"></div>
+
+            <div class="ahs-footer">
+                <button type="button" class="ahs-btn ahs-btn-secondary" id="btn_CloseServiceBenchStatus">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div class="cust-modal" id="MsgViewModal">
         <div class="cust-modal-content msg-modal-content">
             <div class="msg-header">
@@ -1833,5 +1849,5 @@
         }
 
     </script>
-    <script src="Scripts/AppointmentList.js?v=26"></script>
+    <script src="Scripts/AppointmentList.js?v=27"></script>
 </asp:Content>

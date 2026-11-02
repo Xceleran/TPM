@@ -592,6 +592,92 @@ namespace TPM
             return rows;
         }
 
+        // Service Bench Status popup: records the submitted status in tbl_StatusBuffer under
+        // TPName 'ServiceBench'. There is no Service Bench API client yet, so rows are saved
+        // as not approved; once the API is wired in, set IsApproved/ErrorMsg from its reply.
+        [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static bool UpdateServiceBenchStatus(string ApptID, string StatusID, string DispatchID)
+        {
+            string companyid = HttpContext.Current.Session?["CompanyID"]?.ToString();
+            if (string.IsNullOrEmpty(companyid) || string.IsNullOrEmpty(ApptID) || string.IsNullOrEmpty(DispatchID)) return false;
+
+            Database db = new Database();
+            try
+            {
+                string sql = @"INSERT INTO [msSchedulerV3].dbo.[tbl_StatusBuffer]
+                                (CompanyID, ApptID, DispatchID, StatusCode, SentDate, IsApproved, ErrorMsg, TPName)
+                               VALUES (@CompanyID, @ApptID, @DispatchID, @StatusCode, @SentDate, @IsApproved, @ErrorMsg, @TPName);";
+                db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+                db.AddParameter("@ApptID", ApptID, SqlDbType.NVarChar);
+                db.AddParameter("@DispatchID", DispatchID, SqlDbType.NVarChar);
+                db.AddParameter("@StatusCode", StatusID, SqlDbType.NVarChar);
+                db.AddParameter("@SentDate", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture), SqlDbType.NVarChar);
+                db.AddParameter("@IsApproved", "0", SqlDbType.NVarChar);
+                db.AddParameter("@ErrorMsg", "", SqlDbType.NVarChar);
+                db.AddParameter("@TPName", "ServiceBench", SqlDbType.NVarChar);
+                db.ExecuteScalarData(sql);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("UpdateServiceBenchStatus: " + ex.Message);
+                return false;
+            }
+            finally
+            {
+                if (db.Connection.State == ConnectionState.Open) db.Close();
+            }
+        }
+
+        // Reads back the Service Bench rows UpdateServiceBenchStatus wrote for one appointment.
+        [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static List<object> GetServiceBenchStatusBuffer(string ApptID, string DispatchID)
+        {
+            var rows = new List<object>();
+            string companyid = HttpContext.Current.Session?["CompanyID"]?.ToString();
+            if (string.IsNullOrEmpty(companyid) || string.IsNullOrEmpty(ApptID) || string.IsNullOrEmpty(DispatchID)) return rows;
+
+            Database db = new Database();
+            DataTable dt = new DataTable();
+            try
+            {
+                db.Open();
+                string sql = @"SELECT StatusCode, IsApproved, SentDate
+                               FROM [msSchedulerV3].dbo.[tbl_StatusBuffer]
+                               WHERE CompanyID = @CompanyID AND ApptID = @ApptID AND DispatchID = @DispatchID
+                                 AND TPName = 'ServiceBench'
+                               ORDER BY SentDate";
+                db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+                db.AddParameter("@ApptID", ApptID, SqlDbType.NVarChar);
+                db.AddParameter("@DispatchID", DispatchID, SqlDbType.NVarChar);
+                db.ExecuteParam(sql, out dt);
+
+                foreach (DataRow dr in dt.Rows)
+                {
+                    object sent = dr["SentDate"];
+                    rows.Add(new
+                    {
+                        StatusCode = dr["StatusCode"]?.ToString() ?? "",
+                        IsApproved = dr["IsApproved"]?.ToString() ?? "",
+                        SentDate = sent is DateTime sentDate
+                            ? sentDate.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
+                            : sent?.ToString() ?? ""
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("GetServiceBenchStatusBuffer: " + ex.Message);
+            }
+            finally
+            {
+                if (db.Connection.State == ConnectionState.Open) db.Close();
+            }
+            return rows;
+        }
+
 
         public CustomerEntity GetCustomerDetails(string CustomerGuid, string customerId)
         {

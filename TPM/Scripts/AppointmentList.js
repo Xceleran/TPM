@@ -67,6 +67,18 @@ $(document).ready(function () {
         generateCustomerDetails(data);
     });
 
+    // Up/Down arrows move the selection through the grid, crossing pages at the ends.
+    $(document).on('keydown', function (e) {
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        if (!table || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+        // Leave the keys alone while typing or while a popup is open.
+        if ($(e.target).is('input, textarea, select, [contenteditable="true"]')) return;
+        if ($('.cust-modal:visible, .modal.show, .swal2-container').length) return;
+
+        e.preventDefault();
+        moveRowSelection(e.key === 'ArrowDown' ? 1 : -1);
+    });
+
     // The right-hand pane describes the selected work order's site, and the site
     // edit modal is the one wired to a working save endpoint.
     $('#editCustomerBtn').on('click', function () {
@@ -180,6 +192,20 @@ $(document).ready(function () {
         .on('click', '#btn_AhsNeedToReplace', NeedToReplace_Click)
         .on('click', '#btn_AhsPartsEquipmentStatus', PartsEquipmentStatus_Click)
         .on('click', '#btn_AhsCancelDispatch', CancelDispatch_Click);
+
+    // Service Bench Status: same as AHS, one Submit per status.
+    $('#sites').on('click', '.servicebench-status-btn', function () {
+        openServiceBenchStatus(currentRow);
+    });
+
+    $('#close_mdl_ServiceBenchStatus, #btn_CloseServiceBenchStatus').on('click', function () {
+        closeModal('mdl_ServiceBenchStatus');
+    });
+
+    $('#mdl_ServiceBenchStatus').on('click', '.ahs-submit-btn', function () {
+        const sb = SERVICE_BENCH_STATUSES.find(s => s.id === this.id);
+        if (sb) SubmitServiceBenchStatus($(this), sb.status, sb.code);
+    });
 
     $('#sites').on('click', '.site-dup-btn', function () {
         openSiteDuplicateCheck({
@@ -445,6 +471,41 @@ function selectRowAfterLoad(apptId) {
     generateCustomerDetails(row.data());
 }
 
+// Selects the row above (step -1) or below (step 1) the selected one, in the
+// grid's current sort; past the first/last row it turns the page.
+function moveRowSelection(step) {
+    const indexes = table.rows({ page: 'current' }).indexes().toArray();
+    if (!indexes.length) return;
+
+    const selected = table.rows({ selected: true }).indexes().toArray()[0];
+    const pos = indexes.indexOf(selected);
+    const next = pos === -1 ? 0 : pos + step;
+
+    if (next >= 0 && next < indexes.length) {
+        selectGridRow(table.row(indexes[next]));
+        return;
+    }
+
+    const info = table.page.info();
+    if (step > 0 ? info.page >= info.pages - 1 : info.page <= 0) return;
+
+    table.one('draw', function () {
+        const rows = table.rows({ page: 'current' }).indexes().toArray();
+        if (rows.length) selectGridRow(table.row(step > 0 ? rows[0] : rows[rows.length - 1]));
+    });
+    table.page(step > 0 ? 'next' : 'previous').draw('page');
+}
+
+function selectGridRow(row) {
+    table.rows({ selected: true }).deselect();
+    row.select();
+    const node = row.node();
+    if (node) node.scrollIntoView({ block: 'nearest' });
+    $('#contact').slideDown();
+    if (currentRow && currentRow.ApptID === row.data().ApptID) return;
+    generateCustomerDetails(row.data());
+}
+
 function clearDetailsPanel() {
     currentRow = null;
     $('#customerName').text('Select a Customer');
@@ -599,6 +660,8 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
             // "Dispatch ID 95879269"); use that until the backend sends DispatchId on its own.
             const noteDispatch = String(notes || '').match(/dispatch\s*id\s*[:#]?\s*([A-Za-z0-9-]+)/i);
             const dispatchId = (currentRow && currentRow.DispatchId) || (noteDispatch ? noteDispatch[1] : '');
+            // Warranty ID decides the status icon: 1 = AHS Status, 8 = Service Bench.
+            const warrantyId = String((currentRow && currentRow.WarrentyCompanyID) || '').trim();
 
             const sitesHeaderContainer = $('#sites .sites-header');
             const sitesListContainer = $('#sites .sites-list');
@@ -640,8 +703,10 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                     ${dispatchId ? `<span class="ad-dispatch" title="Dispatch ID"><i class="fas fa-hashtag"></i> Dispatch ID: <strong>${escapeHTML(dispatchId)}</strong></span>` : ''}
                                 </div>
                                 <div class="cust-site-actions">
-                                    <button type="button" class="cust-site-icon-btn ahs-status-btn" title="AHS Status">
-                                        <i class="fas fa-clipboard-list"></i></button>
+                                    ${warrantyId === '8' ? `<button type="button" class="cust-site-icon-btn servicebench-status-btn" title="Service Bench">
+                                        <i class="fas fa-tools"></i></button>` : ''}
+                                    ${warrantyId === '1' ? `<button type="button" class="cust-site-icon-btn ahs-status-btn" title="AHS Status">
+                                        <i class="fas fa-clipboard-list"></i></button>` : ''}
                                     <button type="button" class="cust-site-icon-btn cust-site-Duplicate-btn" title="Customer Duplicates" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
                                         <i class="fas fa-users"></i></button>
                                     <button type="button" class="cust-site-icon-btn site-dup-btn" title="Site Duplicates" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
@@ -856,6 +921,116 @@ function openAhsStatus(row) {
 
     openModal('mdl_AhsStatus');
     loadAhsStatusBuffer(row.ApptID);
+}
+
+// The Service Bench statuses offered in the Service Bench Status modal, in the order
+// shown, with the id of each row's Submit button and the status code it records.
+const SERVICE_BENCH_STATUSES = [
+    { id: 'btn_SbAppointmentSet', status: 'Appointment Set', code: 'AppointmentSet' },
+    { id: 'btn_SbWaitingOnCallBack', status: 'Waiting on Customer Call Back', code: 'WaitingOnCustomerCallBack' },
+    { id: 'btn_SbUnableToContact', status: 'Unable To Contact', code: 'UnableToContact' },
+    { id: 'btn_SbCancelDispatch', status: 'Cancel Dispatch', code: 'CancelDispatch' }
+];
+
+// Same contract as the AHS methods, but rows are kept under TPName 'ServiceBench'.
+const SERVICE_BENCH_STATUS_API_URL = "AppoinementList.aspx/UpdateServiceBenchStatus";
+const SERVICE_BENCH_STATUS_BUFFER_URL = "AppoinementList.aspx/GetServiceBenchStatusBuffer";
+
+// Asks Yes/No, then calls the Service Bench backend method.
+function SubmitServiceBenchStatus(btn, status, code) {
+    if (btn.closest('.ahs-row').is('.is-approved, .is-pending')) return;
+
+    const apptId = $('#mdl_ServiceBenchStatus').data('appt-id');
+    const dispatchID = $('#mdl_ServiceBenchStatus').data('dispatch-id');
+
+    if (!dispatchID) {
+        notify('warning', 'No Dispatch ID on this work order.', 'The status cannot be sent to Service Bench without one.');
+        return;
+    }
+
+    confirmYesNo(`Submit "${status}"?`, `Dispatch ID: ${dispatchID}`).then(yes => {
+        if (!yes) return;
+
+        btn.prop('disabled', true).text('Saving…');
+        $.ajax({
+            type: "POST",
+            url: SERVICE_BENCH_STATUS_API_URL,
+            data: JSON.stringify({ ApptID: apptId, StatusID: code, DispatchID: dispatchID }),
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function () {
+                notify('success', `${status} submitted`);
+                markAhsRow(btn.closest('.ahs-row'), { IsApproved: false, SentDate: '' });
+                loadServiceBenchStatusBuffer(apptId);
+            },
+            error: function (xhr) {
+                console.error("Error submitting Service Bench status: ", xhr.responseText);
+                notify('error', 'Could not submit the status.', 'Please try again.');
+                btn.prop('disabled', false).text('Submit');
+            }
+        });
+    });
+}
+
+// Reads tbl_StatusBuffer (Service Bench rows) and marks every status already sent.
+function loadServiceBenchStatusBuffer(apptId) {
+    $.ajax({
+        type: "POST",
+        url: SERVICE_BENCH_STATUS_BUFFER_URL,
+        data: JSON.stringify({ ApptID: apptId, DispatchID: String($('#mdl_ServiceBenchStatus').data('dispatch-id') || '') }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            if ($('#mdl_ServiceBenchStatus').data('appt-id') !== apptId) return;
+
+            const latest = {};
+            (response.d || []).forEach(entry => { latest[String(entry.StatusCode)] = entry; });
+
+            SERVICE_BENCH_STATUSES.forEach(({ id, code }) => {
+                if (latest[code]) {
+                    const row = $('#' + id).closest('.ahs-row');
+                    markAhsRow(row, latest[code]);
+                    row.attr('title', /^(1|true)$/i.test(String(latest[code].IsApproved)) ? 'Approved by Service Bench' : 'Not approved by Service Bench');
+                }
+            });
+        },
+        error: function (xhr) {
+            console.error("Error loading Service Bench status buffer: ", xhr.responseText);
+        }
+    });
+}
+
+function openServiceBenchStatus(row) {
+    if (!row) {
+        notify('warning', 'Select a work order first.');
+        return;
+    }
+
+    const noteDispatch = String(row.Notes || '').match(/dispatch\s*id\s*[:#]?\s*([A-Za-z0-9-]+)/i);
+    const dispatchId = row.DispatchId || (noteDispatch ? noteDispatch[1] : '');
+    $('#mdl_ServiceBenchStatus').data('appt-id', row.ApptID).data('dispatch-id', dispatchId);
+    const siteName = row.SiteName || (sites && sites[0] && sites[0].SiteName) || '';
+    $('#serviceBenchStatusSubtitle').html(`
+        ${siteName ? `<span class="ahs-site-name"><i class="fas fa-map-marker-alt"></i> ${escapeHTML(siteName)}</span>` : ''}
+        <span class="ahs-info" title="Appointment ID">Appt ID: <strong>${escapeHTML(row.ApptID)}</strong></span>
+        ${dispatchId
+            ? `<span class="ad-dispatch" title="Dispatch ID"><i class="fas fa-hashtag"></i> Dispatch ID: <strong>${escapeHTML(dispatchId)}</strong></span>`
+            : `<span class="ahs-no-dispatch"><i class="fas fa-exclamation-triangle"></i> No Dispatch ID</span>`}`);
+
+    $('#ServiceBenchStatusList').html(SERVICE_BENCH_STATUSES.map(({ id, status }) => {
+        const danger = status === 'Cancel Dispatch' ? ' ahs-row-danger' : '';
+        return `
+            <div class="ahs-row${danger}" data-status="${escapeHTML(status)}">
+                <div class="ahs-row-text">
+                    <div class="ahs-row-title">${escapeHTML(status)}</div>
+                    <div class="ahs-row-meta">Not submitted</div>
+                </div>
+                <button type="button" class="ahs-submit-btn" id="${id}">Submit</button>
+            </div>`;
+    }).join(''));
+
+    openModal('mdl_ServiceBenchStatus');
+    loadServiceBenchStatusBuffer(row.ApptID);
 }
 
 // Yes/No confirm; Swal comes from the master page, confirm() is the fallback.

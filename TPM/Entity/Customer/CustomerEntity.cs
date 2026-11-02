@@ -52,7 +52,8 @@ namespace FSM.Entity.Customer
         public string SalesRep { get; set; }
         public string LeadType { get; set; }
         public string DispatchId { get; set; }
-        
+        public string WarrentyCompanyID { get; set; } = "";
+
         public string SalesStatus { get; set; }
         public string ProjectType { get; set; }
         public string projectStatus { get; set; }
