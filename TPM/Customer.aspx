@@ -6,7 +6,7 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/select/3.0.0/css/select.dataTables.min.css">
 
     <!-- Local Styles and Scripts -->
-    <link rel="stylesheet" href="Content/customer.css?v=6">
+    <link rel="stylesheet" href="Content/customer.css?v=8">
 
     <%-- The custom-fields chip tooltip styles moved to Content/customer.css so CustomerDetails.aspx,
          which renders the same chips in its appointment modal, picks them up too. --%>
@@ -395,6 +395,7 @@
                     </thead>
                 </table>
             </div>
+            <div class="cust-resizer" id="custResizer" role="separator" aria-orientation="vertical" aria-label="Resize customer list" tabindex="0" title="Drag to resize (double-click to reset)" data-storage-key="customerPanelListWidth"></div>
             <!-- Customer Details -->
             <div class="cust-details-container">
                 <div class="cust-details-header">
@@ -1233,4 +1234,5 @@
     </div>
 
       <script src="Scripts/customer.js?v=28"></script>
+    <script src="Scripts/panel-resizer.js?v=1"></script>
 </asp:Content>

@@ -6,7 +6,7 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/select/3.0.0/css/select.dataTables.min.css">
 
     <!-- Local Styles and Scripts -->
-    <link rel="stylesheet" href="Content/customer.css?v=6">
+    <link rel="stylesheet" href="Content/customer.css?v=8">
 
     <style>
         .cust-action-btns {
@@ -1320,6 +1320,7 @@
                     </thead>
                 </table>
             </div>
+            <div class="cust-resizer" id="custResizer" role="separator" aria-orientation="vertical" aria-label="Resize appointment list" tabindex="0" title="Drag to resize (double-click to reset)" data-storage-key="appointmentListPanelListWidth"></div>
             <!-- Customer Details -->
             <div class="cust-details-container">
                 <div class="cust-details-header">
@@ -1850,4 +1851,5 @@
 
     </script>
     <script src="Scripts/AppointmentList.js?v=27"></script>
+    <script src="Scripts/panel-resizer.js?v=1"></script>
 </asp:Content>

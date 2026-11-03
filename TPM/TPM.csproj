@@ -268,6 +268,7 @@
     <Content Include="Invoice.aspx" />
     <Content Include="Scripts\AppointmentList.js" />
     <Content Include="Scripts\customer.js" />
+    <Content Include="Scripts\panel-resizer.js" />
     <Content Include="Scripts\customerdetails.js" />
     <Content Include="Scripts\fsm-loading.js" />
     <Content Include="Scripts\announcement.js" />
