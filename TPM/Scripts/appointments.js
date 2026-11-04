@@ -592,22 +592,24 @@ function getEventTimeSlotClass(appointment) {
     return 'service-type-custom'; // Generic class for all service types
 }
 
-function getContrastColor(hex) {
-    if (!hex) return "#000"; // default black if no color
-
-    hex = hex.replace("#", "");
-
-    if (hex.length === 3) {
-        hex = hex.split("").map(c => c + c).join("");
+function getContrastColor(color) {
+    // Text colour for a configured status/service colour (tbl_Status / tbl_ServiceType CalenderColor):
+    // white text by default, dark text once white drops below WCAG's 3:1 minimum (yellow, orange,
+    // light green...). Anything that isn't a hex colour keeps white text.
+    var DARK = '#1f2937', LIGHT = '#ffffff';
+    var hex = String(color || '').trim().replace(/^#/, '');
+    if (hex.length === 3 || hex.length === 4) {
+        hex = hex.split('').map(function (c) { return c + c; }).join('');
     }
+    hex = hex.substr(0, 6);
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return LIGHT;
 
-    let r = parseInt(hex.substr(0, 2), 16);
-    let g = parseInt(hex.substr(2, 2), 16);
-    let b = parseInt(hex.substr(4, 2), 16);
-
-    let luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-
-    return luminance > 0.5 ? "#000000" : "#FFFFFF";
+    function channel(i) {
+        var c = parseInt(hex.substr(i, 2), 16) / 255;
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    }
+    var lum = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+    return 1.05 / (lum + 0.05) < 3 ? DARK : LIGHT;
 }
 
 function updateCalendarEventColors() {

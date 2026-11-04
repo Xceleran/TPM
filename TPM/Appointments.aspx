@@ -1346,7 +1346,7 @@
 
 
 
-    <script src="Scripts/appointments.js?v=faid-select" defer></script>
+    <script src="Scripts/appointments.js?v=faid-select-2" defer></script>
     <script src="Scripts/Views/list-view.js" defer></script>
     <script src="Scripts/Views/map-view.js" defer></script>
     <script src="Scripts/signature-handler.js" defer></script>

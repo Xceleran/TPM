@@ -6,7 +6,7 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/select/3.0.0/css/select.dataTables.min.css">
 
     <!-- Local Styles and Scripts -->
-    <link rel="stylesheet" href="Content/customer.css?v=8">
+    <link rel="stylesheet" href="Content/customer.css?v=10">
 
     <style>
         .cust-action-btns {
@@ -35,6 +35,97 @@
         .sms-btn {
             color: green;
             font-size: 22px;
+        }
+
+        /* Send SMS / MMS / Email popups */
+        .msg-modal {
+            --mm-border: #cbd5e1;
+            --mm-muted: #64748b;
+            --mm-text: #1e293b;
+            --mm-accent: #007bff;
+            --mm-input-bg: #fff;
+        }
+
+        [data-theme="dark"] .msg-modal {
+            --mm-border: rgba(255, 255, 255, 0.18);
+            --mm-muted: #94a3b8;
+            --mm-text: #e2e8f0;
+            --mm-accent: #60a5fa;
+            --mm-input-bg: rgba(255, 255, 255, 0.04);
+        }
+
+        .msg-modal .modal-content {
+            border: 0;
+            border-radius: 12px;
+            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
+        }
+
+        .msg-modal .modal-header {
+            padding: 16px 20px;
+        }
+
+        .msg-modal .modal-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--mm-text);
+        }
+
+        .msg-modal .modal-body {
+            padding: 18px 20px 6px;
+        }
+
+        .msg-modal .modal-body .row {
+            margin-top: 0 !important;
+            margin-bottom: 14px;
+        }
+
+        .msg-modal .form-label {
+            display: block;
+            margin-bottom: 6px !important;
+            font-size: 11.5px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--mm-muted);
+        }
+
+        .msg-modal .form-control {
+            padding: 9px 12px;
+            font-size: 14px;
+            color: var(--mm-text);
+            background: var(--mm-input-bg);
+            border: 1px solid var(--mm-border);
+            border-radius: 8px;
+            box-shadow: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .msg-modal .form-control::placeholder {
+            color: #94a3b8;
+        }
+
+        .msg-modal .form-control:focus {
+            border-color: var(--mm-accent);
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+            outline: 0;
+        }
+
+        .msg-modal textarea.form-control {
+            min-height: 130px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        .msg-modal .modal-footer {
+            padding: 12px 20px;
+            gap: 8px;
+        }
+
+        .msg-modal .modal-footer .btn {
+            border-radius: 8px;
+            padding: 7px 16px;
+            font-size: 14px;
+            font-weight: 500;
         }
 
         .edit-btn svg {
@@ -1580,7 +1671,7 @@
          from here posted blank names to UpdateCustomer. Customer records are edited
          on Customer.aspx / CustomerDetails.aspx. --%>
     <!-- SMS Modal -->
-    <div class="modal fade" id="modalSendSMS" tabindex="-1" role="dialog" aria-labelledby="modalSendSMS"
+    <div class="modal fade msg-modal" id="modalSendSMS" tabindex="-1" role="dialog" aria-labelledby="modalSendSMS"
         aria-hidden="true">
         <div class="modal-dialog modal-dialog-scrollable" role="document">
             <div class="modal-content">
@@ -1592,7 +1683,7 @@
                     <div class="row mt-3">
                         <div class="col-12 mt-0">
                             <label for="txtMobile" class="form-label mb-0">Phone/Mobile Number</label>
-                            <asp:TextBox ID="txtMobile" runat="server" CssClass="form-control" />
+                            <asp:TextBox ID="txtMobile" runat="server" CssClass="form-control" placeholder="(555) 555-5555" />
                             <asp:HiddenField ID="txtCustomerId" runat="server" />
                         </div>
                     </div>
@@ -1600,7 +1691,7 @@
                         <div class="col-12 mt-0">
                             <label for="txtSMS" class="form-label mb-0">Text</label>
                             <asp:TextBox ID="txtSMS" runat="server" TextMode="MultiLine" Rows="5"
-                                CssClass="form-control" />
+                                CssClass="form-control" placeholder="Type your message..." />
                         </div>
                     </div>
                 </div>
@@ -1622,8 +1713,46 @@
         </div>
     </div>
 
+    <!-- Email Modal -->
+    <div class="modal fade msg-modal" id="modalSendEmail" tabindex="-1" role="dialog" aria-labelledby="emailModalLongTitle"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="emailModalLongTitle">Send Email</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="emailCustomerId" />
+                    <div class="row mt-3">
+                        <div class="col-12 mt-0">
+                            <label for="txtEmailTo" class="form-label mb-0">Email</label>
+                            <input type="text" inputmode="email" id="txtEmailTo" class="form-control" placeholder="name@example.com" />
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-12 mt-0">
+                            <label for="txtEmailSubject" class="form-label mb-0">Subject</label>
+                            <input type="text" id="txtEmailSubject" class="form-control" placeholder="Subject" />
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-12 mt-0">
+                            <label for="txtEmailBody" class="form-label mb-0">Body</label>
+                            <textarea id="txtEmailBody" rows="6" class="form-control" placeholder="Type your message..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="CloseEmailPopup()">Close</button>
+                    <button type="button" id="btnSendEmail" class="btn btn-success" onclick="SendSiteEmail()">Send Email</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- MMS Modal -->
-    <div class="modal fade" id="modalSendMMS" tabindex="-1" role="dialog" aria-labelledby="modalSendMMS"
+    <div class="modal fade msg-modal" id="modalSendMMS" tabindex="-1" role="dialog" aria-labelledby="modalSendMMS"
         aria-hidden="true">
         <div class="modal-dialog modal-dialog-scrollable" role="document">
             <div class="modal-content">
@@ -1635,7 +1764,7 @@
                     <div class="row mt-3">
                         <div class="col-12 mt-0">
                             <label for="txtCustMob" class="form-label mb-0">Phone/Mobile Number</label>
-                            <asp:TextBox ID="txtCustMob" runat="server" CssClass="form-control" />
+                            <asp:TextBox ID="txtCustMob" runat="server" CssClass="form-control" placeholder="(555) 555-5555" />
                             <asp:HiddenField ID="txtCustId" runat="server" />
                         </div>
                     </div>
@@ -1643,7 +1772,7 @@
                         <div class="col-12 mt-0">
                             <label for="txtMMSBody" class="form-label mb-0">MMS Body</label>
                             <asp:TextBox ID="txtMMSBody" runat="server" TextMode="MultiLine" Rows="4"
-                                CssClass="form-control" />
+                                CssClass="form-control" placeholder="Type your message..." />
                         </div>
                     </div>
                     <div class="row mt-3">
@@ -1815,6 +1944,64 @@
             $('#modalSendSMS').modal('hide');
         }
 
+        function OpenEmailPopUp(email, customerID) {
+            $('#txtEmailTo').val(email || '');
+            $('#emailCustomerId').val(customerID || '');
+            $('#txtEmailSubject').val('');
+            $('#txtEmailBody').val('');
+            $('#btnSendEmail').prop('disabled', false).text('Send Email');
+            $('#modalSendEmail').modal('show');
+        }
+
+        function CloseEmailPopup() {
+            $('#txtEmailTo, #emailCustomerId, #txtEmailSubject, #txtEmailBody').val('');
+            $('#modalSendEmail').modal('hide');
+        }
+
+        function SendSiteEmail() {
+            var email = $('#txtEmailTo').val().trim();
+            var subject = $('#txtEmailSubject').val().trim();
+            var body = $('#txtEmailBody').val();
+            var customerId = $('#emailCustomerId').val();
+
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+                Swal.fire('Please enter a valid email address.', '', 'warning');
+                return;
+            }
+            if (!subject) {
+                Swal.fire('Subject cannot be empty.', '', 'warning');
+                return;
+            }
+            if (!body.trim()) {
+                Swal.fire('Email body cannot be empty.', '', 'warning');
+                return;
+            }
+
+            var $btn = $('#btnSendEmail').prop('disabled', true).text('Sending...');
+            $.ajax({
+                type: 'POST',
+                url: 'AppoinementList.aspx/SendSiteEmail',
+                data: JSON.stringify({ customerId: customerId, email: email, subject: subject, body: body }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                success: function (response) {
+                    var r = response.d || {};
+                    if (r.success) {
+                        CloseEmailPopup();
+                        Swal.fire(r.message, '', 'success');
+                    } else {
+                        Swal.fire(r.message || 'Something went wrong, Please try again.', '', 'warning');
+                    }
+                },
+                error: function () {
+                    Swal.fire('Something went wrong, Please try again.', '', 'error');
+                },
+                complete: function () {
+                    $btn.prop('disabled', false).text('Send Email');
+                }
+            });
+        }
+
         function OpenMMSPopUp(mobile, customerID) {
             $('#<%= txtCustMob.ClientID %>').val(mobile);
             $('#<%= txtCustId.ClientID %>').val(customerID);
@@ -1850,6 +2037,13 @@
         }
 
     </script>
-    <script src="Scripts/AppointmentList.js?v=27"></script>
+    <script>
+        // The popup sits inside the page's server form: Enter in a text box would post back
+        // through the first submit button (Send SMS), so swallow it here.
+        $(document).on('keydown', '#txtEmailTo, #txtEmailSubject', function (e) {
+            if (e.key === 'Enter') e.preventDefault();
+        });
+    </script>
+    <script src="Scripts/AppointmentList.js?v=28"></script>
     <script src="Scripts/panel-resizer.js?v=1"></script>
 </asp:Content>

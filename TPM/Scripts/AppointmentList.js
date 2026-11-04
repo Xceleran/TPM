@@ -312,6 +312,11 @@ $(document).ready(function () {
         OpenSMSPopUp(mobile, customerId);
     });
 
+    // Email button: opens the Send Email popup with the site's (or default customer's) email filled in
+    $('#sites').on('click', '.cust-site-email-btn', function () {
+        OpenEmailPopUp($(this).attr('data-email'), $(this).attr('data-customer-id'));
+    });
+
     // MMS button click handler in site cards
     $('#sites').on('click', '.cust-site-MMS-btn', function () {
         var mobile = $(this).attr('data-mobilenumber-id');
@@ -712,6 +717,8 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                     <button type="button" class="cust-site-icon-btn site-dup-btn" title="Site Duplicates" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
                                         <i class="fas fa-map-marker-alt"></i></button>
                                     <button type="button" class="cust-site-icon-btn cust-site-msgview-btn" title="View Original Message" data-site-id="${escapeHTML(ApptID)}" data-is-default="${isDefaultSite}">
+                                        <i class="fas fa-file-alt"></i></button>
+                                    <button type="button" class="cust-site-icon-btn cust-site-email-btn" title="Send Email" data-customer-id="${escapeHTML(site.CustomerID)}" data-email="${escapeHTML(site.Email)}">
                                         <i class="fa fa-envelope-open-text"></i></button>
                                     ${editButton}
                                     ${smsButton}
@@ -734,6 +741,8 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                     ${detailRow('fas fa-flag', 'State', escapeHTML(site.State))}
                                     ${detailRow('fas fa-mail-bulk', 'Zip', escapeHTML(site.Zip))}
                                     ${detailRow('fas fa-globe-americas', 'Country', escapeHTML(site.Country))}
+                                    ${detailRow('fas fa-phone-alt', 'Phone', site.PhoneNumber ? `<a href="tel:${escapeHTML(String(site.PhoneNumber).replace(/[^\d+]/g, ''))}">${escapeHTML(site.PhoneNumber)}</a>` : '')}
+                                    ${detailRow('fas fa-envelope', 'Email', site.Email ? `<a href="mailto:${escapeHTML(site.Email)}" title="${escapeHTML(site.Email)}">${escapeHTML(site.Email)}</a>` : '')}
                                 </div>
                                 ${isDefaultSite ? `<div class="ad-address-warn"><i class="fas fa-exclamation-triangle"></i> No site is linked to this appointment, so this is the customer's address, not the job site.</div>` : ''}
                             </section>

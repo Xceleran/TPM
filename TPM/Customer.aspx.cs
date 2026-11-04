@@ -1309,77 +1309,87 @@ namespace FSM
         }
 
         
-             [WebMethod]
+        // Duplicate site search for the Check for Duplicate Sites popup (customer.js).
+        // Returns this company's sites matching ANY of the filled-in boxes.
+        [WebMethod(EnableSession = true)]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
-        public static string GetDuplicatecustomerSiteTable(string customerId, string siteId,string Sitename)
+        public static List<CustomerSite> FindDuplicateSites(string siteName, string address, string city, string zip, string phone, string email)
         {
             var sites = new List<CustomerSite>();
-
-
+            if (HttpContext.Current.Session["CompanyID"] == null) return sites;
             string companyid = HttpContext.Current.Session["CompanyID"].ToString();
+
+            siteName = (siteName ?? "").Trim();
+            address = (address ?? "").Trim();
+            city = (city ?? "").Trim();
+            zip = (zip ?? "").Trim();
+            email = (email ?? "").Trim();
+            // Phone numbers are stored formatted in different ways; compare digits only.
+            string phoneDigits = new string((phone ?? "").Where(char.IsDigit).ToArray());
+
+            var conditions = new List<string>();
+            if (siteName != "") conditions.Add("st.SiteName LIKE @SiteName");
+            if (address != "") conditions.Add("st.Address LIKE @Address");
+            if (city != "") conditions.Add("st.City LIKE @City");
+            if (zip != "") conditions.Add("st.Zip LIKE @Zip");
+            if (email != "") conditions.Add("st.Email = @Email");
+            if (phoneDigits.Length >= 7)
+                conditions.Add("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(st.PhoneNumber,''),'(',''),')',''),'-',''),' ',''),'.','') LIKE @Phone");
+            if (conditions.Count == 0) return sites;
+
             Database db = new Database();
-            int totalRecords = 0;
-            DataTable dt = new DataTable();
-         
             try
             {
-                //db.Open();
-                string strSQL = @"SELECT st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.LastName,st.Address,st.Country,st.State,st.Zip,st.Contact,st.Email,st.PhoneNumber 
-                            FROM [msSchedulerV3].dbo.tbl_CustomerSite st WHERE st.CompanyID='" + companyid + "' AND st.SiteName like'%" + Sitename + "%' ";
+                string strSQL = @"SELECT TOP 200 st.Id, st.CustomerID, st.SiteName, st.FirstName, st.LastName, st.Address, st.City,
+                                         st.State, st.Zip, st.Country, st.Email, st.PhoneNumber
+                                  FROM [msSchedulerV3].dbo.tbl_CustomerSite st
+                                  WHERE st.CompanyID = @CompanyID AND (" + string.Join(" OR ", conditions) + @")
+                                  ORDER BY st.SiteName;";
 
-               
-                strSQL += $" ORDER BY st.SiteName ;";
+                db.Open();
+                db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+                if (siteName != "") db.AddParameter("@SiteName", "%" + siteName + "%", SqlDbType.NVarChar);
+                if (address != "") db.AddParameter("@Address", "%" + address + "%", SqlDbType.NVarChar);
+                if (city != "") db.AddParameter("@City", city + "%", SqlDbType.NVarChar);
+                if (zip != "") db.AddParameter("@Zip", zip + "%", SqlDbType.NVarChar);
+                if (email != "") db.AddParameter("@Email", email, SqlDbType.NVarChar);
+                if (phoneDigits.Length >= 7) db.AddParameter("@Phone", "%" + phoneDigits.Substring(Math.Max(0, phoneDigits.Length - 10)), SqlDbType.NVarChar);
 
-             
-               
+                DataTable dt;
+                db.ExecuteParam(strSQL, out dt);
 
-                DataSet dataSet = db.Get_DataSet(strSQL, companyid);
-                dt = dataSet.Tables[0];
-
-               
-                if (dt.Rows.Count > 0)
+                if (dt != null)
                 {
-                    totalRecords = dt.Rows.Count;
                     foreach (DataRow dr in dt.Rows)
                     {
                         sites.Add(new CustomerSite
                         {
                             Id = Convert.ToInt32(dr["Id"]),
                             CustomerID = dr["CustomerID"].ToString(),
-                            SiteName = dr["SiteName"].ToString() ?? "",
-                            FirstName = dr["FirstName"].ToString() ?? "",
-                            LastName = dr["LastName"].ToString() ?? "",
-                            Address = dr["Address"].ToString() ?? "",
-                            Country = dr["Country"].ToString() ?? "",
-                            State = LocationHelper.GetFullName(dr["State"].ToString() ?? ""),
-                            Zip = dr["Zip"].ToString() ?? "",
-                            Contact = dr["Contact"].ToString() ?? "",
-                            Email = dr["Email"].ToString() ?? "",
+                            SiteName = dr["SiteName"].ToString(),
+                            FirstName = dr["FirstName"].ToString(),
+                            LastName = dr["LastName"].ToString(),
+                            Address = dr["Address"].ToString(),
+                            City = dr["City"].ToString(),
+                            State = LocationHelper.GetFullName(dr["State"].ToString()),
+                            Zip = dr["Zip"].ToString(),
+                            Country = dr["Country"].ToString(),
+                            Email = dr["Email"].ToString(),
                             PhoneNumber = Common.GetFormatedPhoneNumber(dr["PhoneNumber"].ToString())
                         });
                     }
                 }
-               
             }
             catch (Exception ex)
             {
-                if (db.Connection.State == ConnectionState.Open) db.Close();
-
+                System.Diagnostics.Debug.WriteLine("FindDuplicateSites: " + ex.Message);
             }
             finally
             {
                 if (db.Connection.State == ConnectionState.Open) db.Close();
             }
 
-            var response = new
-            {
-                draw = 1,
-                recordsTotal = totalRecords,
-                recordsFiltered = totalRecords,
-                data = sites
-            };
-
-            return JsonConvert.SerializeObject(response);
+            return sites;
         }
 
 

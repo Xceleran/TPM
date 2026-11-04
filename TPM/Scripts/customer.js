@@ -49,6 +49,26 @@ function escapeHTML(str) {
     ));
 }
 
+function getContrastColor(color) {
+    // Text colour for a configured status/service colour (tbl_Status / tbl_ServiceType CalenderColor):
+    // white text by default, dark text once white drops below WCAG's 3:1 minimum (yellow, orange,
+    // light green...). Anything that isn't a hex colour keeps white text.
+    var DARK = '#1f2937', LIGHT = '#ffffff';
+    var hex = String(color || '').trim().replace(/^#/, '');
+    if (hex.length === 3 || hex.length === 4) {
+        hex = hex.split('').map(function (c) { return c + c; }).join('');
+    }
+    hex = hex.substr(0, 6);
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return LIGHT;
+
+    function channel(i) {
+        var c = parseInt(hex.substr(i, 2), 16) / 255;
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    }
+    var lum = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+    return 1.05 / (lum + 0.05) < 3 ? DARK : LIGHT;
+}
+
 function openModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
@@ -373,90 +393,34 @@ $(document).ready(function () {
     });
     
     $('#sites').on('click', '.cust-site-Duplicate-btn', function () {
-        const siteId = $(this).data('siteid');
-     
-        const customerId = $(this).attr('data-CustomerID');
+        openSiteDuplicateCheck({
+            customerId: $(this).attr('data-customerid'),
+            siteId: $(this).attr('data-siteid'),
+            siteName: $(this).attr('data-site-name')
+        });
+    });
 
-        const Sitename = $(this).attr('data-Site-Name'); 
+    $('#close_mdl_CheckSiteDuplicate, #btn_CloseSiteDuplicate').on('click', function () {
+        closeModal('mdl_CheckSiteDuplicate');
+    });
 
-        if ($.fn.DataTable.isDataTable('#DuplicatecustomerSiteTable')) {
+    $('#btn_SearchSiteDuplicates').on('click', SearchSiteDuplicates);
+    $('#btn_MergeSiteDuplicates').on('click', MergeSiteDuplicates);
 
-            $('#DuplicatecustomerSiteTable').DataTable().destroy();
-            $('#DuplicatecustomerSiteTable').empty(); // Manually empty the table's DOM
+    // Enter in any search box runs the search instead of posting the page's form.
+    $('#mdl_CheckSiteDuplicate .dup-search').on('keydown', 'input', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            SearchSiteDuplicates();
         }
+    });
 
-
-
-        $('#DuplicatecustomerSiteTable').on('error.dt', function (e, settings, techNote, message) {
-            alert(message)
-            console.error('An error has been reported by DataTables: ', message);
+    // Tint the rows so the Primary and the ticked Duplicates stand out.
+    $('#DuplicateSiteTable').on('change', 'input', function () {
+        $(this).closest('tbody').find('tr').each(function () {
+            $(this).toggleClass('is-primary', $(this).find('.dup-primary').is(':checked'));
+            $(this).toggleClass('is-duplicate', $(this).find('.dup-target').is(':checked'));
         });
-
-        $('#DuplicatecustomerSiteTable').DataTable({
-            processing: true,
-            serverSide: true,
-            filter: true,
-            select: {
-                style: 'none'
-            },
-            ajax: {
-                url: "Customer.aspx/GetDuplicatecustomerSiteTable",
-                type: "POST",
-                contentType: "application/json; charset=utf-8",
-                dataType: "json",
-
-                data: function (d) {
-                    // Save current filter values on every request
-                   
-                    return JSON.stringify({
-                        customerId: customerId,
-                        siteId: siteId,
-                        Sitename: Sitename
-                    });
-                },
-
-                dataSrc: function (json) {
-                    if (json.error) {
-                        alert("Error loading customers: " + json.error);
-                        return [];
-                    }
-                    return json.data;
-                },
-                error: function (err) {
-                    console.log(err);
-                }
-            },
-            paging: true,
-            pageLength: 10,
-            select: { style: 'single' },
-            columns: [
-
-                {
-                    data: "SiteName",
-                    name: "Select Main Site",
-                    autoWidth: true,
-                    render: function (data, type, row) {
-                        return `<input type="radio" name="row-selection" value="${row.id}">`;
-
-                    }
-                },
-                {
-                    data: 'id', // Map to your data property
-                    render: function (data, type, row) {
-                        // Return a checkbox with the ID as the value
-                        return `<input type="checkbox" name="id" value="${row.id}">`;
-                    },
-                    orderable: false // Prevent sorting on the checkbox column
-                },
-                { data: 'SiteName' },
-                { data: 'Address' },
-                { data: 'PhoneNumber'}
-
-            ]
-        });
-       
-        openModal('mdl_CheckDuplicate');
-       
     });
 
     $('#sites').on('click', '.cust-site-edit-btn', function () {
@@ -505,9 +469,6 @@ $(document).ready(function () {
 
     $('#closeAddSite, #closeAddSiteIcon').on('click', function () {
         closeModal('addSiteModal');
-    });
-    $('#btn_CloseCheckDuplicate, #close_mdl_CheckDuplicate').on('click', function () {
-        closeModal('mdl_CheckDuplicate');
     });
 
     
@@ -706,7 +667,7 @@ function loadCustomers() {
                     let statusText = data || 'N/A';
                     if (statusText === '0') { statusText = 'Multiple'; }
                     const bgColor = row.StatusColor || '#3b82f6';
-                    return `<span class="badge" style="background-color: ${bgColor}; color: #fff; padding: 5px 10px; font-weight: 500; font-size: 0.75rem; border-radius: 4px;">${escapeHTML(statusText)}</span>`;
+                    return `<span class="badge" style="background-color: ${bgColor}; color: ${getContrastColor(bgColor)}; padding: 5px 10px; font-weight: 500; font-size: 0.75rem; border-radius: 4px;">${escapeHTML(statusText)}</span>`;
                 }
             },
             {
@@ -1834,7 +1795,7 @@ function renderSiteAppointments(siteId, list, containerEl) {
                     
                 </div>
                 <div class="appt-status">
-                    <span class="badge" style="background-color: ${item.StatusColor || '#3b82f6'} !important;">${escapeHTML(status)}</span>
+                    <span class="badge" style="background-color: ${item.StatusColor || '#3b82f6'} !important; color: ${getContrastColor(item.StatusColor || '#3b82f6')} !important;">${escapeHTML(status)}</span>
                     <span class="appt-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 6l6 6-6 6"></path></svg></span>
                 </div>
             </div>`;
@@ -2635,5 +2596,175 @@ function sendFormsViaSMS() {
         error: function (xhr, status, error) {
             _cslFormsAlert({ icon: 'error', title: 'Error', text: 'Failed to send SMS: ' + error });
         }
+    });
+}
+
+// ---- Duplicate site check (same popup and flow as AppointmentList.js) ----
+//   FindDuplicateSites(siteName, address, city, zip, phone, email) -> sites matching ANY filled-in box
+//   MergeCustomerSites(primarySiteId, siteIds, Isdelete) -> "Done! ..." message
+const SITE_DUP_SEARCH_URL = "Customer.aspx/FindDuplicateSites";
+const SITE_DUP_MERGE_URL = "Customer.aspx/MergeCustomerSites";
+
+// The site the popup was opened from; listed first and preselected as Primary.
+let siteDupContext = {};
+
+function dupNotify(icon, title, text) {
+    if (typeof Swal !== 'undefined') {
+        return Swal.fire({ icon: icon, title: title, text: text || '' });
+    }
+    alert(title + (text ? '\n' + text : ''));
+    return Promise.resolve();
+}
+
+function dupConfirm(title, text) {
+    if (typeof Swal !== 'undefined') {
+        return Swal.fire({
+            icon: 'question',
+            title: title,
+            text: text || '',
+            showCancelButton: true,
+            confirmButtonText: 'Yes',
+            cancelButtonText: 'No',
+            reverseButtons: true
+        }).then(result => result.isConfirmed);
+    }
+    return Promise.resolve(confirm(title + (text ? '\n' + text : '')));
+}
+
+function dupMessage(html, table) {
+    $(table).find('tbody').html(`<tr class="dup-message"><td colspan="10">${html}</td></tr>`);
+}
+
+// Opens the popup with the search prefilled from the clicked site.
+function openSiteDuplicateCheck(opts) {
+    siteDupContext = opts;
+    const site = sites.find(s => String(s.Id) === String(opts.siteId)) || {};
+
+    $('#dupSiteName').val(site.SiteName || opts.siteName || '');
+    $('#dupSiteAddress').val(site.Address || '');
+    $('#dupSiteCity').val(site.City || '');
+    $('#dupSiteZip').val(site.Zip || '');
+    $('#dupSitePhone').val(site.PhoneNumber || '');
+    $('#dupSiteEmail').val(site.Email || '');
+
+    openModal('mdl_CheckSiteDuplicate');
+    SearchSiteDuplicates();
+}
+
+function SearchSiteDuplicates() {
+    const payload = {
+        siteName: $.trim($('#dupSiteName').val()),
+        address: $.trim($('#dupSiteAddress').val()),
+        city: $.trim($('#dupSiteCity').val()),
+        zip: $.trim($('#dupSiteZip').val()),
+        phone: $.trim($('#dupSitePhone').val()),
+        email: $.trim($('#dupSiteEmail').val())
+    };
+
+    if (!Object.values(payload).some(Boolean)) {
+        dupMessage('Fill in at least one search box.', '#DuplicateSiteTable');
+        return;
+    }
+
+    dupMessage('<span class="spinner-border spinner-border-sm"></span> Searching…', '#DuplicateSiteTable');
+    $('#btn_SearchSiteDuplicates').prop('disabled', true);
+
+    $.ajax({
+        type: "POST",
+        url: SITE_DUP_SEARCH_URL,
+        data: JSON.stringify(payload),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function (response) {
+            const list = response.d || [];
+            if (!list.length) {
+                dupMessage('No matching sites found. Try adjusting the search.', '#DuplicateSiteTable');
+                return;
+            }
+
+            const isCurrent = s => String(s.Id) === String(siteDupContext.siteId);
+            const ordered = list.filter(isCurrent).concat(list.filter(s => !isCurrent(s)));
+
+            $('#DuplicateSiteTable tbody').html(ordered.map(s => {
+                const id = escapeHTML(s.Id);
+                const current = isCurrent(s);
+                const contact = [s.FirstName, s.LastName].filter(Boolean).join(' ');
+                return `
+                    <tr class="${current ? 'is-primary' : ''}">
+                        <td class="dup-pick"><input type="radio" name="dupSitePrimary" class="dup-primary" value="${id}" aria-label="Keep as primary" ${current ? 'checked' : ''} /></td>
+                        <td class="dup-pick"><input type="checkbox" class="dup-target" value="${id}" aria-label="Mark as duplicate" /></td>
+                        <td>${escapeHTML(s.SiteName)}${current ? '<span class="dup-current-tag">current</span>' : ''}</td>
+                        <td>${escapeHTML(contact)}</td>
+                        <td>${escapeHTML(s.Address)}</td>
+                        <td>${escapeHTML(s.City)}</td>
+                        <td>${escapeHTML(s.State)}</td>
+                        <td>${escapeHTML(s.Zip)}</td>
+                        <td>${escapeHTML(s.PhoneNumber)}</td>
+                        <td>${escapeHTML(s.Email)}</td>
+                    </tr>`;
+            }).join(''));
+        },
+        error: function (xhr) {
+            console.error("Error searching duplicate sites: ", xhr.responseText);
+            dupMessage('<span class="text-danger">Something went wrong while searching. Please try again.</span>', '#DuplicateSiteTable');
+        },
+        complete: function () {
+            $('#btn_SearchSiteDuplicates').prop('disabled', false);
+        }
+    });
+}
+
+function MergeSiteDuplicates() {
+    const $primary = $('#DuplicateSiteTable .dup-primary:checked');
+    if (!$primary.length) {
+        dupNotify('warning', 'Select a site', 'Please choose the site you want to keep.');
+        return;
+    }
+    const primaryId = String($primary.val());
+
+    const siteIds = $('#DuplicateSiteTable .dup-target:checked').map(function () {
+        return $(this).val();
+    }).get().filter(id => id !== primaryId).map(id => parseInt(id, 10));
+
+    if (!siteIds.length) {
+        dupNotify('warning', 'Select duplicates', 'Please tick at least one duplicate site to merge.');
+        return;
+    }
+
+    const deleteMerged = $('#chk_DeleteMergedSites').is(':checked');
+
+    dupConfirm('Merge duplicate sites?',
+        `The ${siteIds.length} selected site(s) will be merged into the site you chose to keep, ` +
+        `and their appointments will be moved to it.` +
+        (deleteMerged ? ' The old sites will be removed.' : '')
+    ).then(yes => {
+        if (!yes) return;
+
+        $('#btn_MergeSiteDuplicates').prop('disabled', true).text('Merging…');
+        $.ajax({
+            type: "POST",
+            url: SITE_DUP_MERGE_URL,
+            data: JSON.stringify({
+                primarySiteId: parseInt(primaryId, 10),
+                siteIds: siteIds,
+                Isdelete: deleteMerged
+            }),
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function (response) {
+                closeModal('mdl_CheckSiteDuplicate');
+                const msg = response.d || 'Sites merged.';
+                const ok = /^done/i.test(msg);
+                Promise.resolve(dupNotify(ok ? 'info' : 'error', ok ? 'Merged' : 'Merge failed', msg))
+                    .then(() => { if (ok) location.reload(); });
+            },
+            error: function (xhr) {
+                console.error("Error merging duplicate sites: ", xhr.responseText);
+                dupNotify('error', 'Merge failed', 'Something went wrong while merging. Please try again.');
+            },
+            complete: function () {
+                $('#btn_MergeSiteDuplicates').prop('disabled', false).text('Merge Selected Sites');
+            }
+        });
     });
 }

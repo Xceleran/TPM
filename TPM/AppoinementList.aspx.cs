@@ -959,6 +959,47 @@ namespace TPM
             }
             return sites;
         }
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static object SendSiteEmail(string customerId, string email, string subject, string body)
+        {
+            try
+            {
+                if (HttpContext.Current.Session["CompanyID"] == null)
+                    return new { success = false, message = "Session expired. Please login again." };
+
+                email = (email ?? "").Trim();
+                subject = (subject ?? "").Trim();
+                body = body ?? "";
+
+                if (string.IsNullOrWhiteSpace(customerId))
+                    return new { success = false, message = "Customer ID is required." };
+                if (!Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+                    return new { success = false, message = "Please enter a valid email address." };
+                if (string.IsNullOrWhiteSpace(subject))
+                    return new { success = false, message = "Subject cannot be empty." };
+                if (string.IsNullOrWhiteSpace(body))
+                    return new { success = false, message = "Email body cannot be empty." };
+
+                string companyId = HttpContext.Current.Session["CompanyID"].ToString();
+
+                // The body is typed as plain text; encode it so it can't inject markup.
+                // SendHtmlFormattedEmail turns the line breaks into <br />.
+                string result = new EmailProcessor().SendHtmlFormattedEmail(
+                    companyId, Common.CleanInput(customerId), "Customer Email",
+                    HttpUtility.HtmlEncode(subject), HttpUtility.HtmlEncode(body),
+                    email, "", "", new List<EmailContent>());
+
+                return result == "Sent"
+                    ? new { success = true, message = "Email Sent Successfully" }
+                    : new { success = false, message = string.IsNullOrEmpty(result) ? "Something went wrong, Please try again." : result };
+            }
+            catch (Exception ex)
+            {
+                return new { success = false, message = "Error: " + ex.Message };
+            }
+        }
+
         protected void btnSendSMS_Click(object sender, EventArgs e)
         {
             try
