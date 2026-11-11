@@ -1930,5 +1930,5 @@
                 });
             })();
         </script>
-               <script src="Scripts/customerdetails.js?v=21"></script>
+               <script src="Scripts/customerdetails.js?v=22"></script>
     </asp:Content>

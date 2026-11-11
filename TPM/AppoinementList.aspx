@@ -6,7 +6,7 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/select/3.0.0/css/select.dataTables.min.css">
 
     <!-- Local Styles and Scripts -->
-    <link rel="stylesheet" href="Content/customer.css?v=10">
+    <link rel="stylesheet" href="Content/customer.css?v=13">
 
     <style>
         .cust-action-btns {
@@ -1381,13 +1381,27 @@
         <section class="cust-section">
             <!-- Customer List -->
             <div class="cust-list-container">
-                <div class="cust-list-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="cust-list-filter">
-                            <label for="statusFilter" class="form-label"><i class="fas fa-filter"></i>Status</label>
-                            <%-- Sp_GetAppointmnetData only branches on 'accept' and 'pending'; an
-                                 appointment's status here is IsApproved, so there is no Cancel to filter by. --%>
-                            <asp:DropDownList ID="statusFilter" ClientIDMode="Static" runat="server" CssClass="form-select w-auto">
+                <div class="cust-list-toolbar">
+                    <div class="lf-bar">
+                        <%-- One compact row: Dispatch ID | request date range | Status --%>
+                        <div class="lf-search">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="search" id="dispatchIdSearch" class="form-control" placeholder="Dispatch ID" aria-label="Search Dispatch ID" title="Search Dispatch ID" autocomplete="off" />
+                        </div>
+                        <%-- TPM request date = tbl_Appointment.CreatedDateTime, which is what
+                             Sp_GetAppointmnetData filters @From/@To on. --%>
+                        <div class="lf-daterange" role="group" aria-label="Request date range" title="Request date range">
+                            <i class="fas fa-calendar-alt lf-daterange-icon" aria-hidden="true"></i>
+                            <input type="date" id="requestDateFrom" class="form-control" aria-label="Request from" title="Request from" />
+                            <span class="lf-sep" aria-hidden="true">&ndash;</span>
+                            <input type="date" id="requestDateTo" class="form-control" aria-label="Request to" title="Request to" />
+                            <button type="button" id="clearRequestDates" class="lf-clear" title="Clear dates" aria-label="Clear request dates" hidden><i class="fas fa-times"></i></button>
+                        </div>
+                        <%-- Sp_GetAppointmnetData only branches on 'accept' and 'pending'; an
+                             appointment's status here is IsApproved, so there is no Cancel to filter by. --%>
+                        <div class="lf-status">
+                            <i class="fas fa-filter" aria-hidden="true"></i>
+                            <asp:DropDownList ID="statusFilter" ClientIDMode="Static" runat="server" CssClass="form-select" ToolTip="Status">
                                 <asp:ListItem Text="All Statuses" Value="ALL"></asp:ListItem>
                                 <asp:ListItem Text="Accept" Value="Accept"></asp:ListItem>
                                 <asp:ListItem Text="Pending" Value="Pending"></asp:ListItem>
@@ -2044,6 +2058,6 @@
             if (e.key === 'Enter') e.preventDefault();
         });
     </script>
-    <script src="Scripts/AppointmentList.js?v=28"></script>
+    <script src="Scripts/AppointmentList.js?v=29"></script>
     <script src="Scripts/panel-resizer.js?v=1"></script>
 </asp:Content>

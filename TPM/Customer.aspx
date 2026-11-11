@@ -6,7 +6,7 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/select/3.0.0/css/select.dataTables.min.css">
 
     <!-- Local Styles and Scripts -->
-    <link rel="stylesheet" href="Content/customer.css?v=10">
+    <link rel="stylesheet" href="Content/customer.css?v=13">
 
     <%-- The custom-fields chip tooltip styles moved to Content/customer.css so CustomerDetails.aspx,
          which renders the same chips in its appointment modal, picks them up too. --%>
@@ -669,10 +669,25 @@
             <!-- Customer List -->
             <div class="cust-list-container">
                 <div class="cust-list-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="cust-list-filter">
-                            <label for="statusFilter" class="form-label"><i class="fas fa-filter"></i> Status</label>
-                            <asp:DropDownList ID="statusFilter" runat="server" CssClass="form-select w-auto">
+                    <%-- Same compact one-row bar as AppoinementList.aspx. Search = the grid's
+                         TP name / email search (DataTables' own box is hidden). The request date
+                         range keeps customers with an appointment created in that range
+                         (LoadCustomers, EXISTS on tbl_Appointment.CreatedDateTime). --%>
+                    <div class="lf-bar">
+                        <div class="lf-search">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="search" id="customerSearch" class="form-control" placeholder="Search" aria-label="Search customers" title="Search by TP name or email" autocomplete="off" />
+                        </div>
+                        <div class="lf-daterange" role="group" aria-label="Request date range" title="Request date range">
+                            <i class="fas fa-calendar-alt lf-daterange-icon" aria-hidden="true"></i>
+                            <input type="date" id="requestDateFrom" class="form-control" aria-label="Request from" title="Request from" />
+                            <span class="lf-sep" aria-hidden="true">&ndash;</span>
+                            <input type="date" id="requestDateTo" class="form-control" aria-label="Request to" title="Request to" />
+                            <button type="button" id="clearRequestDates" class="lf-clear" title="Clear dates" aria-label="Clear request dates" hidden><i class="fas fa-times"></i></button>
+                        </div>
+                        <div class="lf-status lf-status-wide">
+                            <i class="fas fa-filter" aria-hidden="true"></i>
+                            <asp:DropDownList ID="statusFilter" runat="server" CssClass="form-select" ToolTip="Status">
                                 <asp:ListItem Text="Active appointments" Value=""></asp:ListItem>
                                 <asp:ListItem Text="All (incl. Closed/Canceled)" Value="all_inclusive"></asp:ListItem>
                             </asp:DropDownList>
@@ -1567,6 +1582,6 @@
         </div>
     </div>
 
-      <script src="Scripts/customer.js?v=30"></script>
+      <script src="Scripts/customer.js?v=32"></script>
     <script src="Scripts/panel-resizer.js?v=1"></script>
 </asp:Content>

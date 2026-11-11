@@ -1535,13 +1535,134 @@ div#contact {
         box-shadow: none;
     }
 
+    .cust-list-filter .form-control {
+        height: 36px;
+        min-width: 150px;
+        padding: 4px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 9px;
+        font-size: 13.5px;
+        color: #1e293b;
+        box-shadow: none;
+    }
+
+        .cust-list-filter .form-control:focus,
         .cust-list-filter .form-select:focus {
             border-color: #2563eb;
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
         }
 
+/* Compact filter bar (AppoinementList.aspx): search + status on one row,
+   request date range as a single grouped control on the next. Wraps
+   cleanly as the resizable list panel narrows. */
+.lf-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.lf-search,
+.lf-status {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.lf-search { flex: 0 0 160px; }
+.lf-status { flex: 0 0 145px; }
+.lf-status-wide { flex-basis: 215px; }
+
+    .lf-search > i,
+    .lf-status > i {
+        position: absolute;
+        left: 12px;
+        font-size: 12px;
+        color: #94a3b8;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+.lf-bar .form-control,
+.lf-bar .form-select {
+    height: 36px;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    font-size: 13.5px;
+    color: #1e293b;
+    box-shadow: none;
+}
+
+.lf-search .form-control { width: 100%; padding: 4px 12px 4px 32px; }
+.lf-status .form-select { width: 100%; padding: 4px 30px 4px 32px; }
+
+.lf-daterange {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 36px;
+    padding: 0 4px 0 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    background: #fff;
+    min-width: 0;
+}
+
+    .lf-daterange:focus-within,
+    .lf-bar .form-control:focus,
+    .lf-bar .form-select:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+.lf-daterange-icon { color: #94a3b8; font-size: 12px; margin-right: 2px; }
+
+.lf-bar .lf-daterange .form-control {
+    flex: 0 0 auto;
+    width: 122px;
+    height: 30px;
+    padding: 2px 4px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+}
+
+    .lf-bar .lf-daterange .form-control:focus { box-shadow: none; background: #f1f5f9; }
+
+.lf-sep { color: #94a3b8; font-size: 13px; }
+
+.lf-clear {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 12px;
+    line-height: 1;
+}
+
+    .lf-clear:hover { background: #f1f5f9; color: #334155; }
+    .lf-clear[hidden] { display: none; }
+
+
+[data-theme="dark"] .lf-bar .form-control,
+[data-theme="dark"] .lf-bar .form-select,
+[data-theme="dark"] .lf-daterange {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #e2e8f0;
+}
+[data-theme="dark"] .lf-bar .lf-daterange .form-control { background: transparent; }
+[data-theme="dark"] .lf-bar .lf-daterange .form-control:focus,
+[data-theme="dark"] .lf-clear:hover { background: rgba(255, 255, 255, 0.1); color: #e2e8f0; }
+[data-theme="dark"] .lf-bar input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.8); }
+
 [data-theme="dark"] .cust-list-toolbar { border-bottom-color: rgba(255, 255, 255, 0.1); }
 [data-theme="dark"] .cust-list-filter .form-label { color: #94a3b8; }
+[data-theme="dark"] .cust-list-filter .form-control,
 [data-theme="dark"] .cust-list-filter .form-select {
     background-color: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.15);
@@ -1926,7 +2047,8 @@ div#contact {
 }
 
 @media (max-width: 640px) {
-    .cust-list-filter .form-select { min-width: 0; }
+    .cust-list-filter .form-select,
+    .cust-list-filter .form-control { min-width: 0; }
     #customerTable_wrapper .dt-search input,
     #AppointmentListTable_wrapper .dt-search input,
     #customerSiteTable_wrapper .dt-search input { width: 100%; }

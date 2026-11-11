@@ -1350,10 +1350,16 @@ namespace TPM
                         COALESCE(n.TaggedTo, '') as TaggedTo,
                         COALESCE(n.TaggedFrom, 'FSM') as TaggedFrom,
                         COALESCE(CAST(n.AppointmentId AS NVARCHAR(50)), '') as AppointmentId,
+                        COALESCE(appt.AppoinmentUId, '') as AppointmentUId,
                         CAST(n.CustomerId AS NVARCHAR(50)) as CustomerId,
                         n.CompanyId,
                         COALESCE(n.SiteId, 0) as SiteId
                     FROM [msSchedulerV3].[dbo].[tbl_Note] n
+                    OUTER APPLY (
+                        SELECT TOP 1 a.AppoinmentUId
+                          FROM [msSchedulerV3].[dbo].[tbl_Appointment] a
+                         WHERE a.ApptID = TRY_CAST(n.AppointmentId AS INT) AND a.CompanyID = n.CompanyId
+                    ) appt
                     WHERE n.CustomerId = @CustomerId 
                       AND n.CompanyId = @CompanyId and n.SiteID = @siteId and  n.TaggedFrom = 'FSM' 
                     ORDER BY n.CreatedAt DESC";
@@ -1392,6 +1398,7 @@ namespace TPM
                             AppointmentId = row["AppointmentId"] != null && row["AppointmentId"] != DBNull.Value
                                 ? row["AppointmentId"].ToString()
                                 : "",
+                            AppointmentUId = row.Table.Columns.Contains("AppointmentUId") ? (row["AppointmentUId"]?.ToString() ?? "") : "",
                             CustomerId = row["CustomerId"] != null && row["CustomerId"] != DBNull.Value
                                 ? row["CustomerId"].ToString()
                                 : ""
@@ -1532,6 +1539,7 @@ namespace TPM
             public string TaggedTo { get; set; }
             public string TaggedFrom { get; set; }
             public string AppointmentId { get; set; }
+            public string AppointmentUId { get; set; }
             public string Reference { get; set; }
             public string CustomerId { get; set; }
         }
@@ -2141,6 +2149,7 @@ namespace TPM
             public string UploadDate { get; set; }
             public string UploadedBy { get; set; }
             public int? AppointmentId { get; set; }
+            public string AppointmentUId { get; set; }
             public string Reference { get; set; }
             public string TaggedFrom { get; set; }
             public string TaggedTo { get; set; }
@@ -2172,22 +2181,28 @@ namespace TPM
                 // Note: tbl_Pictures table doesn't have AppointmentId, TaggedFrom, TaggedTo, UploadedFrom, UploadedTo columns
                 string sql = @"
                     SELECT
-                        Id,
-                        FileName,
-                        PictureURL,
-                        UploadDate,
-                        COALESCE(NULLIF(UploadedBy, ''), 'System') as UploadedBy,
-                        SiteId,
-                        AppointmentId,
-                        Reference,
+                        p.Id,
+                        p.FileName,
+                        p.PictureURL,
+                        p.UploadDate,
+                        COALESCE(NULLIF(p.UploadedBy, ''), 'System') as UploadedBy,
+                        p.SiteId,
+                        p.AppointmentId,
+                        COALESCE(appt.AppoinmentUId, '') as AppointmentUId,
+                        p.Reference,
                         'FSM' as TaggedFrom,
                         NULL as TaggedTo,
                         NULL as UploadedFrom,
                         NULL as UploadedTo
-                    FROM [msSchedulerV3].[dbo].[tbl_Pictures]
-                    WHERE CAST(CustomerID AS NVARCHAR(50)) = @CustomerID
-                      AND CompanyID = @CompanyID and SiteId = @SiteId
-                    ORDER BY UploadDate DESC";
+                    FROM [msSchedulerV3].[dbo].[tbl_Pictures] p
+                    OUTER APPLY (
+                        SELECT TOP 1 a.AppoinmentUId
+                          FROM [msSchedulerV3].[dbo].[tbl_Appointment] a
+                         WHERE a.ApptID = TRY_CAST(p.AppointmentId AS INT) AND a.CompanyID = p.CompanyID
+                    ) appt
+                    WHERE CAST(p.CustomerID AS NVARCHAR(50)) = @CustomerID
+                      AND p.CompanyID = @CompanyID and p.SiteId = @SiteId
+                    ORDER BY p.UploadDate DESC";
 
                 // Initialize Command if needed (ExecuteParam uses db.Command.Parameters)
                 if (db.Command == null)
@@ -2241,6 +2256,7 @@ namespace TPM
                             UploadDate = row.Field<DateTime?>("UploadDate")?.ToString("MM/dd/yyyy HH:mm") ?? "",
                             UploadedBy = row.Field<string>("UploadedBy") ?? "System",
                             AppointmentId = row.Table.Columns.Contains("AppointmentId") && row["AppointmentId"] != DBNull.Value ? (int?)Convert.ToInt32(row["AppointmentId"]) : null,
+                            AppointmentUId = row.Table.Columns.Contains("AppointmentUId") ? (row["AppointmentUId"]?.ToString() ?? "") : "",
                             Reference = row.Table.Columns.Contains("Reference") ? (row.Field<string>("Reference") ?? "") : "",
                             TaggedFrom = row.Table.Columns.Contains("TaggedFrom") ? row.Field<string>("TaggedFrom") : "FSM",
                             TaggedTo = row.Table.Columns.Contains("TaggedTo") ? row.Field<string>("TaggedTo") : null
@@ -2444,6 +2460,7 @@ namespace TPM
             public string UploadedBy { get; set; }
             public long FileSize { get; set; }
             public int? AppointmentId { get; set; }
+            public string AppointmentUId { get; set; }
             public string Reference { get; set; }
             public string TaggedFrom { get; set; }
             public string TaggedTo { get; set; }
@@ -2474,24 +2491,30 @@ namespace TPM
                 // Handle CustomerID as both string and integer for compatibility
                 // Note: tbl_Files table doesn't have AppointmentId, TaggedFrom, TaggedTo, UploadedFrom, UploadedTo columns
                 string sql = @"
-                    SELECT 
-                        Id,
-                        FileName,
-                        FileType,
-                        FileSize,
-                        UploadDate,
-                        Reference,
-                        COALESCE(NULLIF(UploadedBy, ''), 'System') as UploadedBy,
-                        SiteId,
-                        AppointmentId,
+                    SELECT
+                        f.Id,
+                        f.FileName,
+                        f.FileType,
+                        f.FileSize,
+                        f.UploadDate,
+                        f.Reference,
+                        COALESCE(NULLIF(f.UploadedBy, ''), 'System') as UploadedBy,
+                        f.SiteId,
+                        f.AppointmentId,
+                        COALESCE(appt.AppoinmentUId, '') as AppointmentUId,
                         'FSM' as TaggedFrom,
                         NULL as TaggedTo,
                         NULL as UploadedFrom,
                         NULL as UploadedTo
-                    FROM [msSchedulerV3].[dbo].[tbl_Files]
-                    WHERE CAST(CustomerID AS NVARCHAR(50)) = @CustomerID 
-                      AND CompanyID = @CompanyID and SiteId= @SiteId
-                    ORDER BY UploadDate DESC";
+                    FROM [msSchedulerV3].[dbo].[tbl_Files] f
+                    OUTER APPLY (
+                        SELECT TOP 1 a.AppoinmentUId
+                          FROM [msSchedulerV3].[dbo].[tbl_Appointment] a
+                         WHERE a.ApptID = TRY_CAST(f.AppointmentId AS INT) AND a.CompanyID = f.CompanyID
+                    ) appt
+                    WHERE CAST(f.CustomerID AS NVARCHAR(50)) = @CustomerID
+                      AND f.CompanyID = @CompanyID and f.SiteId= @SiteId
+                    ORDER BY f.UploadDate DESC";
 
                 // Initialize Command if needed (ExecuteParam uses db.Command.Parameters)
                 if (db.Command == null)
@@ -2526,6 +2549,7 @@ namespace TPM
                             UploadedBy = row.Field<string>("UploadedBy") ?? "System",
                             FileSize = row.Field<long?>("FileSize") ?? 0,
                             AppointmentId = row.Table.Columns.Contains("AppointmentId") && row["AppointmentId"] != DBNull.Value ? (int?)Convert.ToInt32(row["AppointmentId"]) : null,
+                            AppointmentUId = row.Table.Columns.Contains("AppointmentUId") ? (row["AppointmentUId"]?.ToString() ?? "") : "",
                             Reference = row.Table.Columns.Contains("Reference") ? (row.Field<string>("Reference") ?? "") : "",
                             TaggedFrom = row.Table.Columns.Contains("TaggedFrom") ? row.Field<string>("TaggedFrom") : "FSM",
                             TaggedTo = row.Table.Columns.Contains("TaggedTo") ? row.Field<string>("TaggedTo") : null

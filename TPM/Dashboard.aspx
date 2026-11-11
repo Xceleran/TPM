@@ -58,7 +58,7 @@
 
             <!-- 3. Active Appointments — purple -->
             <div class="col-12 col-md-6 col-xl-3">
-                <a href="Appointments.aspx" class="stat-card purple" id="card-active">
+                <div class="stat-card purple" id="card-active">
                     <button class="stat-info-btn" type="button" tabindex="-1" onclick="return false;"><i class="bi bi-info-circle"></i></button>
                     <span class="stat-info-tip">Approved appointments not closed, cancelled or deleted</span>
                     <div class="stat-icon">
@@ -68,13 +68,12 @@
                         <div class="stat-num" id="val-active"><asp:Label ID="lblActiveAppointments" runat="server" Text="0" /></div>
                         <div class="stat-label">Active Appointments</div>
                     </div>
-                    <span class="stat-go-link">View Appointments <i class="bi bi-arrow-right"></i></span>
-                </a>
+                </div>
             </div>
 
             <!-- 4. Active Assignments — orange -->
             <div class="col-12 col-md-6 col-xl-3">
-                <a href="Dispatch.aspx" class="stat-card orange" id="card-dispatched">
+                <div class="stat-card orange" id="card-dispatched">
                     <button class="stat-info-btn" type="button" tabindex="-1" onclick="return false;"><i class="bi bi-info-circle"></i></button>
                     <span class="stat-info-tip">Assignments whose appointment is still open</span>
                     <div class="stat-icon">
@@ -84,8 +83,7 @@
                         <div class="stat-num" id="val-dispatched"><asp:Label ID="lblActiveAssignments" runat="server" Text="0" /></div>
                         <div class="stat-label">Active Assignments</div>
                     </div>
-                    <span class="stat-go-link">View Dispatch <i class="bi bi-arrow-right"></i></span>
-                </a>
+                </div>
             </div>
 
         </div>
@@ -117,12 +115,7 @@
 
             <!-- Recent Activity (right) -->
             <div class="col-12 col-lg-6">
-                <div class="section-hdr d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-clock-history" style="margin-right: 7px;"></i>Recent Activity</span>
-                    <a href="Appointments.aspx" class="text-decoration-none" style="font-size: .78rem; color: #6366f1; font-weight: 600; text-transform: none; letter-spacing: 0;">
-                        View all <i class="bi bi-arrow-right"></i>
-                    </a>
-                </div>
+                <div class="section-hdr"><i class="bi bi-clock-history" style="margin-right: 7px;"></i>Recent Activity</div>
                 <div class="activity-feed" id="activityFeed">
                     <asp:Repeater ID="rptRecent" runat="server">
                         <ItemTemplate>

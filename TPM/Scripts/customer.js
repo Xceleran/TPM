@@ -512,6 +512,45 @@ $(document).ready(function () {
     // Delegated + both IDs, because the ASP.NET control renders as #MainContent_statusFilter.
     // This must re-query the server (not table.draw) now that the status filter is applied in
     // SQL - a client-side redraw would only re-filter the 10 rows already on screen.
+    // Request date range + Dispatch ID (same compact bar as the Appointment List).
+    function syncClearDates() {
+        $('#clearRequestDates').prop('hidden', !($('#requestDateFrom').val() || $('#requestDateTo').val()));
+    }
+    $('#clearRequestDates').on('click', function () {
+        $('#requestDateFrom, #requestDateTo').val('');
+        syncClearDates();
+        if (table) table.ajax.reload();
+    });
+    $('#requestDateFrom, #requestDateTo').on('change', function () {
+        const from = $('#requestDateFrom').val();
+        const to = $('#requestDateTo').val();
+        syncClearDates();
+        if (from && to && from > to) {
+            alert('Request From date must be on or before Request To date.');
+            return;
+        }
+        if (table) table.ajax.reload();
+    });
+    // Customer search (TP name / email): debounced, since the grid is server-side and
+    // DataTables would otherwise query on every keystroke.
+    let customerSearchTimer = null;
+    function runCustomerSearch() {
+        clearTimeout(customerSearchTimer);
+        const value = ($('#customerSearch').val() || '').trim();
+        if (table && table.search() !== value) table.search(value).draw();
+    }
+    $('#customerSearch')
+        .on('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // don't submit the page's server form
+                runCustomerSearch();
+            }
+        })
+        .on('input', function () {
+            clearTimeout(customerSearchTimer);
+            customerSearchTimer = setTimeout(runCustomerSearch, 400);
+        });
+
     $(document).on('change', '#statusFilter, #MainContent_statusFilter', function () {
         if (table) table.ajax.reload();
     });
@@ -605,6 +644,7 @@ function loadCustomers() {
     var savedState = getFilterState();
     var initSearch = (savedState && savedState.search) ? savedState.search : '';
     var initPage = (savedState && savedState.page) ? savedState.page : 0;
+    $('#customerSearch').val(initSearch);
 
     // Assign to the module-level `table`. Without this it stayed null forever, so every
     // `if (table) table.ajax.reload()` guard (status filter, hideNA toggle, view filter)
@@ -614,6 +654,8 @@ function loadCustomers() {
         serverSide: true,
         filter: true,
         search: { search: initSearch },
+        // Search lives in the toolbar (#customerSearch), so drop DataTables' own box.
+        layout: { topEnd: null },
         displayStart: initPage * 10,
         ajax: {
             url: "Customer.aspx/LoadCustomers",
@@ -630,7 +672,9 @@ function loadCustomers() {
                     sortDirection: d.order[0].dir,
                     cslViewFilter: 'all', // No longer using $('#cslViewFilter').val()
                     hideNoAppointments: $('#hideNA').is(':checked'),
-                    statusFilter: $statusFilterEl().val() || ''
+                    statusFilter: $statusFilterEl().val() || '',
+                    requestFrom: $('#requestDateFrom').val() || '',   // yyyy-MM-dd
+                    requestTo: $('#requestDateTo').val() || ''        // yyyy-MM-dd
                 });
             },
             dataSrc: function (json) {
@@ -704,19 +748,8 @@ function loadCustomers() {
             // reload of the page starts clean instead of resurrecting an old search.
             clearFilterState();
 
-            // Debounce the search box: DataTables fires a server round-trip on every
-            // keystroke by default, which on a server-side grid means a query per letter.
-            var api = this.api();
-            var searchInput = $('div.dataTables_filter input');
-            searchInput.off('keyup search input').on('keyup', function () {
-                var self = this;
-                clearTimeout(self._searchTimer);
-                self._searchTimer = setTimeout(function () {
-                    if (api.search() !== self.value) {
-                        api.search(self.value).draw();
-                    }
-                }, 400);
-            });
+            // The grid's own search box is hidden (layout.topEnd); #customerSearch in the
+            // toolbar drives api.search() instead (wired once in document.ready).
         }
     });
 

@@ -336,6 +336,43 @@ $(document).ready(function () {
         LoadAppointments();
     });
 
+    // Request date range: reload once both ends make sense (or either is cleared).
+    function syncClearDates() {
+        $('#clearRequestDates').prop('hidden', !($('#requestDateFrom').val() || $('#requestDateTo').val()));
+    }
+
+    $('#clearRequestDates').on('click', function () {
+        $('#requestDateFrom, #requestDateTo').val('');
+        syncClearDates();
+        LoadAppointments();
+    });
+
+    $('#requestDateFrom, #requestDateTo').on('change', function () {
+        const from = $('#requestDateFrom').val();
+        const to = $('#requestDateTo').val();
+        syncClearDates();
+        if (from && to && from > to) {
+            notify('warning', 'Request From date must be on or before Request To date.');
+            return;
+        }
+        LoadAppointments();
+    });
+
+    // Dispatch ID: search on Enter, after a short pause in typing, or when cleared.
+    let dispatchSearchTimer = null;
+    $('#dispatchIdSearch')
+        .on('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // don't submit the page's server form
+                clearTimeout(dispatchSearchTimer);
+                LoadAppointments();
+            }
+        })
+        .on('input', function () {
+            clearTimeout(dispatchSearchTimer);
+            dispatchSearchTimer = setTimeout(LoadAppointments, 500);
+        });
+
     $('#addSiteModal').on('change', '#isActive', function () {
         updateIsActiveLabel();
     });
@@ -369,11 +406,12 @@ function LoadAppointments(selectApptId) {
                 return JSON.stringify({
                     SearchBy: "",
                     SearchFor: "",
-                    SearchFrom: "",
-                    SearchTo: "",
+                    SearchFrom: $('#requestDateFrom').val() || "",   // yyyy-MM-dd
+                    SearchTo: $('#requestDateTo').val() || "",       // yyyy-MM-dd
                     SearchCriteria: "",
                     SearchByWarrantyCompany: "",
-                    wantedStatus: currentStatusFilter()
+                    wantedStatus: currentStatusFilter(),
+                    DispatchId: ($('#dispatchIdSearch').val() || "").trim()
                 });
             },
             dataSrc: function (json) {

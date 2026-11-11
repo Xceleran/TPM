@@ -40,7 +40,7 @@
 
 a.stat-card { cursor: pointer; }
 
-.stat-card:hover {
+a.stat-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 8px 24px rgba(0,0,0,0.12);
     text-decoration: none;

@@ -1834,7 +1834,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Read More link is needed by measuring actual overflow, not character count.
             html += `
                 <tr ${note.AppointmentId ? `data-appointment-id="${note.AppointmentId}"` : ''}>
-                    <td>${note.AppointmentId ? `<a href="javascript:void(0);" onclick="showAppointmentDetailsModal('${note.AppointmentId}')">${note.AppointmentId}</a>` : '-'}</td>
+                    <td>${note.AppointmentId ? `<a href="javascript:void(0);" onclick="showAppointmentDetailsModal('${note.AppointmentId}')">${note.AppointmentUId || note.AppointmentId}</a>` : '-'}</td>
                     <td class="note-content-cell">
                         <div class="note-text clamped">${escapeHTML(noteText)}</div>
                         <button type="button" class="btn btn-sm btn-link read-more-btn p-0 d-none" style="text-decoration: none;">Read More</button>
@@ -1935,7 +1935,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let html = '';
         forms.forEach(form => {
             const apptId = form.AppointmentId || '-';
-            const formattedApptId = appointmentData.find(apt => apt.AppoinmentId === apptId)?.FormattedAppointmentId || apptId;
+            const formattedApptId = appointmentData.find(apt => String(apt.AppoinmentId) === String(apptId))?.AppoinmentUId || apptId;
             const dateAdded = form.StartedDateTime || form.CreatedDateTime || '-';
             const formName = form.TemplateName || `Form #${form.TemplateId}`;
             const status = form.Status || 'Pending';
@@ -2016,7 +2016,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sitePictures.forEach(pic => {
             html += `
                 <tr ${pic.AppointmentId ? `data-appointment-id="${pic.AppointmentId}"` : ''}>
-                    <td>${pic.AppointmentId ? `<a href="javascript:void(0);" onclick="showAppointmentDetailsModal(${pic.AppointmentId})">${pic.AppointmentId}</a>` : '-'}</td>
+                    <td>${pic.AppointmentId ? `<a href="javascript:void(0);" onclick="showAppointmentDetailsModal(${pic.AppointmentId})">${pic.AppointmentUId || pic.AppointmentId}</a>` : '-'}</td>
                     <td>
                         <img src="${pic.FileUrl}" style="max-width: 100px; max-height: 100px; cursor: pointer;" onclick="window.open('${pic.FileUrl}', '_blank')" />
                         <div>${pic.FileName || '-'}</div>
@@ -2088,7 +2088,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const fileUrl = file.FileUrl || `/fsm/CustomerDetails.aspx?type=file&id=${file.Id}`;
             html += `
                 <tr ${file.AppointmentId ? `data-appointment-id="${file.AppointmentId}"` : ''} class="file-row">
-                    <td>${file.AppointmentId ? `<a href="javascript:void(0);" onclick="showAppointmentDetailsModal(${file.AppointmentId})">${file.AppointmentId}</a>` : '-'}</td>
+                    <td>${file.AppointmentId ? `<a href="javascript:void(0);" onclick="showAppointmentDetailsModal(${file.AppointmentId})">${file.AppointmentUId || file.AppointmentId}</a>` : '-'}</td>
                     <td>
                         <a href="${fileUrl}" target="_blank" class="file-preview-trigger" data-file-url="${fileUrl}" data-file-type="${file.FileType || ''}">${escapeHTML(file.FileName || '-')}</a>
                         <div><small>${escapeHTML(file.FileType || '-')} - ${formatFileSize(file.FileSize || 0)}</small></div>

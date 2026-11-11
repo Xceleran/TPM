@@ -151,7 +151,8 @@ namespace TPM
           string SearchTo = "",
           string SearchCriteria = "",
           string SearchByWarrantyCompany = "",
-         string  wantedStatus ="")
+         string  wantedStatus ="",
+          string DispatchId = "")
         {
             List<CustomerEntity> _List = new List<CustomerEntity>();
 
@@ -174,18 +175,25 @@ namespace TPM
 
 
 
-                DateTime _SearchFrom = DateTime.Now.AddDays(-30);
-                if (String.IsNullOrEmpty((SearchFrom)))
+                // TPM request date range (Sp_GetAppointmnetData filters CreatedDateTime on it).
+                // The page sends yyyy-MM-dd from <input type="date">; blank means the default
+                // window, except when searching a Dispatch ID, which looks across all dates.
+                string dispatchSearch = (DispatchId ?? "").Trim();
+                bool searchingDispatch = dispatchSearch.Length > 0;
+
+                DateTime _SearchFrom = searchingDispatch ? new DateTime(1900, 1, 1) : DateTime.Now.AddDays(-60);
+                DateTime parsedFrom;
+                if (!String.IsNullOrWhiteSpace(SearchFrom) && DateTime.TryParse(SearchFrom, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsedFrom))
                 {
-                    _SearchFrom = DateTime.Now.AddDays(-60);
+                    _SearchFrom = parsedFrom.Date;
                 }
 
-
-                DateTime _SearchTo = DateTime.Now.AddDays(30);
-
-                if (String.IsNullOrEmpty((SearchTo)))
+                DateTime _SearchTo = searchingDispatch ? new DateTime(9999, 12, 31) : DateTime.Now.AddDays(60);
+                DateTime parsedTo;
+                if (!String.IsNullOrWhiteSpace(SearchTo) && DateTime.TryParse(SearchTo, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsedTo))
                 {
-                    _SearchTo = DateTime.Now.AddDays(60);
+                    // Include the whole "To" day.
+                    _SearchTo = parsedTo.Date.AddDays(1).AddTicks(-1);
                 }
 
 
@@ -229,6 +237,12 @@ namespace TPM
 
                 foreach (DataRow dataRow in dataSet.Tables[0].Rows)
                 {
+                    if (searchingDispatch &&
+                        dataRow["DispatchId"].ToString().IndexOf(dispatchSearch, StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        continue;
+                    }
+
                     _List.Add(new CustomerEntity
                     {
                         SiteName = dataRow["SiteName"].ToString(),

@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Security.Policy;
@@ -137,7 +138,8 @@ namespace FSM
         }
         [WebMethod]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
-        public static string LoadCustomers(int draw, int start, int length, string searchValue, string sortColumn, string sortDirection, string cslViewFilter = "all", bool hideNoAppointments = false, string statusFilter = "")
+        public static string LoadCustomers(int draw, int start, int length, string searchValue, string sortColumn, string sortDirection, string cslViewFilter = "all", bool hideNoAppointments = false, string statusFilter = "",
+            string requestFrom = "", string requestTo = "")
         {
             string companyid = HttpContext.Current.Session["CompanyID"].ToString();
             int totalRecords = 0;
@@ -197,6 +199,28 @@ namespace FSM
                 if (hideNoAppointments)
                 {
                     fromAndWhere += " and apptData.LatestAppointmentID  > 0 ";
+                }
+
+                // Request date range (same bar as AppoinementList.aspx): keep customers with at
+                // least one appointment created in the range. Request date =
+                // tbl_Appointment.CreatedDateTime, which is what Sp_GetAppointmnetData filters on.
+                string apptMatch = "";
+                DateTime reqFrom, reqTo;
+                if (!string.IsNullOrWhiteSpace(requestFrom) &&
+                    DateTime.TryParse(requestFrom, CultureInfo.InvariantCulture, DateTimeStyles.None, out reqFrom))
+                {
+                    apptMatch += $" AND a2.CreatedDateTime >= '{reqFrom:yyyy-MM-dd}' ";
+                }
+                if (!string.IsNullOrWhiteSpace(requestTo) &&
+                    DateTime.TryParse(requestTo, CultureInfo.InvariantCulture, DateTimeStyles.None, out reqTo))
+                {
+                    apptMatch += $" AND a2.CreatedDateTime < '{reqTo.Date.AddDays(1):yyyy-MM-dd}' ";
+                }
+                if (apptMatch.Length > 0)
+                {
+                    fromAndWhere += $@" AND EXISTS (
+                        SELECT 1 FROM [msSchedulerV3].[dbo].[tbl_Appointment] a2
+                        WHERE a2.CustomerID = c.CustomerID AND a2.CompanyID = c.CompanyID {apptMatch}) ";
                 }
 
                 // Status filter (mirrors the FSM CSL board):
