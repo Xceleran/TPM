@@ -2058,6 +2058,6 @@
             if (e.key === 'Enter') e.preventDefault();
         });
     </script>
-    <script src="Scripts/AppointmentList.js?v=29"></script>
+    <script src="Scripts/AppointmentList.js?v=30"></script>
     <script src="Scripts/panel-resizer.js?v=1"></script>
 </asp:Content>

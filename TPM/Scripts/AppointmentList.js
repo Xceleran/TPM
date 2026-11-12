@@ -724,10 +724,10 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                         </button>`;
 
                     const smsButton = `
-                        <button type="button" class="cust-site-icon-btn cust-site-SMS-btn" title="Send SMS" data-site-id="${escapeHTML(site.Id)}" data-customer-id="${escapeHTML(site.CustomerID)}" data-MobileNumber-id="${escapeHTML(site.MobileNumber)}" data-is-default="${isDefaultSite}">
+                        <button type="button" class="cust-site-icon-btn cust-site-SMS-btn" title="Send SMS" data-site-id="${escapeHTML(site.Id)}" data-customer-id="${escapeHTML(site.CustomerID)}" data-MobileNumber-id="${escapeHTML(site.MobileNumber || site.PhoneNumber)}" data-is-default="${isDefaultSite}">
                             <i class="fa-solid fa-message"></i></button>`;
                     const mmsButton = `
-                        <button type="button" class="cust-site-icon-btn cust-site-MMS-btn" title="Send MMS" data-site-id="${escapeHTML(site.Id)}" data-customer-id="${escapeHTML(site.CustomerID)}" data-MobileNumber-id="${escapeHTML(site.MobileNumber)}" data-is-default="${isDefaultSite}">
+                        <button type="button" class="cust-site-icon-btn cust-site-MMS-btn" title="Send MMS" data-site-id="${escapeHTML(site.Id)}" data-customer-id="${escapeHTML(site.CustomerID)}" data-MobileNumber-id="${escapeHTML(site.MobileNumber || site.PhoneNumber)}" data-is-default="${isDefaultSite}">
                             <i class="fa-solid fa-photo-film"></i></button>`;
                     const mapQuery = [site.Address, site.City, site.State, site.Zip].filter(Boolean).join(', ');
                     const detailRow = (icon, label, value) => `

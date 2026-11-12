@@ -924,6 +924,36 @@ namespace TPM
                             CreatedDateTime = Convert.ToDateTime(dr["CreatedDateTime"])
                         });
                     }
+
+                    // A site without its own phone/email falls back to the customer's, so the
+                    // SMS/MMS/Email popups open pre-filled whenever the customer has one on file.
+                    if (sites.Exists(s => string.IsNullOrWhiteSpace(s.Email)
+                        || (string.IsNullOrWhiteSpace(s.MobileNumber) && string.IsNullOrWhiteSpace(s.PhoneNumber))))
+                    {
+                        DataTable custDt = new DataTable();
+                        db.Open();
+                        db.AddParameter("@CustomerID", customerId, SqlDbType.NVarChar);
+                        db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+                        db.ExecuteParam(@"SELECT * FROM [msSchedulerV3].[dbo].[tbl_Customer] WHERE CustomerID = @CustomerID AND CompanyID = @CompanyID;", out custDt);
+                        db.Close();
+
+                        if (custDt.Rows.Count > 0)
+                        {
+                            DataRow c = custDt.Rows[0];
+                            string custEmail = c["Email"].ToString();
+                            string custPhone = Common.GetFormatedPhoneNumber(c["Phone"].ToString());
+                            string custMobile = custDt.Columns.Contains("Mobile") ? Common.GetFormatedPhoneNumber(c["Mobile"].ToString()) : "";
+                            foreach (var s in sites)
+                            {
+                                if (string.IsNullOrWhiteSpace(s.Email)) s.Email = custEmail;
+                                if (string.IsNullOrWhiteSpace(s.MobileNumber) && string.IsNullOrWhiteSpace(s.PhoneNumber))
+                                {
+                                    s.MobileNumber = custMobile;
+                                    s.PhoneNumber = custPhone;
+                                }
+                            }
+                        }
+                    }
                 }
                 else
                 {
@@ -954,7 +984,9 @@ namespace TPM
                             State = LocationHelper.GetFullName(cust["State"].ToString()),
                             Zip = cust["ZipCode"].ToString(),
                             Country = customerDt.Columns.Contains("Country") ? cust["Country"].ToString() : "",
-                            PhoneNumber = cust["Phone"].ToString(),
+                            PhoneNumber = Common.GetFormatedPhoneNumber(cust["Phone"].ToString()),
+                            // Without this the SMS/MMS popups opened with an empty number for the default site.
+                            MobileNumber = customerDt.Columns.Contains("Mobile") ? Common.GetFormatedPhoneNumber(cust["Mobile"].ToString()) : "",
                             Email = cust["Email"].ToString(),
                             IsActive = true,
                             Note = "This is the primary customer location."
