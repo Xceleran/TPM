@@ -553,6 +553,7 @@ $(document).ready(function () {
 
     $(document).on('change', '#statusFilter, #MainContent_statusFilter', function () {
         if (table) table.ajax.reload();
+        if ($.fn.DataTable.isDataTable('#customerSiteTable')) $('#customerSiteTable').DataTable().draw();
     });
 
     $('#cslViewFilter').on('change', function () {
@@ -872,7 +873,8 @@ function loadCustomerSiteData(customerId) {
                     sortDirection: d.order[0].dir,
                     appointmentStartDate: getDateRangeFromSelection($('#siteApptDateRangeSelect').val()).startDate,
                     appointmentEndDate: getDateRangeFromSelection($('#siteApptDateRangeSelect').val()).endDate,
-                    appointmentStatus: $('#siteApptStatusFilter').val() || ''
+                    appointmentStatus: $('#siteApptStatusFilter').val() || '',
+                    customerStatusFilter: $statusFilterEl().val() || ''
                 });
             },
 
