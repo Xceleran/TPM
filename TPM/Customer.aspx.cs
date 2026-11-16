@@ -1419,7 +1419,7 @@ namespace FSM
 
         [WebMethod]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
-        public static string GetCustomerSiteData(string customerId,int draw, int start, int length, string searchValue, string sortColumn, string sortDirection, string appointmentStartDate = "", string appointmentEndDate = "", string appointmentStatus = "")
+        public static string GetCustomerSiteData(string customerId,int draw, int start, int length, string searchValue, string sortColumn, string sortDirection, string appointmentStartDate = "", string appointmentEndDate = "", string appointmentStatus = "", string customerStatusFilter = "")
         {
             var sites = new List<CustomerSite>();
 
@@ -1453,6 +1453,11 @@ namespace FSM
                     // Handle status as either StatusName or StatusID via tbl_Status
                     strSQL += $" AND appt.status = '{appointmentStatus}' ";
                 }
+                else if (!string.IsNullOrEmpty(customerStatusFilter) && customerStatusFilter != "all_inclusive")
+                {
+                    // Customer-list status filter (e.g. Pending): only sites that have an appointment in that status.
+                    strSQL += $" AND TRY_CAST(appt.status AS INT) IN (SELECT StatusID FROM [msSchedulerV3].[dbo].[tbl_Status] WHERE CompanyID = st.CompanyID AND StatusName = '{customerStatusFilter.Replace("'", "''")}') ";
+                }
 
                 strSQL += $" GROUP BY st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.LastName,st.Address,st.City,st.Country,st.State,st.Zip,st.MobileNumber,st.Contact,st.Email,st.PhoneNumber,st.Note,st.IsActive ";
                 strSQL += $" ORDER BY st.SiteName {sortDirection} OFFSET {start} ROWS FETCH NEXT {length} ROWS ONLY;";
@@ -1473,6 +1478,11 @@ namespace FSM
                 {
                     // Handle status as either StatusName or StatusID via tbl_Status
                     strSQL += $" AND appt.status = '{appointmentStatus}' ";
+                }
+                else if (!string.IsNullOrEmpty(customerStatusFilter) && customerStatusFilter != "all_inclusive")
+                {
+                    // Customer-list status filter (e.g. Pending): only sites that have an appointment in that status.
+                    strSQL += $" AND TRY_CAST(appt.status AS INT) IN (SELECT StatusID FROM [msSchedulerV3].[dbo].[tbl_Status] WHERE CompanyID = st.CompanyID AND StatusName = '{customerStatusFilter.Replace("'", "''")}') ";
                 }
 
                 if (!string.IsNullOrEmpty(searchValue))
