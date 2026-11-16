@@ -750,10 +750,10 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                         <i class="fas fa-tools"></i></button>` : ''}
                                     ${warrantyId === '1' ? `<button type="button" class="cust-site-icon-btn ahs-status-btn" title="AHS Status">
                                         <i class="fas fa-clipboard-list"></i></button>` : ''}
-                                    <button type="button" class="cust-site-icon-btn cust-site-Duplicate-btn" title="Customer Duplicates" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
+                                    <button type="button" class="cust-site-icon-btn d-none cust-site-Duplicate-btn" title="Customer Duplicates" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
                                         <i class="fas fa-users"></i></button>
                                     <button type="button" class="cust-site-icon-btn site-dup-btn" title="Site Duplicates" data-Site-Name="${escapeHTML(site.SiteName)}" data-siteid="${escapeHTML(site.Id)}" data-CustomerID="${escapeHTML(site.CustomerID)}">
-                                        <i class="fas fa-map-marker-alt"></i></button>
+                                        <i class="fas fa-users"></i></button>
                                     <button type="button" class="cust-site-icon-btn cust-site-msgview-btn" title="View Original Message" data-site-id="${escapeHTML(ApptID)}" data-is-default="${isDefaultSite}">
                                         <i class="fas fa-file-alt"></i></button>
                                     <button type="button" class="cust-site-icon-btn cust-site-email-btn" title="Send Email" data-customer-id="${escapeHTML(site.CustomerID)}" data-email="${escapeHTML(site.Email)}">
