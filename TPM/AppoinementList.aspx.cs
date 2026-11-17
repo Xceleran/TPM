@@ -1508,6 +1508,20 @@ namespace TPM
             }
             return success;
         }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static List<CustomerSite> FindDuplicateSites(string siteName, string address, string city, string zip, string phone, string email)
+        {
+            return Customer.FindDuplicateSites(siteName, address, city, zip, phone, email);
+        }
+
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static string MergeCustomerSites(int primarySiteId, List<int> siteIds, bool Isdelete)
+        {
+            return Customer.MergeCustomerSites(primarySiteId, siteIds, Isdelete);
+        }
     }
     public enum AppointmentStatus
     {

@@ -222,6 +222,35 @@ $(document).ready(function () {
     $('#btn_SearchSiteDuplicates').on('click', SearchSiteDuplicates);
     $('#btn_MergeSiteDuplicates').on('click', MergeSiteDuplicates);
 
+    // "Select All except Primary" button for duplicate sites
+    $('#mdl_CheckSiteDuplicate').on('click', '#btn_SelectAllDupSites', function () {
+        const primaryVal = $('#DuplicateSiteTable .dup-primary:checked').val();
+        $('#DuplicateSiteTable .dup-target').each(function () {
+            if (!$(this).prop('disabled')) {
+                $(this).prop('checked', $(this).val() !== String(primaryVal));
+            }
+        });
+        refreshDupSiteRowTints();
+    });
+
+    // "Deselect All" button for duplicate sites
+    $('#mdl_CheckSiteDuplicate').on('click', '#btn_DeselectAllDupSites', function () {
+        $('#DuplicateSiteTable .dup-target').prop('checked', false);
+        refreshDupSiteRowTints();
+    });
+
+    // When the Primary radio changes: disable that row's checkbox, re-enable all others,
+    // and uncheck the now-primary row's checkbox.
+    $('#DuplicateSiteTable').on('change', '.dup-primary', function () {
+        syncDupSiteCheckboxDisabled();
+        refreshDupSiteRowTints();
+    });
+
+    // Tint rows when any checkbox changes.
+    $('#DuplicateSiteTable').on('change', '.dup-target', function () {
+        refreshDupSiteRowTints();
+    });
+
     $('#dupSiteName').on('keydown', function (e) {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -1262,6 +1291,25 @@ const SITE_DUP_MERGE_URL = "AppoinementList.aspx/MergeCustomerSites";
 // The site the popup was opened from; listed first and preselected as Primary.
 let siteDupContext = {};
 
+// Disable the checkbox on whichever row is selected as Primary (can't mark it as duplicate).
+function syncDupSiteCheckboxDisabled() {
+    const primaryVal = $('#DuplicateSiteTable .dup-primary:checked').val();
+    $('#DuplicateSiteTable tbody tr').each(function () {
+        const $cb = $(this).find('.dup-target');
+        const isPrimary = $cb.val() === String(primaryVal);
+        $cb.prop('disabled', isPrimary);
+        if (isPrimary) $cb.prop('checked', false);
+    });
+}
+
+// Recolour rows based on current radio/checkbox state.
+function refreshDupSiteRowTints() {
+    $('#DuplicateSiteTable tbody tr').each(function () {
+        $(this).toggleClass('is-primary', $(this).find('.dup-primary').is(':checked'));
+        $(this).toggleClass('is-duplicate', $(this).find('.dup-target').is(':checked'));
+    });
+}
+
 // Opens the popup with the search prefilled from the clicked site.
 function openSiteDuplicateCheck(opts) {
     siteDupContext = opts;
@@ -1319,7 +1367,7 @@ function SearchSiteDuplicates() {
                 return `
                     <tr class="${current ? 'is-primary' : ''}">
                         <td class="dup-pick"><input type="radio" name="dupSitePrimary" class="dup-primary" value="${id}" aria-label="Keep as primary" ${current ? 'checked' : ''} /></td>
-                        <td class="dup-pick"><input type="checkbox" class="dup-target" value="${id}" aria-label="Mark as duplicate" /></td>
+                        <td class="dup-pick"><input type="checkbox" class="dup-target" value="${id}" aria-label="Mark as duplicate" ${current ? 'disabled' : ''} /></td>
                         <td>${escapeHTML(s.SiteName)}${current ? '<span class="dup-current-tag">current</span>' : ''}</td>
                         <td>${escapeHTML(contact)}</td>
                         <td>${escapeHTML(s.Address)}</td>
@@ -1330,6 +1378,9 @@ function SearchSiteDuplicates() {
                         <td>${escapeHTML(s.Email)}</td>
                     </tr>`;
             }).join(''));
+
+            syncDupSiteCheckboxDisabled();
+            refreshDupSiteRowTints();
         },
         error: function (xhr) {
             console.error("Error searching duplicate sites: ", xhr.responseText);
