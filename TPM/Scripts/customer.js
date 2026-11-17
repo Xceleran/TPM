@@ -415,13 +415,35 @@ $(document).ready(function () {
         }
     });
 
-    // Tint the rows so the Primary and the ticked Duplicates stand out.
-    $('#DuplicateSiteTable').on('change', 'input', function () {
-        $(this).closest('tbody').find('tr').each(function () {
-            $(this).toggleClass('is-primary', $(this).find('.dup-primary').is(':checked'));
-            $(this).toggleClass('is-duplicate', $(this).find('.dup-target').is(':checked'));
+    // "Select All except Primary" button
+    $('#mdl_CheckSiteDuplicate').on('click', '#btn_SelectAllDupSites', function () {
+        const primaryVal = $('#DuplicateSiteTable .dup-primary:checked').val();
+        $('#DuplicateSiteTable .dup-target').each(function () {
+            if (!$(this).prop('disabled')) {
+                $(this).prop('checked', $(this).val() !== String(primaryVal));
+            }
         });
+        refreshDupRowTints();
     });
+
+    // "Deselect All" button
+    $('#mdl_CheckSiteDuplicate').on('click', '#btn_DeselectAllDupSites', function () {
+        $('#DuplicateSiteTable .dup-target').prop('checked', false);
+        refreshDupRowTints();
+    });
+
+    // When the Primary radio changes: disable that row's checkbox, re-enable all others,
+    // and uncheck the now-primary row's checkbox.
+    $('#DuplicateSiteTable').on('change', '.dup-primary', function () {
+        syncDupCheckboxDisabled();
+        refreshDupRowTints();
+    });
+
+    // Tint rows when any checkbox/radio changes.
+    $('#DuplicateSiteTable').on('change', '.dup-target', function () {
+        refreshDupRowTints();
+    });
+
 
     $('#sites').on('click', '.cust-site-edit-btn', function () {
         const siteId = $(this).data('site-id');
@@ -2643,6 +2665,25 @@ const SITE_DUP_MERGE_URL = "Customer.aspx/MergeCustomerSites";
 // The site the popup was opened from; listed first and preselected as Primary.
 let siteDupContext = {};
 
+// Disable the checkbox on whichever row is selected as Primary (can't mark it as duplicate).
+function syncDupCheckboxDisabled() {
+    const primaryVal = $('#DuplicateSiteTable .dup-primary:checked').val();
+    $('#DuplicateSiteTable tbody tr').each(function () {
+        const $cb = $(this).find('.dup-target');
+        const isPrimary = $cb.val() === String(primaryVal);
+        $cb.prop('disabled', isPrimary);
+        if (isPrimary) $cb.prop('checked', false);
+    });
+}
+
+// Recolour rows based on current radio/checkbox state.
+function refreshDupRowTints() {
+    $('#DuplicateSiteTable tbody tr').each(function () {
+        $(this).toggleClass('is-primary', $(this).find('.dup-primary').is(':checked'));
+        $(this).toggleClass('is-duplicate', $(this).find('.dup-target').is(':checked'));
+    });
+}
+
 function dupNotify(icon, title, text) {
     if (typeof Swal !== 'undefined') {
         return Swal.fire({ icon: icon, title: title, text: text || '' });
@@ -2727,7 +2768,7 @@ function SearchSiteDuplicates() {
                 return `
                     <tr class="${current ? 'is-primary' : ''}">
                         <td class="dup-pick"><input type="radio" name="dupSitePrimary" class="dup-primary" value="${id}" aria-label="Keep as primary" ${current ? 'checked' : ''} /></td>
-                        <td class="dup-pick"><input type="checkbox" class="dup-target" value="${id}" aria-label="Mark as duplicate" /></td>
+                        <td class="dup-pick"><input type="checkbox" class="dup-target" value="${id}" aria-label="Mark as duplicate" ${current ? 'disabled' : ''} /></td>
                         <td>${escapeHTML(s.SiteName)}${current ? '<span class="dup-current-tag">current</span>' : ''}</td>
                         <td>${escapeHTML(contact)}</td>
                         <td>${escapeHTML(s.Address)}</td>
@@ -2738,6 +2779,10 @@ function SearchSiteDuplicates() {
                         <td>${escapeHTML(s.Email)}</td>
                     </tr>`;
             }).join(''));
+
+            // After rendering: sync disabled state with whichever radio is checked
+            syncDupCheckboxDisabled();
+            refreshDupRowTints();
         },
         error: function (xhr) {
             console.error("Error searching duplicate sites: ", xhr.responseText);
