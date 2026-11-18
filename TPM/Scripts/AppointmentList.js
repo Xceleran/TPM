@@ -47,10 +47,22 @@ function dateSortKey(value) {
 }
 
 function currentStatusFilter() {
-    return ($('#statusFilter').val() || 'ALL').toLowerCase();
+    let val = ($('#statusFilter').val() || 'ALL').toLowerCase();
+    if (val === 'new') val = 'pending';
+    if (val === 'accepted') val = 'accept';
+    return val;
 }
 
 $(document).ready(function () {
+
+    // Set filter from URL query parameter (e.g. from Dashboard tiles: ?status=new or ?status=accepted)
+    const urlParams = new URLSearchParams(window.location.search);
+    const statusParam = (urlParams.get('status') || '').toLowerCase();
+    if (statusParam === 'new' || statusParam === 'pending') {
+        $('#statusFilter').val('pending');
+    } else if (statusParam === 'accepted' || statusParam === 'accept') {
+        $('#statusFilter').val('accept');
+    }
 
     LoadAppointments();
 
@@ -491,8 +503,11 @@ function LoadAppointments(selectApptId) {
 
                     let statusClass = 'status-na';
                     switch (statusText.toLowerCase()) {
+                        case 'new':
+                        case 'new appt':
                         case 'pending': statusClass = 'status-pending'; break;
                         case 'accept':
+                        case 'accepted':
                         case 'approved':
                         case 'confirmed': statusClass = 'status-confirmed'; break;
                         case 'dispatched': statusClass = 'status-dispatched'; break;

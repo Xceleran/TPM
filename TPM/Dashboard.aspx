@@ -25,7 +25,7 @@
         <div class="row g-3 mb-4">
 
             <!-- 1. Total Third Party Providers — blue -->
-            <div class="col-12 col-md-6 col-xl-3">
+            <div class="col-12 col-md-4">
                 <a href="TpList.aspx" class="stat-card blue" id="card-providers">
                     <button class="stat-info-btn" type="button" tabindex="-1" onclick="return false;"><i class="bi bi-info-circle"></i></button>
                     <span class="stat-info-tip">Providers linked to your company (IsBusinessContact with a warranty company)</span>
@@ -41,8 +41,8 @@
             </div>
 
             <!-- 2. New Work Order Requests — lime -->
-            <div class="col-12 col-md-6 col-xl-3">
-                <a href="AppoinementList.aspx" class="stat-card lime" id="card-requests">
+            <div class="col-12 col-md-4">
+                <a href="AppoinementList.aspx?status=new" class="stat-card lime" id="card-requests">
                     <button class="stat-info-btn" type="button" tabindex="-1" onclick="return false;"><i class="bi bi-info-circle"></i></button>
                     <span class="stat-info-tip">TPM work-order requests waiting for approval (IsApproved = 0)</span>
                     <div class="stat-icon">
@@ -56,34 +56,20 @@
                 </a>
             </div>
 
-            <!-- 3. Active Appointments — purple -->
-            <div class="col-12 col-md-6 col-xl-3">
-                <div class="stat-card purple" id="card-active">
+            <!-- 3. Accepted Appointments — purple -->
+            <div class="col-12 col-md-4">
+                <a href="AppoinementList.aspx?status=accepted" class="stat-card purple" id="card-active">
                     <button class="stat-info-btn" type="button" tabindex="-1" onclick="return false;"><i class="bi bi-info-circle"></i></button>
-                    <span class="stat-info-tip">Approved appointments not closed, cancelled or deleted</span>
+                    <span class="stat-info-tip">Accepted TPM work orders (IsApproved = 1)</span>
                     <div class="stat-icon">
-                        <img src="images/icons/activeappointments.svg" alt="Active Appointments" />
+                        <img src="images/icons/activeappointments.svg" alt="Accepted Appointments" />
                     </div>
                     <div>
                         <div class="stat-num" id="val-active"><asp:Label ID="lblActiveAppointments" runat="server" Text="0" /></div>
-                        <div class="stat-label">Active Appointments</div>
+                        <div class="stat-label">Accepted Appointments</div>
                     </div>
-                </div>
-            </div>
-
-            <!-- 4. Active Assignments — orange -->
-            <div class="col-12 col-md-6 col-xl-3">
-                <div class="stat-card orange" id="card-dispatched">
-                    <button class="stat-info-btn" type="button" tabindex="-1" onclick="return false;"><i class="bi bi-info-circle"></i></button>
-                    <span class="stat-info-tip">Assignments whose appointment is still open</span>
-                    <div class="stat-icon">
-                        <img src="images/icons/assignment.svg" alt="Active Assignments" />
-                    </div>
-                    <div>
-                        <div class="stat-num" id="val-dispatched"><asp:Label ID="lblActiveAssignments" runat="server" Text="0" /></div>
-                        <div class="stat-label">Active Assignments</div>
-                    </div>
-                </div>
+                    <span class="stat-go-link">View Accepted <i class="bi bi-arrow-right"></i></span>
+                </a>
             </div>
 
         </div>

@@ -223,7 +223,11 @@ namespace TPM
                         // handed the @To datetime.
                         cmd.Parameters.Add("@IsWarrantyCompany", System.Data.SqlDbType.NVarChar, 500).Value =
                             (object)SearchByWarrantyCompany ?? DBNull.Value;
-                        cmd.Parameters.Add("@Status", System.Data.SqlDbType.NVarChar).Value = wantedStatus;
+                        // Normalize status for Sp_GetAppointmnetData ('accept' or 'pending')
+                        string statusParam = (wantedStatus ?? "").Trim().ToLower();
+                        if (statusParam == "new") statusParam = "pending";
+                        else if (statusParam == "accepted") statusParam = "accept";
+                        cmd.Parameters.Add("@Status", System.Data.SqlDbType.NVarChar).Value = statusParam;
 
                         cmd.CommandTimeout = 900;
                         adapter.SelectCommand = cmd;

@@ -1403,8 +1403,8 @@
                             <i class="fas fa-filter" aria-hidden="true"></i>
                             <asp:DropDownList ID="statusFilter" ClientIDMode="Static" runat="server" CssClass="form-select" ToolTip="Status">
                                 <asp:ListItem Text="All Statuses" Value="ALL"></asp:ListItem>
-                                <asp:ListItem Text="Accept" Value="Accept"></asp:ListItem>
-                                <asp:ListItem Text="Pending" Value="Pending"></asp:ListItem>
+                                <asp:ListItem Text="New" Value="pending"></asp:ListItem>
+                                <asp:ListItem Text="Accepted" Value="accept"></asp:ListItem>
                             </asp:DropDownList>
                         </div>
                     </div>
@@ -2063,6 +2063,6 @@
             if (e.key === 'Enter') e.preventDefault();
         });
     </script>
-    <script src="Scripts/AppointmentList.js?v=30"></script>
+    <script src="Scripts/AppointmentList.js?v=31"></script>
     <script src="Scripts/panel-resizer.js?v=1"></script>
 </asp:Content>
