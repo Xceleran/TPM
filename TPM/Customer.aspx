@@ -1588,6 +1588,6 @@
         </div>
     </div>
 
-      <script src="Scripts/customer.js?v=32"></script>
+      <script src="Scripts/customer.js?v=35"></script>
     <script src="Scripts/panel-resizer.js?v=1"></script>
 </asp:Content>

@@ -1300,8 +1300,8 @@ function MergeDuplicates() {
 //     { Id, SiteName, FirstName, LastName, Address, City, State, Zip, PhoneNumber, Email },
 //     matching ANY filled-in box (like FindDuplicateCustomers)
 //   MergeCustomerSites(primarySiteId, siteIds, Isdelete) -> "Done! ..." message
-const SITE_DUP_SEARCH_URL = "AppoinementList.aspx/FindDuplicateSites";
-const SITE_DUP_MERGE_URL = "AppoinementList.aspx/MergeCustomerSites";
+const SITE_DUP_SEARCH_URL = "Customer.aspx/FindDuplicateSites";
+const SITE_DUP_MERGE_URL = "Customer.aspx/MergeCustomerSites";
 
 // The site the popup was opened from; listed first and preselected as Primary.
 let siteDupContext = {};

@@ -362,9 +362,7 @@
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="bc-details-tab" data-bs-toggle="tab" data-bs-target="#bc-details" type="button" role="tab" aria-controls="bc-details" aria-selected="true">Details</button>
                     </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="bc-linked-tab" data-bs-toggle="tab" data-bs-target="#bc-linked" type="button" role="tab" aria-controls="bc-linked" aria-selected="false">Linked Contacts</button>
-                    </li>
+                   
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="bc-invoices-tab" data-bs-toggle="tab" data-bs-target="#bc-invoices" type="button" role="tab" aria-controls="bc-invoices" aria-selected="false">Invoices</button>
                     </li>
@@ -551,16 +549,7 @@
                         </div>
                     </div>
 
-                    <div class="tab-pane" id="bc-linked" role="tabpanel" aria-labelledby="bc-linked-tab">
-                        <div class="bc-pane-header">
-                            <h5>Linked Contacts</h5>
-                            <button type="button" class="btn btn-sm btn-primary" onclick="return AddLinkedContact();">Add Link Contact</button>
-                        </div>
-                        <div class="table-responsive">
-                            <asp:PlaceHolder ID="ListTable" runat="server"></asp:PlaceHolder>
-                        </div>
-                        <p id="bcLinkedEmpty" class="text-muted text-center py-4 mb-0 d-none">No linked contacts yet.</p>
-                    </div>
+                   
 
                     <div id="div_details" runat="server">
                 <div class="accordion" id="accordionExample">

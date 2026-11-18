@@ -1547,7 +1547,7 @@ namespace FSM
                             {
                                 using (SqlCommand cmd = new SqlCommand($@"
                                     UPDATE [msSchedulerV3].[dbo].[tbl_CustomerSite]
-                                    SET IsActive = 0
+                                    SET CompanyID = @CompanyID + '-Dup'
                                     WHERE CompanyID = @CompanyID AND Id IN ({inClause})", conn, trans))
                                 {
                                     cmd.Parameters.AddWithValue("@CompanyID", companyid);

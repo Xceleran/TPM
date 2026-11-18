@@ -949,7 +949,7 @@ function loadCustomerSiteData(customerId) {
                                 </div>
                                 <div class="cust-site-actions">
                                     <button class="cust-site-icon-btn cust-site-Duplicate-btn" title="Check Duplicate"  data-Site-Name="${site.SiteName}"  data-siteid="${site.Id}" data-CustomerID="${site.CustomerID}" >
-                                   <i class="fa fa-eye"></i> </button>
+                                   <img src="images/duplicate.png" width="18" height="18"/></i> </button>
                                    
                                     ${editButton}
                                     ${deleteButton}
