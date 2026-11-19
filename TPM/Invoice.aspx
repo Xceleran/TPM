@@ -840,6 +840,7 @@
             </div>
         </div>
     </div>
+    <img src="images/Delete.png" />
 
     <div class="modal fade" id="showMMSBody" tabindex="-1" role="dialog" aria-labelledby="Collect_deposit" aria-hidden="true" style="z-index: 1000000000000000">
         <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable" role="document">

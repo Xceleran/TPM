@@ -1532,7 +1532,8 @@ namespace FSM
                             if (Isdelete)
                             {
                                 using (SqlCommand cmd = new SqlCommand($@"
-                                    DELETE FROM [msSchedulerV3].[dbo].[tbl_CustomerSite]
+                                    UPDATE [msSchedulerV3].[dbo].[tbl_CustomerSite]
+                                    SET CompanyID = @CompanyID + '-Dup'
                                     WHERE CompanyID = @CompanyID AND Id IN ({inClause})", conn, trans))
                                 {
                                     cmd.Parameters.AddWithValue("@CompanyID", companyid);
@@ -1545,18 +1546,7 @@ namespace FSM
                             }
                             else
                             {
-                                using (SqlCommand cmd = new SqlCommand($@"
-                                    UPDATE [msSchedulerV3].[dbo].[tbl_CustomerSite]
-                                    SET CompanyID = @CompanyID + '-Dup'
-                                    WHERE CompanyID = @CompanyID AND Id IN ({inClause})", conn, trans))
-                                {
-                                    cmd.Parameters.AddWithValue("@CompanyID", companyid);
-                                    for (int i = 0; i < dupSiteIds.Count; i++)
-                                    {
-                                        cmd.Parameters.AddWithValue("@dupId" + i, dupSiteIds[i]);
-                                    }
-                                    cmd.ExecuteNonQuery();
-                                }
+                                
                             }
 
                             trans.Commit();
