@@ -1676,10 +1676,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${apt.AppoinmentUId || '-'}${highlightIcon}
                         </button>
                     </td>
-                    <td>${(() => {
-                        const dispatchId = apt.DispatchId || extractDispatchId(apt.Note);
-                        return dispatchId ? `<span class="dispatch-pill"><i class="fas fa-hashtag"></i> ${dispatchId}</span>` : '-';
-                    })()}</td>
+                    <td>${apt.Dispatchid || ''}</td>
                     <td>${apt.RequestDate || apt.AppoinmentDate || '-'}</td>
                     <td>${apt.TimeSlot || '-'}</td>
                     <td>${apt.ServiceType || '-'}</td>

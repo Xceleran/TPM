@@ -464,7 +464,7 @@ namespace TPM
 
                 string sql = @"
                     SELECT
-                        apt.ApptID,apt.AppoinmentUId, apt.Note, apt.TimeSlot, apt.Hour, apt.Minute,
+                        apt.ApptID,apt.dispatchid,apt.AppoinmentUId, apt.Note, apt.TimeSlot, apt.Hour, apt.Minute,
                         apt.StartDateTime, apt.EndDateTime,
                         CONVERT(VARCHAR(10), apt.ApptDateTime, 120) as RequestDate,
                         COALESCE(rsc.Name, NULLIF(LTRIM(RTRIM(CAST(apt.ResourceID AS NVARCHAR))), '0'), '') as ResourceName,
@@ -542,7 +542,8 @@ namespace TPM
                             appoinment.ResourceName = row.Field<string>("ResourceName") ?? "";
                             appoinment.ServiceType = row.Field<string>("ServiceName") ?? "";
                             appoinment.RequestDate = row.Field<string>("RequestDate") ?? "";
-
+                            appoinment.Dispatchid = row.Field<string>("dispatchid") ?? "";
+                            
                             if (row["StartDateTime"] != DBNull.Value)
                             {
                                 DateTime startDateTime = Convert.ToDateTime(row["StartDateTime"]);
