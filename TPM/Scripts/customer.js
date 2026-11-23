@@ -34,7 +34,10 @@ function saveFilterState() {
         page: dt ? dt.page() : 0,
         pageLength: dt ? dt.page.len() : 10,
         statusFilter: $statusFilterEl().val() || '',
-        hideNA: $('#hideNA').is(':checked')
+        hideNA: $('#hideNA').is(':checked'),
+        // Stored even when empty, so a deliberately cleared range stays cleared on return.
+        requestFrom: $('#requestDateFrom').val() || '',
+        requestTo: $('#requestDateTo').val() || ''
     };
     sessionStorage.setItem(TPM_FILTER_STATE_KEY, JSON.stringify(state));
 }
@@ -185,6 +188,23 @@ $(document).ready(function () {
     $(document).on('click', 'a[href*="CustomerDetails.aspx"]', function () {
         saveFilterState();
     });
+
+    // Request date range: the bar used to open blank, which meant "every appointment ever" and,
+    // on a company with years of history, a very slow first load. Default to the current year
+    // (Jan 1 - today); returning from CustomerDetails restores whatever was there, including
+    // an emptied range. The Clear button still gives the unbounded view.
+    function toIsoDate(d) {
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    if (savedFilterState && typeof savedFilterState.requestFrom === 'string') {
+        $('#requestDateFrom').val(savedFilterState.requestFrom);
+        $('#requestDateTo').val(savedFilterState.requestTo || '');
+    } else {
+        var nowDate = new Date();
+        $('#requestDateFrom').val(toIsoDate(new Date(nowDate.getFullYear(), 0, 1)));
+        $('#requestDateTo').val(toIsoDate(nowDate));
+    }
+    $('#clearRequestDates').prop('hidden', !($('#requestDateFrom').val() || $('#requestDateTo').val()));
 
     loadCustomers();
     loadSiteApptStatuses();
@@ -489,6 +509,15 @@ $(document).ready(function () {
         $('#customDateRange').hide();
         $('#siteApptStatusFilter').val('');
         clearSiteFiltersFromSession();
+        if ($.fn.DataTable.isDataTable('#customerSiteTable')) {
+            $('#customerSiteTable').DataTable().draw();
+        }
+    });
+
+    // Picking a status applies it straight away, like the date dropdown (it used to wait for
+    // the Search button, so the list kept showing the old status until it was pressed).
+    $('#siteApptStatusFilter').on('change', function () {
+        saveSiteFiltersToSession();
         if ($.fn.DataTable.isDataTable('#customerSiteTable')) {
             $('#customerSiteTable').DataTable().draw();
         }
@@ -1201,10 +1230,20 @@ function loadSiteAppointments(siteId, containerEl) {
 
     $.ajax({
         type: 'POST',
-        url: 'AppoinementList.aspx/GetCustomerAppoinmetsForView',
+        // Same date/status filters as the site cards above, so an expanded card only lists
+        // the appointments its filter allows (it used to list every appointment, e.g. Archived
+        // ones under a Pending filter).
+        url: 'Customer.aspx/GetSiteAppointments',
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
-        data: JSON.stringify({ customerId: customerId, siteId: siteId }),
+        data: JSON.stringify({
+            customerId: customerId,
+            siteId: siteId,
+            appointmentStartDate: getDateRangeFromSelection($('#siteApptDateRangeSelect').val()).startDate,
+            appointmentEndDate: getDateRangeFromSelection($('#siteApptDateRangeSelect').val()).endDate,
+            appointmentStatus: $('#siteApptStatusFilter').val() || '',
+            customerStatusFilter: $statusFilterEl().val() || ''
+        }),
         success: function (resp) {
             const list = resp && Array.isArray(resp.d) ? resp.d : [];
             siteAppointmentsCache[siteId] = list;

@@ -165,8 +165,8 @@ namespace FSM
                                 s.CalenderColor AS StatusColor,
                                 a.ApptID AS LatestAppointmentID -- Select the Appointment ID
                             FROM [msSchedulerV3].[dbo].[tbl_Appointment] a
-                            LEFT JOIN [msSchedulerV3].[dbo].[tbl_Status] s ON TRY_CAST(a.Status AS INT) = s.StatusID AND a.CompanyID = s.CompanyID
-                            WHERE a.CustomerID = c.CustomerID AND a.CompanyID = c.CompanyID
+                            LEFT JOIN [msSchedulerV3].[dbo].[tbl_Status] s ON CASE WHEN a.Status IS NULL OR a.Status = '' OR a.Status = '0' THEN 1 ELSE TRY_CAST(a.Status AS INT) END = s.StatusID AND a.CompanyID = s.CompanyID
+                            WHERE a.CustomerID = c.CustomerID AND a.CompanyID = c.CompanyID AND ISNULL(a.Status,'') <> 'Deleted'
                             ORDER BY a.ApptDateTime DESC
                         ) AS apptData
                         WHERE c.warrentycompanyid > 0 and  c.CompanyID = '{companyid}'
@@ -1417,6 +1417,89 @@ namespace FSM
         }
 
 
+        // Appointment predicate for the site filters (date, appointment status, or the customer-list
+        // status). Shared by the site list (badge count / has-a-match test) and the expanded
+        // appointment list, so a card can never show appointments its filter excluded.
+        // Expects the appointment table aliased as `appt`.
+        private static string BuildSiteApptFilter(string startDate, string endDate, string appointmentStatus, string customerStatusFilter, string companyExpr)
+        {
+            string f = "";
+            DateTime fromDt, toDt;
+            bool hasFrom = DateTime.TryParse(startDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out fromDt);
+            bool hasTo = DateTime.TryParse(endDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out toDt);
+            if (hasFrom && hasTo)
+                f += $" AND CONVERT(DATE, COALESCE(appt.StartDateTime, appt.ApptDateTime)) BETWEEN '{fromDt:yyyy-MM-dd}' AND '{toDt:yyyy-MM-dd}' ";
+            else if (hasFrom)
+                f += $" AND CONVERT(DATE, COALESCE(appt.StartDateTime, appt.ApptDateTime)) = '{fromDt:yyyy-MM-dd}' ";
+
+            // Status '0' / NULL / '' means Pending (StatusID 1) everywhere else in TPM, so map it
+            // the same way here; a plain TRY_CAST dropped those rows from the Pending filter.
+            const string statusIdExpr = "CASE WHEN appt.Status IS NULL OR appt.Status = '' OR appt.Status = '0' THEN 1 ELSE TRY_CAST(appt.Status AS INT) END";
+            int apptStatusId;
+            if (!string.IsNullOrEmpty(appointmentStatus))
+            {
+                f += int.TryParse(appointmentStatus, out apptStatusId) ? $" AND {statusIdExpr} = {apptStatusId} " : " AND 1 = 0 ";
+            }
+            else if (!string.IsNullOrEmpty(customerStatusFilter) && customerStatusFilter != "all_inclusive")
+            {
+                string name = (customerStatusFilter == "Confirmed" ? "Scheduled" : customerStatusFilter).Replace("'", "''");
+                f += $" AND {statusIdExpr} IN (SELECT StatusID FROM [msSchedulerV3].[dbo].[tbl_Status] WHERE CompanyID = {companyExpr} AND StatusName = '{name}') ";
+            }
+            return f;
+        }
+
+        // Appointments listed under a site card. Honours the same filters as the card list.
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static List<FSM.Models.AppoinmentModel.AppointmentModel> GetSiteAppointments(string customerId, int siteId, string appointmentStartDate, string appointmentEndDate, string appointmentStatus, string customerStatusFilter)
+        {
+            var list = new List<FSM.Models.AppoinmentModel.AppointmentModel>();
+            string companyid = HttpContext.Current.Session["CompanyID"]?.ToString();
+            if (string.IsNullOrEmpty(companyid)) return list;
+            Database db = new Database();
+            try
+            {
+                string filter = BuildSiteApptFilter(appointmentStartDate, appointmentEndDate, appointmentStatus, customerStatusFilter, "@CompanyID");
+                string sql = @"SELECT CONVERT(VARCHAR(10), appt.ApptDateTime, 101) AS ApptDateConverted, appt.ApptID, appt.AppoinmentUId, srv.ServiceName,
+                    CASE WHEN sts.StatusName = 'Scheduled' THEN 'Confirmed' ELSE sts.StatusName END AS AppStatus,
+                    sts.CalenderColor AS StatusColor
+                    FROM tbl_Appointment AS appt
+                    LEFT JOIN tbl_ServiceType AS srv ON appt.ServiceType = srv.ServiceTypeID AND appt.CompanyID = srv.CompanyID
+                    LEFT JOIN tbl_Status AS sts ON CASE WHEN appt.Status IS NULL OR appt.Status = '' OR appt.Status = '0' THEN 1 ELSE TRY_CAST(appt.Status AS INT) END = sts.StatusID AND appt.CompanyID = sts.CompanyID
+                    WHERE CAST(appt.CustomerID AS NVARCHAR(50)) = @CustomerID AND appt.CompanyID = @CompanyID AND appt.SiteID = @SiteID
+                      AND ISNULL(appt.Status,'') <> 'Deleted' " + filter + " ORDER BY appt.ApptDateTime DESC;";
+                db.Open();
+                DataTable dt = new DataTable();
+                db.AddParameter("@SiteID", siteId, SqlDbType.NVarChar);
+                db.AddParameter("@CustomerID", customerId, SqlDbType.NVarChar);
+                db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+                db.ExecuteParam(sql, out dt);
+                db.Close();
+                foreach (DataRow row in dt.Rows)
+                {
+                    list.Add(new FSM.Models.AppoinmentModel.AppointmentModel
+                    {
+                        AppoinmentUId = row["AppoinmentUId"]?.ToString() ?? "",
+                        AppoinmentId = row["ApptID"]?.ToString() ?? "",
+                        CustomerID = customerId,
+                        CompanyID = companyid,
+                        AppoinmentStatus = row["AppStatus"] == DBNull.Value ? "" : row["AppStatus"].ToString(),
+                        StatusColor = row["StatusColor"] == DBNull.Value ? "" : row["StatusColor"].ToString(),
+                        ServiceType = row["ServiceName"] == DBNull.Value ? "" : row["ServiceName"].ToString(),
+                        RequestDate = row["ApptDateConverted"].ToString(),
+                        AppoinmentDate = row["ApptDateConverted"].ToString()
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error in GetSiteAppointments: " + ex.Message);
+                if (db.Connection != null && db.Connection.State == ConnectionState.Open) db.Close();
+                return new List<FSM.Models.AppoinmentModel.AppointmentModel>();
+            }
+            return list;
+        }
+
         [WebMethod]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public static string GetCustomerSiteData(string customerId,int draw, int start, int length, string searchValue, string sortColumn, string sortDirection, string appointmentStartDate = "", string appointmentEndDate = "", string appointmentStatus = "", string customerStatusFilter = "")
@@ -1427,79 +1510,46 @@ namespace FSM
             string companyid = HttpContext.Current.Session["CompanyID"].ToString();
             Database db = new Database();
             int totalRecords = 0;
+            bool hasSiteApptFilter = false;
             DataTable dt = new DataTable();
-            searchValue = searchValue.Replace("'", "");
+            searchValue = (searchValue ?? "").Replace("'", "");
+            customerId = (customerId ?? "").Replace("'", "''");
+            string safeSortDir = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase) ? "DESC" : "ASC";
             try
             {
-                //db.Open();
-                string strSQL = @"SELECT st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.MobileNumber,st.LastName,st.Address,st.City,st.Country,st.State,st.Zip,st.Contact,st.Email,st.PhoneNumber,st.Note,st.IsActive,COUNT(appt.CompanyID) AS appointment_count
-                            FROM [msSchedulerV3].dbo.tbl_CustomerSite st LEFT JOIN [msSchedulerV3].[dbo].[tbl_Appointment] appt 
-                    ON  appt.CompanyID = st.CompanyID and appt.siteid = st.id and  appt.CustomerID = st.CustomerID      WHERE st.CompanyID='" + companyid + "' AND st.CustomerID='" + customerId + "' ";
+                // Appointment predicate shared by the badge count and the "has a matching appointment"
+                // test. Deleted appointments never count (the appointment list hides them too, so the
+                // badge used to disagree with the list under it). Dates are parsed rather than pasted.
+                string apptWhere = "appt.CompanyID = st.CompanyID AND appt.SiteID = st.Id AND appt.CustomerID = st.CustomerID AND ISNULL(appt.Status,'') <> 'Deleted'";
+                string apptFilter = BuildSiteApptFilter(appointmentStartDate, appointmentEndDate, appointmentStatus, customerStatusFilter, "st.CompanyID");
+                hasSiteApptFilter = apptFilter.Length > 0;
 
+                // The sites are filtered with a semi-join and counted per displayed row. The old query
+                // LEFT JOINed every site to every appointment and, for the totals, grouped by site: on a
+                // customer with 56k sites / 230k appointments that never finished, and it shipped one row
+                // per site just to be counted. Now the total is a COUNT(*) and only the page is counted.
+                string siteWhere = "WHERE st.CompanyID = '" + companyid + "' AND st.CustomerID = '" + customerId + "' ";
                 if (!string.IsNullOrEmpty(searchValue))
                 {
-                    strSQL += $" AND (st.SiteName LIKE '%{searchValue}%' OR st.FirstName LIKE '%{searchValue}%' OR st.Email LIKE '%{searchValue}%') ";
+                    siteWhere += $" AND (st.SiteName LIKE '%{searchValue}%' OR st.FirstName LIKE '%{searchValue}%' OR st.Email LIKE '%{searchValue}%') ";
+                }
+                if (hasSiteApptFilter)
+                {
+                    siteWhere += $" AND EXISTS (SELECT 1 FROM [msSchedulerV3].[dbo].[tbl_Appointment] appt WHERE {apptWhere} {apptFilter}) ";
                 }
 
-                if (!string.IsNullOrEmpty(appointmentStartDate))
-                {
-                    if (!string.IsNullOrEmpty(appointmentEndDate))
-                        strSQL += $" AND CONVERT(DATE, COALESCE(appt.StartDateTime, appt.ApptDateTime)) BETWEEN '{appointmentStartDate}' AND '{appointmentEndDate}' ";
-                    else
-                        strSQL += $" AND CONVERT(DATE, COALESCE(appt.StartDateTime, appt.ApptDateTime)) = '{appointmentStartDate}' ";
-                }
-                if (!string.IsNullOrEmpty(appointmentStatus))
-                {
-                    // Handle status as either StatusName or StatusID via tbl_Status
-                    strSQL += $" AND appt.status = '{appointmentStatus}' ";
-                }
-                else if (!string.IsNullOrEmpty(customerStatusFilter) && customerStatusFilter != "all_inclusive")
-                {
-                    // Customer-list status filter (e.g. Pending): only sites that have an appointment in that status.
-                    strSQL += $" AND TRY_CAST(appt.status AS INT) IN (SELECT StatusID FROM [msSchedulerV3].[dbo].[tbl_Status] WHERE CompanyID = st.CompanyID AND StatusName = '{customerStatusFilter.Replace("'", "''")}') ";
-                }
-
-                strSQL += $" GROUP BY st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.LastName,st.Address,st.City,st.Country,st.State,st.Zip,st.MobileNumber,st.Contact,st.Email,st.PhoneNumber,st.Note,st.IsActive ";
-                strSQL += $" ORDER BY st.SiteName {sortDirection} OFFSET {start} ROWS FETCH NEXT {length} ROWS ONLY;";
-
-
-                // For TOTAL RECORDS
-                strSQL += @"SELECT count(st.Id) as totalRecords,st.Id  FROM [msSchedulerV3].dbo.tbl_CustomerSite st LEFT JOIN [msSchedulerV3].[dbo].[tbl_Appointment] appt
-                    ON  appt.CompanyID = st.CompanyID and appt.siteid = st.id and  appt.CustomerID = st.CustomerID  WHERE st.CompanyID='" + companyid + "' AND st.CustomerID='" + customerId + "'";
-
-                if (!string.IsNullOrEmpty(appointmentStartDate))
-                {
-                    if (!string.IsNullOrEmpty(appointmentEndDate))
-                        strSQL += $" AND CONVERT(DATE, COALESCE(appt.StartDateTime, appt.ApptDateTime)) BETWEEN '{appointmentStartDate}' AND '{appointmentEndDate}' ";
-                    else
-                        strSQL += $" AND CONVERT(DATE, COALESCE(appt.StartDateTime, appt.ApptDateTime)) = '{appointmentStartDate}' ";
-                }
-                if (!string.IsNullOrEmpty(appointmentStatus))
-                {
-                    // Handle status as either StatusName or StatusID via tbl_Status
-                    strSQL += $" AND appt.status = '{appointmentStatus}' ";
-                }
-                else if (!string.IsNullOrEmpty(customerStatusFilter) && customerStatusFilter != "all_inclusive")
-                {
-                    // Customer-list status filter (e.g. Pending): only sites that have an appointment in that status.
-                    strSQL += $" AND TRY_CAST(appt.status AS INT) IN (SELECT StatusID FROM [msSchedulerV3].[dbo].[tbl_Status] WHERE CompanyID = st.CompanyID AND StatusName = '{customerStatusFilter.Replace("'", "''")}') ";
-                }
-
-                if (!string.IsNullOrEmpty(searchValue))
-                {
-                    strSQL += $" AND (st.SiteName LIKE '%{searchValue}%' OR st.FirstName LIKE '%{searchValue}%' OR st.Email LIKE '%{searchValue}%') GROUP BY st.Id ;";
-                }
-                else
-                {
-                    strSQL += $" GROUP BY st.Id;";
-                }
+                string strSQL = @"SELECT st.Id,st.CustomerID,st.SiteName,st.FirstName,st.CustomerGuid,st.MobileNumber,st.LastName,st.Address,st.City,st.Country,st.State,st.Zip,st.Contact,st.Email,st.PhoneNumber,st.Note,st.IsActive,
+                            (SELECT COUNT(*) FROM [msSchedulerV3].[dbo].[tbl_Appointment] appt WHERE " + apptWhere + apptFilter + @") AS appointment_count
+                            FROM [msSchedulerV3].dbo.tbl_CustomerSite st " + siteWhere;
+                strSQL += $" ORDER BY st.SiteName {safeSortDir}, st.Id OFFSET {Math.Max(0, start)} ROWS FETCH NEXT {Math.Max(1, length)} ROWS ONLY;";
+                strSQL += " SELECT COUNT(*) AS totalRecords FROM [msSchedulerV3].dbo.tbl_CustomerSite st " + siteWhere + ";";
 
                 DataSet dataSet = db.Get_DataSet(strSQL, companyid);
                 dt = dataSet.Tables[0];
 
-                if (dataSet.Tables[1].Rows.Count > 0)
+                if (dataSet.Tables.Count > 1 && dataSet.Tables[1].Rows.Count > 0)
                 {
-                    totalRecords = dataSet.Tables[1].Rows.Count;
+                    totalRecords = Convert.ToInt32(dataSet.Tables[1].Rows[0]["totalRecords"]);
                 }
                 if (dt.Rows.Count > 0)
                 {
@@ -1532,8 +1582,9 @@ namespace FSM
                         });
                     }
                 }
-                else
+                else if (!hasSiteApptFilter && string.IsNullOrEmpty(searchValue))
                 {
+                    totalRecords = 1;
                     DataTable customerDt = new DataTable();
                     db.Open();
                     string customerSql = @"SELECT * FROM [msSchedulerV3].[dbo].[tbl_Customer] WHERE CustomerID = @CustomerID AND CompanyID = @CompanyID;";

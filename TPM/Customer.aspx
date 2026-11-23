@@ -1362,7 +1362,8 @@
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <%-- jQuery comes from TPM.Master (3.7.1). A second copy here replaced $ after jquery-ui and the
+         master's plugins had attached to the first one, and cost an extra download on every load. --%>
     <script src="https://cdn.datatables.net/2.2.2/js/dataTables.min.js"></script>
     <script type="text/javascript" src="https://cdn.datatables.net/select/3.0.0/js/dataTables.select.min.js"></script>
   
@@ -1582,6 +1583,6 @@
         </div>
     </div>
 
-      <script src="Scripts/customer.js?v=32"></script>
+      <script src="Scripts/customer.js?v=34"></script>
     <script src="Scripts/panel-resizer.js?v=1"></script>
 </asp:Content>
