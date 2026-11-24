@@ -1403,8 +1403,8 @@
                             <i class="fas fa-filter" aria-hidden="true"></i>
                             <asp:DropDownList ID="statusFilter" ClientIDMode="Static" runat="server" CssClass="form-select" ToolTip="Status">
                                 <asp:ListItem Text="All Statuses" Value="ALL"></asp:ListItem>
-                                <asp:ListItem Text="Accept" Value="Accept"></asp:ListItem>
-                                <asp:ListItem Text="Pending" Value="Pending"></asp:ListItem>
+                                <asp:ListItem Text="New" Value="pending"></asp:ListItem>
+                                <asp:ListItem Text="Accepted" Value="accept"></asp:ListItem>
                             </asp:DropDownList>
                         </div>
                     </div>
@@ -1531,7 +1531,6 @@
                             <tr>
                                 <th class="dup-pick">Primary</th>
                                 <th class="dup-pick">Duplicate</th>
-                                <th class="dup-pick">Secondary</th>
                                 <th>First Name</th>
                                 <th>Last Name</th>
                                 <th>Address</th>
@@ -1593,7 +1592,13 @@
                         <thead>
                             <tr>
                                 <th class="dup-pick">Primary</th>
-                                <th class="dup-pick">Duplicate</th>
+                                <th class="dup-pick">
+                                    <div>Duplicate</div>
+                                    <div style="display:flex;gap:3px;margin-top:4px;">
+                                        <button type="button" id="btn_SelectAllDupSites" title="Select all non-primary sites" style="flex:1;padding:2px 6px;font-size:11px;font-weight:600;cursor:pointer;background:#3b82f6;color:#fff;border:none;border-radius:3px;">All</button>
+                                        <button type="button" id="btn_DeselectAllDupSites" title="Deselect all" style="flex:1;padding:2px 6px;font-size:11px;font-weight:600;cursor:pointer;background:#6b7280;color:#fff;border:none;border-radius:3px;">None</button>
+                                    </div>
+                                </th>
                                 <th>Site Name</th>
                                 <th>Contact</th>
                                 <th>Address</th>
@@ -2058,6 +2063,6 @@
             if (e.key === 'Enter') e.preventDefault();
         });
     </script>
-    <script src="Scripts/AppointmentList.js?v=30"></script>
+    <script src="Scripts/AppointmentList.js?v=31"></script>
     <script src="Scripts/panel-resizer.js?v=1"></script>
 </asp:Content>

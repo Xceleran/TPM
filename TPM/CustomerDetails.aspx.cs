@@ -464,7 +464,7 @@ namespace TPM
 
                 string sql = @"
                     SELECT
-                        apt.ApptID,apt.AppoinmentUId, apt.Note, apt.TimeSlot, apt.Hour, apt.Minute,
+                        apt.ApptID,apt.dispatchid,apt.AppoinmentUId, apt.Note, apt.TimeSlot, apt.Hour, apt.Minute,
                         apt.StartDateTime, apt.EndDateTime,
                         CONVERT(VARCHAR(10), apt.ApptDateTime, 120) as RequestDate,
                         COALESCE(rsc.Name, NULLIF(LTRIM(RTRIM(CAST(apt.ResourceID AS NVARCHAR))), '0'), '') as ResourceName,
@@ -482,16 +482,33 @@ namespace TPM
                         tbl_Appointment apt
                     LEFT JOIN
                         tbl_Resources as rsc ON apt.ResourceID = rsc.Id AND apt.CompanyID = rsc.CompanyID
-                    LEFT JOIN
-                        tbl_ServiceType AS srv ON apt.CompanyID = srv.CompanyID AND (TRY_CAST(apt.ServiceType AS INT) = srv.ServiceTypeID OR apt.ServiceType = srv.ServiceName)
-                    LEFT JOIN
-                        tbl_Status AS sts ON apt.CompanyID = sts.CompanyID AND
-                            (CASE WHEN apt.Status = '0' OR apt.Status IS NULL OR apt.Status = '' THEN 1 ELSE TRY_CAST(apt.Status AS INT) END = sts.StatusID OR apt.Status = sts.StatusName)
-                    LEFT JOIN
-                        tbl_TicketStatus AS tkt ON apt.CompanyID = tkt.CompanyID AND
-                            (CASE WHEN apt.TicketStatus = '0' OR apt.TicketStatus IS NULL OR apt.TicketStatus = '' THEN 1 ELSE TRY_CAST(apt.TicketStatus AS INT) END = tkt.StatusID OR apt.TicketStatus = tkt.StatusName)
-                    LEFT JOIN
-                        tbl_AppointmentAutoGenerate gen ON apt.CompanyID = gen.CompanyID
+                    OUTER APPLY (
+                        SELECT TOP 1 srv2.ServiceTypeID, srv2.ServiceName, srv2.CalenderColor
+                        FROM tbl_ServiceType srv2
+                        WHERE srv2.CompanyID = apt.CompanyID
+                          AND (TRY_CAST(apt.ServiceType AS INT) = srv2.ServiceTypeID OR apt.ServiceType = srv2.ServiceName)
+                        ORDER BY srv2.ServiceTypeID
+                    ) srv
+                    OUTER APPLY (
+                        SELECT TOP 1 sts2.StatusID, sts2.StatusName, sts2.CalenderColor
+                        FROM tbl_Status sts2
+                        WHERE sts2.CompanyID = apt.CompanyID
+                          AND (CASE WHEN apt.Status = '0' OR apt.Status IS NULL OR apt.Status = '' THEN 1 ELSE TRY_CAST(apt.Status AS INT) END = sts2.StatusID OR apt.Status = sts2.StatusName)
+                        ORDER BY sts2.StatusID
+                    ) sts
+                    OUTER APPLY (
+                        SELECT TOP 1 tkt2.StatusID, tkt2.StatusName
+                        FROM tbl_TicketStatus tkt2
+                        WHERE tkt2.CompanyID = apt.CompanyID
+                          AND (CASE WHEN apt.TicketStatus = '0' OR apt.TicketStatus IS NULL OR apt.TicketStatus = '' THEN 1 ELSE TRY_CAST(apt.TicketStatus AS INT) END = tkt2.StatusID OR apt.TicketStatus = tkt2.StatusName)
+                        ORDER BY tkt2.StatusID
+                    ) tkt
+                    OUTER APPLY (
+                        SELECT TOP 1 gen2.AppointmentPrefix
+                        FROM tbl_AppointmentAutoGenerate gen2
+                        WHERE gen2.CompanyID = apt.CompanyID
+                        ORDER BY gen2.Id
+                    ) gen
                     WHERE apt.CompanyID = @CompanyID AND apt.CustomerID = @CustomerID
                       AND apt.SiteID = @SiteID
                       AND apt.Status != 'Deleted'
@@ -525,7 +542,8 @@ namespace TPM
                             appoinment.ResourceName = row.Field<string>("ResourceName") ?? "";
                             appoinment.ServiceType = row.Field<string>("ServiceName") ?? "";
                             appoinment.RequestDate = row.Field<string>("RequestDate") ?? "";
-
+                            appoinment.Dispatchid = row.Field<string>("dispatchid") ?? "";
+                            
                             if (row["StartDateTime"] != DBNull.Value)
                             {
                                 DateTime startDateTime = Convert.ToDateTime(row["StartDateTime"]);

@@ -18,19 +18,10 @@ namespace TPM.Processors
             string TPName)
         {
 
-            bool result = false;
-            try
-            {
-                DispatchStatusUpdateSoapClient AHSClient = new DispatchStatusUpdateSoapClient();
-                AHSClient.ClientCredentials.UserName.UserName = ConfigurationManager.AppSettings["AHSUser"].ToString();
-                AHSClient.ClientCredentials.UserName.Password = ConfigurationManager.AppSettings["AHSPassword"].ToString();
-                DispatchStatusUpdateInformation AHSRetVal;
+            DataTable dt = new DataTable();
+            Database db = new Database();
 
-
-                DataTable dt = new DataTable();
-                Database db = new Database();
-
-                string strSQL = @"INSERT INTO [msSchedulerV3].dbo.[tbl_StatusBuffer]
+            string strSQL = @"INSERT INTO [msSchedulerV3].dbo.[tbl_StatusBuffer]
                                 (CompanyID,ApptID
                                    ,DispatchID
                                    ,StatusCode
@@ -40,12 +31,20 @@ namespace TPM.Processors
                                    ,TPName)
                                 VALUES (@CompanyID, @ApptID, @DispatchID, @StatusCode, @SentDate, @IsApproved, @ErrorMsg, @TPName);";
 
-                db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
-                db.AddParameter("@ApptID", ApptID, SqlDbType.NVarChar);
-                db.AddParameter("@DispatchID", DispatchId, SqlDbType.NVarChar);
-                db.AddParameter("@StatusCode", StatusCode, SqlDbType.NVarChar);
-                db.AddParameter("@SentDate", sTimestamp, SqlDbType.NVarChar);
-                db.AddParameter("@TPName", TPName, SqlDbType.NVarChar);
+            db.AddParameter("@CompanyID", companyid, SqlDbType.NVarChar);
+            db.AddParameter("@ApptID", ApptID, SqlDbType.NVarChar);
+            db.AddParameter("@DispatchID", DispatchId, SqlDbType.NVarChar);
+            db.AddParameter("@StatusCode", StatusCode, SqlDbType.NVarChar);
+            db.AddParameter("@SentDate", sTimestamp, SqlDbType.NVarChar);
+            db.AddParameter("@TPName", TPName, SqlDbType.NVarChar);
+
+            bool result = false;
+            try
+            {
+               
+
+
+               
 
 
 
@@ -53,7 +52,10 @@ namespace TPM.Processors
                 try
                 {
 
-
+                    DispatchStatusUpdateSoapClient AHSClient = new DispatchStatusUpdateSoapClient();
+                    AHSClient.ClientCredentials.UserName.UserName = ConfigurationManager.AppSettings["AHSUser"].ToString();
+                    AHSClient.ClientCredentials.UserName.Password = ConfigurationManager.AppSettings["AHSPassword"].ToString();
+                    DispatchStatusUpdateInformation AHSRetVal;
 
 
                     AHSRetVal = AHSClient.updateDispatchStatus(DispatchId, StatusCode, sTimestamp, "EST");
@@ -71,27 +73,29 @@ namespace TPM.Processors
                         db.AddParameter("@IsApproved", "0", SqlDbType.NVarChar);
                         result =false;
                     }
-                     db.ExecuteScalarData(strSQL);
+                     
 
                     return result;
 
                 }
                 catch (Exception ex)
                 {
-                    return false;
+                    db.AddParameter("@ErrorMsg", ex.InnerException.Message, SqlDbType.NVarChar);
+                    db.AddParameter("@IsApproved", "0", SqlDbType.NVarChar);
+                  
 
                 }
 
 
 
-
+                db.ExecuteScalarData(strSQL);
 
             }
             catch (Exception ex)
             {
-                return false;
+                return result;
             }
-            return true;
+            return result;
         }
         private DateTime UtcToEstern(DateTime value)
         {

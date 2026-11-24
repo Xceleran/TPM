@@ -51,31 +51,13 @@ namespace FSM
                   AND TRY_CAST(WarrentyCompanyID AS BIGINT) > 0",
                 companyID).ToString();
 
-            // Pending TPM work-order requests. Deliberately runs the same stored
-            // procedure the New Work Orders page uses (Sp_GetAppointmnetData with
-            // @Status='pending') with the same default +/-60 day window, so the
-            // tile can never disagree with the grid it links to.
-            lblNewWorkOrders.Text = GetPendingWorkOrderCount(companyID).ToString();
+            // 2. New Work Order Requests (IsApproved = 0). Uses Sp_GetAppointmnetData
+            // with @Status='pending' and the default +/-60 day window.
+            lblNewWorkOrders.Text = GetWorkOrderCount(companyID, "pending").ToString();
 
-            // Approved, not closed/cancelled/deleted (mirrors Appointments.aspx + Customer.aspx filters).
-            lblActiveAppointments.Text = GetCount(@"
-                SELECT COUNT(1)
-                FROM [msSchedulerV3].[dbo].[tbl_Appointment]
-                WHERE CompanyID = @CompanyID
-                  AND IsApproved = 1
-                  AND Status NOT IN ('Deleted','Closed','Cancelled','Canceled')",
-                companyID).ToString();
-
-            // tbl_Assignment has no status column, so "active" = assignment whose
-            // appointment is still open. No prebuilt query exists; this is the definition.
-            lblActiveAssignments.Text = GetCount(@"
-                SELECT COUNT(1)
-                FROM [msSchedulerV3].[dbo].[tbl_Assignment] a
-                INNER JOIN [msSchedulerV3].[dbo].[tbl_Appointment] ap
-                    ON ap.CompanyID = a.CompanyID AND ap.ApptID = a.ApptID
-                WHERE a.CompanyID = @CompanyID
-                  AND ap.Status NOT IN ('Deleted','Closed','Cancelled','Canceled')",
-                companyID).ToString();
+            // 3. Accepted Appointments (IsApproved = 1). Uses Sp_GetAppointmnetData
+            // with @Status='accept' and the default +/-60 day window.
+            lblActiveAppointments.Text = GetWorkOrderCount(companyID, "accept").ToString();
 
             LoadAnnouncements(companyID);
             LoadRecentActivity(companyID);
@@ -161,10 +143,11 @@ namespace FSM
         }
 
         /// <summary>
-        /// Counts pending TPM work orders by running the exact same stored procedure
+        /// Counts TPM work orders by running the exact same stored procedure
         /// and parameters as AppoinementList.aspx (New Work Orders), then counting rows.
+        /// status: "pending" for New, "accept" for Accepted.
         /// </summary>
-        private int GetPendingWorkOrderCount(string companyID)
+        private int GetWorkOrderCount(string companyID, string status)
         {
             try
             {
@@ -179,7 +162,7 @@ namespace FSM
                     cmd.Parameters.Add("@SearchText", SqlDbType.NVarChar, 500).Value = string.Empty;
                     cmd.Parameters.Add("@From", SqlDbType.DateTime).Value = DateTime.Now.AddDays(-60);
                     cmd.Parameters.Add("@To", SqlDbType.DateTime).Value = DateTime.Now.AddDays(60);
-                    cmd.Parameters.Add("@Status", SqlDbType.NVarChar, 500).Value = "pending";
+                    cmd.Parameters.Add("@Status", SqlDbType.NVarChar, 500).Value = status ?? string.Empty;
                     cmd.Parameters.Add("@IsWarrantyCompany", SqlDbType.NVarChar, 500).Value = DBNull.Value;
                     con.Open();
                     using (var rdr = cmd.ExecuteReader())
@@ -192,7 +175,7 @@ namespace FSM
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("GetPendingWorkOrderCount: " + ex);
+                System.Diagnostics.Debug.WriteLine("GetWorkOrderCount: " + ex);
                 return 0;
             }
         }

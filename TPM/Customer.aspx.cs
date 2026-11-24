@@ -15,6 +15,7 @@ using System.Web.UI;
 using System.Web.UI.WebControls;
 using System.Xml.Linq;
 using System.Configuration;
+using System.Data.SqlClient;
 using System.Web.UI.HtmlControls;
 
 namespace FSM
@@ -1414,6 +1415,157 @@ namespace FSM
             }
 
             return sites;
+        }
+
+        // Merges duplicate sites into the selected primary site.
+        [WebMethod(EnableSession = true)]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public static string MergeCustomerSites(int primarySiteId, List<int> siteIds, bool Isdelete)
+        {
+            if (HttpContext.Current.Session["CompanyID"] == null)
+            {
+                return "Session expired. Please log in again.";
+            }
+            string companyid = HttpContext.Current.Session["CompanyID"].ToString();
+
+            var dupSiteIds = (siteIds ?? new List<int>()).Where(id => id > 0 && id != primarySiteId).Distinct().ToList();
+            if (primarySiteId <= 0 || dupSiteIds.Count == 0)
+            {
+                return "Please select a valid primary site and at least one duplicate site to merge.";
+            }
+
+            Database db = new Database();
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(db.ConnectionString))
+                {
+                    conn.Open();
+
+                    string customerId = "";
+                    string customerGuid = "";
+
+                    using (SqlCommand checkCmd = new SqlCommand("SELECT CustomerID, CustomerGuid FROM [msSchedulerV3].[dbo].[tbl_CustomerSite] WHERE Id = @PrimarySiteId AND CompanyID = @CompanyID", conn))
+                    {
+                        checkCmd.Parameters.AddWithValue("@PrimarySiteId", primarySiteId);
+                        checkCmd.Parameters.AddWithValue("@CompanyID", companyid);
+                        using (SqlDataReader reader = checkCmd.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                customerId = reader["CustomerID"] != DBNull.Value ? reader["CustomerID"].ToString() : "";
+                                customerGuid = reader["CustomerGuid"] != DBNull.Value ? reader["CustomerGuid"].ToString() : "";
+                            }
+                            else
+                            {
+                                return "The selected primary site could not be found.";
+                            }
+                        }
+                    }
+
+                    using (SqlTransaction trans = conn.BeginTransaction())
+                    {
+                        try
+                        {
+                            var paramNames = new List<string>();
+                            for (int i = 0; i < dupSiteIds.Count; i++)
+                            {
+                                paramNames.Add("@dupId" + i);
+                            }
+                            string inClause = string.Join(",", paramNames);
+
+                            Action<SqlCommand> addParams = (cmd) =>
+                            {
+                                cmd.Parameters.AddWithValue("@PrimarySiteId", primarySiteId);
+                                cmd.Parameters.AddWithValue("@CustomerID", customerId);
+                                cmd.Parameters.AddWithValue("@CustomerGuid", customerGuid);
+                                cmd.Parameters.AddWithValue("@CompanyID", companyid);
+                                for (int i = 0; i < dupSiteIds.Count; i++)
+                                {
+                                    cmd.Parameters.AddWithValue("@dupId" + i, dupSiteIds[i]);
+                                }
+                            };
+
+                            // Move appointments to primary site
+                            using (SqlCommand cmd = new SqlCommand($@"
+                                UPDATE [msSchedulerV3].[dbo].[tbl_Appointment]
+                                SET SiteID = @PrimarySiteId, CustomerID = @CustomerID
+                                WHERE CompanyID = @CompanyID AND SiteID IN ({inClause})", conn, trans))
+                            {
+                                addParams(cmd);
+                                cmd.ExecuteNonQuery();
+                            }
+
+                            // Move related equipment, notes, pictures, files, agreements if tables exist
+                            string auxSql = $@"
+                                IF OBJECT_ID('[msSchedulerV3].[dbo].[tbl_Equipment]', 'U') IS NOT NULL
+                                    UPDATE [msSchedulerV3].[dbo].[tbl_Equipment]
+                                    SET SiteId = @PrimarySiteId, CustomerID = @CustomerID, CustomerGuid = @CustomerGuid
+                                    WHERE CompanyID = @CompanyID AND SiteId IN ({inClause});
+
+                                IF OBJECT_ID('[msSchedulerV3].[dbo].[tbl_Note]', 'U') IS NOT NULL
+                                    UPDATE [msSchedulerV3].[dbo].[tbl_Note]
+                                    SET SiteId = @PrimarySiteId, CustomerId = @CustomerID
+                                    WHERE CompanyId = @CompanyID AND SiteId IN ({inClause});
+
+                                IF OBJECT_ID('[msSchedulerV3].[dbo].[tbl_Pictures]', 'U') IS NOT NULL
+                                    UPDATE [msSchedulerV3].[dbo].[tbl_Pictures]
+                                    SET SiteId = @PrimarySiteId, CustomerID = @CustomerID
+                                    WHERE CompanyID = @CompanyID AND SiteId IN ({inClause});
+
+                                IF OBJECT_ID('[msSchedulerV3].[dbo].[tbl_Files]', 'U') IS NOT NULL
+                                    UPDATE [msSchedulerV3].[dbo].[tbl_Files]
+                                    SET SiteId = @PrimarySiteId, CustomerID = @CustomerID
+                                    WHERE CompanyID = @CompanyID AND SiteId IN ({inClause});
+
+                                IF OBJECT_ID('[msSchedulerV3].[dbo].[tbl_MaintenanceAgreements]', 'U') IS NOT NULL
+                                    UPDATE [msSchedulerV3].[dbo].[tbl_MaintenanceAgreements]
+                                    SET SiteId = @PrimarySiteId, CustomerID = @CustomerID
+                                    WHERE CompanyID = @CompanyID AND SiteId IN ({inClause});";
+
+                            using (SqlCommand cmd = new SqlCommand(auxSql, conn, trans))
+                            {
+                                addParams(cmd);
+                                cmd.ExecuteNonQuery();
+                            }
+
+                            // Delete or deactivate duplicate sites
+                            if (Isdelete)
+                            {
+                                using (SqlCommand cmd = new SqlCommand($@"
+                                    UPDATE [msSchedulerV3].[dbo].[tbl_CustomerSite]
+                                    SET CompanyID = @CompanyID + '-Dup'
+                                    WHERE CompanyID = @CompanyID AND Id IN ({inClause})", conn, trans))
+                                {
+                                    cmd.Parameters.AddWithValue("@CompanyID", companyid);
+                                    for (int i = 0; i < dupSiteIds.Count; i++)
+                                    {
+                                        cmd.Parameters.AddWithValue("@dupId" + i, dupSiteIds[i]);
+                                    }
+                                    cmd.ExecuteNonQuery();
+                                }
+                            }
+                            else
+                            {
+                                
+                            }
+
+                            trans.Commit();
+                            return $"Done! {dupSiteIds.Count} duplicate site(s) successfully merged into primary site.";
+                        }
+                        catch (Exception ex)
+                        {
+                            trans.Rollback();
+                            System.Diagnostics.Debug.WriteLine("MergeCustomerSites error: " + ex.Message);
+                            return "Error merging duplicate sites: " + ex.Message;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("MergeCustomerSites connection error: " + ex.Message);
+                return "Error connecting to database: " + ex.Message;
+            }
         }
 
 

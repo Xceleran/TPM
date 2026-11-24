@@ -1332,7 +1332,13 @@
                         <thead>
                             <tr>
                                 <th class="dup-pick">Primary</th>
-                                <th class="dup-pick">Duplicate</th>
+                                <th class="dup-pick">
+                                    <div>Duplicate</div>
+                                    <div style="display:flex;gap:3px;margin-top:4px;">
+                                        <button type="button" id="btn_SelectAllDupSites" title="Select all non-primary sites" style="flex:1;padding:2px 6px;font-size:11px;font-weight:600;cursor:pointer;background:#3b82f6;color:#fff;border:none;border-radius:3px;">All</button>
+                                        <button type="button" id="btn_DeselectAllDupSites" title="Deselect all" style="flex:1;padding:2px 6px;font-size:11px;font-weight:600;cursor:pointer;background:#6b7280;color:#fff;border:none;border-radius:3px;">None</button>
+                                    </div>
+                                </th>
                                 <th>Site Name</th>
                                 <th>Contact</th>
                                 <th>Address</th>
@@ -1583,6 +1589,6 @@
         </div>
     </div>
 
-      <script src="Scripts/customer.js?v=34"></script>
+      <script src="Scripts/customer.js?v=36"></script>
     <script src="Scripts/panel-resizer.js?v=1"></script>
 </asp:Content>
