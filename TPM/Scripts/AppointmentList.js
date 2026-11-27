@@ -641,7 +641,7 @@ function generateCustomerDetails(data) {
     $('#CustomerID').val(safe(data.CustomerID));
     $('#CustomerGuid').val(safe(data.CustomerGuid));
 
-    loadCustomerSiteData(data.CustomerID, data.Notes, data.ApptID, data.SchedulingCal, data.IsApproved, data.SiteID, data.ApptDateTime);
+    loadCustomerSiteData(data.CustomerID, data.Notes, data.ApptID, data.SchedulingCal, data.IsApproved, data.SiteID, data.ApptDateTime, data.AppoinmentUId);
 }
 
 // Notes arrive as plain text from the dispatch feed. Escape first, then give
@@ -649,13 +649,14 @@ function generateCustomerDetails(data) {
 // "*** ... ***" callouts, "-----LABEL-----" dividers and blank-line breaks.
 function formatNotes(notes) {
     // The feed usually opens with its own "Notes :" line, which the panel title already covers.
-    const text = String(notes ?? '').trim().replace(/^notes\s*:\s*(\r?\n|\r)+/i, '');
+    const text = String(notes ?? '').trim().replace(/^notes\s*:\s*(?:\r?\n|\r)*/i, '');
     if (!text) return '<p class="ad-empty">No notes for this appointment.</p>';
 
     const out = [];
     let list = null;
     let pairs = null;
     let loud = null;
+    let importantText = '';
 
     const flush = () => {
         if (list) { out.push(`<ul class="ad-notes-list">${list.join('')}</ul>`); list = null; }
@@ -663,6 +664,73 @@ function formatNotes(notes) {
         if (loud) { out.push(`<div class="ad-notes-important">${loud.join('')}</div>`); loud = null; }
     };
     const isLoud = (line) => line.length > 3 && line === line.toUpperCase() && /[A-Z]{3}/.test(line);
+
+    // Legal blocks ("As a reminder...", "IMPORTANT NOTICE...") are far too long
+    // for the narrow label column, so give them their own full-width section.
+    const addLongValue = (label, value) => {
+        flush();
+        out.push(`<h5 class="ad-notes-heading">${escapeHTML(label.trim())}</h5>`);
+        const steps = value.split(/(?:^|\s)(?=\d+\.\s)/).filter(s => s.trim());
+        if (steps.length > 1) {
+            out.push(`<ol class="ad-notes-steps">${steps.map(s => `<li>${escapeHTML(s.trim().replace(/^\d+\.\s*/, ''))}</li>`).join('')}</ol>`);
+        } else {
+            out.push(`<p class="ad-notes-line">${escapeHTML(value)}</p>`);
+        }
+    };
+
+    const addPair = (label, value) => {
+        value = String(value ?? '').trim().replace(/\s*<mailto:[^>]+>/gi, '');
+        label = String(label ?? '').trim();
+        if (/^email address$/i.test(label)) label = 'Email';
+        // Hold the legal notice until the end so it always lands at the bottom.
+        if (/^important notice$/i.test(label)) {
+            if (value) importantText = importantText ? importantText + ' ' + value : value;
+            return;
+        }
+        if (value.length > 180) { addLongValue(label, value); return; }
+        (pairs = pairs || []).push(`<dt>${escapeHTML(label)}</dt><dd>${value ? escapeHTML(value) : '<span class="ad-empty">Not provided</span>'}</dd>`);
+    };
+    // Service Bench writes "Label    value" columns instead of "Label: value",
+    // and often packs a second label into the same line ("... Fax: ...").
+    // Split both shapes into the same key/value pairs the AHS feed produces.
+    const addSpacedPairs = (label, value) => {
+        const parts = String(value ?? '').split(/(?:^|\s)([A-Z][A-Za-z0-9 #\/().'&-]{1,30}?)\s*:\s*/);
+        if (parts.length === 1) { addPair(label, parts[0]); return; }
+        if (parts[0].trim()) addPair(label, parts[0]);
+        for (let i = 1; i < parts.length; i += 2) addPair(parts[i], parts[i + 1] ?? '');
+    };
+
+    // The feed sometimes puts the whole work order on one line ("Problem Description:
+    // ... Customer Name : ... Complaint Code: ..."). Split only when several known
+    // field labels show up on that line; ordinary prose with a stray colon stays put.
+    const inlineLabels = [
+        'Problem Description', 'Customer Name', 'Location of Issue', 'Complaint Code',
+        'Product Category', 'Scheduled Service Date', 'Scheduled Time Slot',
+        'Special Instructions', 'SERVICE PROVIDER Name', 'Service Provider Name',
+        'Contractor Code', 'Alternate Phone', 'Authorization Number',
+        'Authorization Amount', 'Service Call Fee', 'Total Customer to Pay Contractor',
+        'MODEL Manufacturer', 'Model Number', 'Serial Number', 'Product Line',
+        'IMPORTANT NOTICE', 'Vendor #', 'Vendor', 'Email Address', 'Address',
+        'Phone', 'Brand', 'Fax Number', 'Fax', 'Email', 'As a reminder',
+        'Invoicing Instructions', 'Cost Breakdown', 'Total Invoice Amount',
+        'Customer Signature', 'Manufacturer', 'Dispatch ID', 'Priority'
+    ];
+    const inlineRe = new RegExp('(?:^|\\s)(' +
+        inlineLabels.slice().sort((a, b) => b.length - a.length)
+            .map(l => l.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') +
+        ')\\s*:', 'gi');
+    const splitInlinePairs = (line) => {
+        const parts = line.split(inlineRe);
+        if ((parts.length - 1) / 2 < 2) return false;
+        flush();
+        if (parts[0].trim()) out.push(`<p class="ad-notes-line">${escapeHTML(parts[0].trim())}</p>`);
+        for (let i = 1; i < parts.length; i += 2) {
+            // Empty fields (e.g. "Authorization Number: Authorization Amount: ...")
+            // still get their own row so the next label isn't swallowed as a value.
+            addPair(parts[i], parts[i + 1]);
+        }
+        return true;
+    };
 
     text.split(/\r?\n|\r/).forEach(raw => {
         const line = raw.trim();
@@ -691,6 +759,13 @@ function formatNotes(notes) {
             // All-caps warranty rules ("REMINDER: ...") read better together than as key/value pairs.
             if (list || pairs) flush();
             (loud = loud || []).push(`<div>${escapeHTML(line)}</div>`);
+        } else if (splitInlinePairs(line)) {
+            // Whole work order arrived on one line - already rendered as pairs.
+        } else if ((m = line.match(/^([A-Za-z][A-Za-z0-9 #\/().'&-]{0,34}?)\s{2,}([^\s].*)$/))) {
+            // Service Bench feed: label and value separated by column padding.
+            // Only accept a short, label-like left side so prose stays prose.
+            if (list || loud) flush();
+            addSpacedPairs(m[1], m[2]);
         } else if ((m = line.match(/^([A-Za-z][\w #\/().'&-]{0,40}?)\s*:\s*(.*)$/)) && !m[2].startsWith('//')) {
             if (list || loud) flush();
             if (!m[2]) {
@@ -703,7 +778,7 @@ function formatNotes(notes) {
                 // The feed leaves blank fields as a bare trailing label ("Effective Date : Expires :"),
                 // so drop that label rather than show it as the value.
                 const value = m[2].replace(/\s*[A-Za-z][\w ]{0,30}:\s*$/, '').trim();
-                (pairs = pairs || []).push(`<dt>${escapeHTML(m[1])}</dt><dd>${value ? escapeHTML(value) : '<span class="ad-empty">Not provided</span>'}</dd>`);
+                addPair(m[1], value);
             }
         } else {
             flush();
@@ -711,6 +786,9 @@ function formatNotes(notes) {
         }
     });
     flush();
+    if (importantText) {
+        out.push(`<div class="ad-notes-important-block"><div class="ad-notes-important-title"><i class="fas fa-exclamation-triangle"></i> IMPORTANT NOTICE</div><div>${escapeHTML(importantText)}</div></div>`);
+    }
 
     // Collapse runs of blank-line gaps and drop leading/trailing ones.
     return out.join('')
@@ -721,7 +799,7 @@ function formatNotes(notes) {
 // Bumped on every details load; lets a response tell whether it is still the latest.
 let siteLoadSeq = 0;
 
-function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApproved, SiteId, ApptDateTime) {
+function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApproved, SiteId, ApptDateTime, ApptUId) {
 
     if (!customerId) return;
     const seq = ++siteLoadSeq;
@@ -829,6 +907,10 @@ function loadCustomerSiteData(customerId, notes, ApptID, SchedulingCal, IsApprov
                                 ${isDefaultSite ? `<div class="ad-address-warn"><i class="fas fa-exclamation-triangle"></i> No site is linked to this appointment, so this is the customer's address, not the job site.</div>` : ''}
                             </section>
                             <div class="ad-toolbar">
+                                <div class="ad-field">
+                                    <span class="ad-field-label">Appointment ID:</span>
+                                    <span class="ad-field-static">${escapeHTML(ApptUId) || '-'}</span>
+                                </div>
                                 <label class="ad-field">
                                     <span class="ad-field-label">Appointment status</span>
                                     <select class="form-select form-select-sm appt-status-select" aria-label="Appointment status" data-appt-id="${escapeHTML(ApptID)}" data-customer-id="${escapeHTML(customerId)}" data-site-id="${escapeHTML(site.Id)}"><option value="0">Select</option><option ${IsApproved ? 'selected' : ''} value="Accept">Accept</option><option ${!IsApproved ? 'selected' : ''} value="Pending">New Appt</option></select>

@@ -1198,6 +1198,45 @@
             color: var(--ad-text);
         }
 
+        /* Legal notice is always last and visually set apart from the fields. */
+        .ad-notes-important-block {
+            margin: 12px 0 2px;
+            padding: 10px 12px;
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-left: 4px solid #ea580c;
+            border-radius: 6px;
+            color: #7c2d12;
+            font-size: 12.5px;
+            line-height: 1.5;
+        }
+
+            .ad-notes-important-title {
+                margin-bottom: 6px;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.6px;
+                text-transform: uppercase;
+            }
+
+        [data-theme="dark"] .ad-notes-important-block {
+            background: rgba(234, 88, 12, 0.12);
+            border-color: rgba(251, 146, 60, 0.4);
+            color: #fed7aa;
+        }
+
+        /* Numbered legal steps pulled out of a long note value. */
+        .ad-notes-steps {
+            margin: 6px 0 12px;
+            padding-left: 22px;
+            font-size: 12.5px;
+            line-height: 1.5;
+        }
+
+            .ad-notes-steps li {
+                margin-bottom: 6px;
+            }
+
         .ad-notes-list {
             margin: 8px 0 6px;
             padding: 0;
@@ -2063,6 +2102,6 @@
             if (e.key === 'Enter') e.preventDefault();
         });
     </script>
-    <script src="Scripts/AppointmentList.js?v=31"></script>
+    <script src="Scripts/AppointmentList.js?v=32"></script>
     <script src="Scripts/panel-resizer.js?v=1"></script>
 </asp:Content>

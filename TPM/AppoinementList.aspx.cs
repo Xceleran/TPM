@@ -263,6 +263,7 @@ namespace TPM
                         Notes = dataRow["Note"].ToString(),
                         SchedulingCal = dataRow["SchedulingCal"].ToString(),
                         ApptID = dataRow["ApptID"].ToString(),
+                        AppoinmentUId = dataRow.Table.Columns.Contains("AppoinmentUId") ? dataRow["AppoinmentUId"].ToString() : "",
                         IsApproved = Convert.ToBoolean(dataRow["IsApproved"]),
                         SiteID = dataRow["SiteID"].ToString(),
                         WarrentyCompanyID = dataRow["WarrentyCompanyID"].ToString(),

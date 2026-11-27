@@ -61,6 +61,7 @@ namespace FSM.Entity.Customer
         public string CreatedCompanyID { get; set; } = "";
         public string Apptstatus { get; set; } = "";
         public string ApptID { get; set; } = "";
+        public string AppoinmentUId { get; set; } = "";
         
         public string SiteName { get; set; }
         public string CustomerName { get; set; }
